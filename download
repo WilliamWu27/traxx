@@ -1,0 +1,1849 @@
+import React, { useState, useEffect } from 'react';
+import { Trophy, Target, Calendar, Plus, Trash2, Check, LogOut, Users, HelpCircle } from 'lucide-react';
+
+export default function AccountabilityTracker() {
+  const [currentUser, setCurrentUser] = useState(null);
+  const [view, setView] = useState('login'); // login, signup, dashboard
+  const [users, setUsers] = useState([]);
+  const [habits, setHabits] = useState([]);
+  const [completions, setCompletions] = useState([]);
+  const [loginForm, setLoginForm] = useState({ username: '', password: '' });
+  const [signupForm, setSignupForm] = useState({ username: '', password: '', confirmPassword: '' });
+  const [newHabit, setNewHabit] = useState({ name: '', points: 10, category: 'Mind', isRepeatable: false, maxCompletions: 1 });
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
+  const [showHelp, setShowHelp] = useState(false);
+  const [crystals, setCrystals] = useState([]);
+  const [habitBoardMode, setHabitBoardMode] = useState('shared'); // 'shared' or 'custom'
+  const [showCelebration, setShowCelebration] = useState(false);
+  const [celebrationMessage, setCelebrationMessage] = useState('');
+  const [showTutorial, setShowTutorial] = useState(false);
+  const [weeklyStakes, setWeeklyStakes] = useState(''); // What's at stake this week
+  const [showStakesModal, setShowStakesModal] = useState(false);
+  const [weeklyHistory, setWeeklyHistory] = useState([]); // Track past week winners
+  const [viewingCompetitor, setViewingCompetitor] = useState(null); // View another user's progress
+
+  // Crystal tracking
+  const getTodayCategoryScores = (userId) => {
+    return {
+      Mind: getCategoryPoints(userId, 'Mind'),
+      Body: getCategoryPoints(userId, 'Body'),
+      Spirit: getCategoryPoints(userId, 'Spirit')
+    };
+  };
+
+  const getTodayCategoryWinners = () => {
+    if (users.length < 2) return null;
+    
+    const categories = ['Mind', 'Body', 'Spirit'];
+    const winners = {};
+    
+    categories.forEach(category => {
+      let maxPoints = -1;
+      let winner = null;
+      let tie = false;
+      
+      users.forEach(user => {
+        const points = getCategoryPoints(user.id, category);
+        if (points > maxPoints) {
+          maxPoints = points;
+          winner = user;
+          tie = false;
+        } else if (points === maxPoints && points > 0) {
+          tie = true;
+          winner = null; // No winner on tie
+        }
+      });
+      
+      winners[category] = tie ? null : winner; // Changed from 'tie' to null
+    });
+    
+    return winners;
+  };
+
+  const getTodayCrystals = (userId) => {
+    const today = new Date().toISOString().split('T')[0];
+    const todayCrystals = crystals.filter(c => c.userId === userId && c.date === today);
+    return {
+      Mind: todayCrystals.some(c => c.category === 'Mind'),
+      Body: todayCrystals.some(c => c.category === 'Body'),
+      Spirit: todayCrystals.some(c => c.category === 'Spirit')
+    };
+  };
+
+  const getWeekCrystals = (userId) => {
+    const today = new Date();
+    const weekAgo = new Date(today);
+    weekAgo.setDate(weekAgo.getDate() - 7);
+    
+    const weekCrystals = crystals.filter(c => {
+      if (c.userId !== userId) return false;
+      const crystalDate = new Date(c.date);
+      return crystalDate >= weekAgo && crystalDate <= today;
+    });
+    
+    return weekCrystals.length;
+  };
+
+  const getAllTimeCrystals = (userId) => {
+    return crystals.filter(c => c.userId === userId).length;
+  };
+
+  const getWeeklyWins = (userId) => {
+    // Count how many weeks this user won
+    // Group crystals by week, count wins
+    const weeklyWins = {};
+    crystals.forEach(c => {
+      if (c.userId === userId) {
+        const weekKey = getWeekKey(new Date(c.date));
+        weeklyWins[weekKey] = (weeklyWins[weekKey] || 0) + 1;
+      }
+    });
+    
+    // Count how many weeks user had most crystals
+    let wins = 0;
+    Object.keys(weeklyWins).forEach(week => {
+      const otherUserCrystals = users
+        .filter(u => u.id !== userId)
+        .map(u => {
+          return crystals.filter(c => {
+            if (c.userId !== u.id) return false;
+            return getWeekKey(new Date(c.date)) === week;
+          }).length;
+        });
+      
+      const userCrystals = weeklyWins[week];
+      const maxOther = Math.max(...otherUserCrystals, 0);
+      if (userCrystals > maxOther) wins++;
+    });
+    
+    return wins;
+  };
+
+  const getCurrentWeekWinner = () => {
+    if (users.length < 2) return null;
+    
+    const leaderboard = users.map(user => ({
+      user,
+      crystals: getWeekCrystals(user.id),
+      shards: getWeekPoints(user.id)
+    })).sort((a, b) => {
+      if (b.crystals !== a.crystals) return b.crystals - a.crystals;
+      return b.shards - a.shards;
+    });
+    
+    // Check if there's a tie
+    if (leaderboard.length >= 2 && 
+        leaderboard[0].crystals === leaderboard[1].crystals &&
+        leaderboard[0].shards === leaderboard[1].shards) {
+      return null; // Tie
+    }
+    
+    return leaderboard[0].user;
+  };
+
+  const recordWeeklyWinner = () => {
+    const winner = getCurrentWeekWinner();
+    const weekKey = getWeekKey(new Date());
+    
+    // Check if this week is already recorded
+    if (weeklyHistory.some(w => w.weekKey === weekKey)) return;
+    
+    if (winner) {
+      const record = {
+        weekKey,
+        weekEnding: new Date().toISOString().split('T')[0],
+        winnerId: winner.id,
+        winnerName: winner.username,
+        stakes: weeklyStakes || 'No stakes set',
+        crystals: getWeekCrystals(winner.id)
+      };
+      
+      setWeeklyHistory([record, ...weeklyHistory]);
+    }
+  };
+
+  const getWeekKey = (date) => {
+    const year = date.getFullYear();
+    const week = getWeekNumber(date);
+    return `${year}-W${week}`;
+  };
+
+  const getWeekNumber = (date) => {
+    const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+    const dayNum = d.getUTCDay() || 7;
+    d.setUTCDate(d.getUTCDate() + 4 - dayNum);
+    const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+    return Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
+  };
+
+  const awardCrystals = () => {
+    const today = new Date().toISOString().split('T')[0];
+    
+    if (!habits.length || !users.length) return;
+    
+    const categoryWinners = getTodayCategoryWinners();
+    
+    // If only one user, no crystals to award
+    if (!categoryWinners) return;
+    
+    // Calculate what the new crystals should be
+    const newCrystals = [];
+    ['Mind', 'Body', 'Spirit'].forEach(category => {
+      const winner = categoryWinners[category];
+      if (winner && winner !== 'tie') {
+        newCrystals.push({
+          id: `${today}-${category}-${winner.id}`,
+          userId: winner.id,
+          category: category,
+          date: today
+        });
+      }
+    });
+    
+    // Check if crystals actually changed
+    const todaysCrystals = crystals.filter(c => c.date === today);
+    const crystalsChanged = JSON.stringify(todaysCrystals.sort((a, b) => a.id.localeCompare(b.id))) !== 
+                           JSON.stringify(newCrystals.sort((a, b) => a.id.localeCompare(b.id)));
+    
+    if (crystalsChanged) {
+      // Check if current user gained a new crystal
+      const myOldCrystals = todaysCrystals.filter(c => c.userId === currentUser?.id);
+      const myNewCrystals = newCrystals.filter(c => c.userId === currentUser?.id);
+      
+      if (currentUser && myNewCrystals.length > myOldCrystals.length) {
+        const newCrystal = myNewCrystals.find(nc => !myOldCrystals.some(oc => oc.category === nc.category));
+        if (newCrystal) {
+          const crystalEmoji = newCrystal.category === 'Mind' ? '🔵' : newCrystal.category === 'Body' ? '🔴' : '🟡';
+          setCelebrationMessage(`You won the ${newCrystal.category} Crystal! ${crystalEmoji}`);
+          setShowCelebration(true);
+          setTimeout(() => setShowCelebration(false), 3000);
+        }
+      }
+      
+      const filteredCrystals = crystals.filter(c => c.date !== today);
+      setCrystals([...filteredCrystals, ...newCrystals]);
+    }
+  };
+
+  // Load data from storage on mount
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  // Save data whenever it changes
+  useEffect(() => {
+    if (users.length > 0) saveData();
+  }, [users, habits, completions, crystals, habitBoardMode, weeklyStakes, weeklyHistory]);
+
+  // Award crystals when completions or habits change
+  useEffect(() => {
+    if (users.length > 0 && habits.length > 0) {
+      awardCrystals();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [completions, users, habits]);
+
+  const loadData = async () => {
+    try {
+      const [usersResult, habitsResult, completionsResult, crystalsResult, modeResult, stakesResult, historyResult] = await Promise.all([
+        window.storage.get('users', true),
+        window.storage.get('habits', true),
+        window.storage.get('completions', true),
+        window.storage.get('crystals', true),
+        window.storage.get('habitBoardMode', true),
+        window.storage.get('weeklyStakes', true),
+        window.storage.get('weeklyHistory', true)
+      ]);
+
+      if (usersResult) setUsers(JSON.parse(usersResult.value));
+      if (habitsResult) setHabits(JSON.parse(habitsResult.value));
+      if (completionsResult) setCompletions(JSON.parse(completionsResult.value));
+      if (crystalsResult) setCrystals(JSON.parse(crystalsResult.value));
+      if (modeResult) setHabitBoardMode(JSON.parse(modeResult.value));
+      if (stakesResult) setWeeklyStakes(JSON.parse(stakesResult.value));
+      if (historyResult) setWeeklyHistory(JSON.parse(historyResult.value));
+      
+      // Check if first time user
+      if (!usersResult || JSON.parse(usersResult.value).length === 0) {
+        setShowTutorial(true);
+      }
+    } catch (err) {
+      // Data doesn't exist yet, that's okay
+      console.log('No existing data, starting fresh');
+      setShowTutorial(true);
+    }
+  };
+
+  const saveData = async () => {
+    try {
+      await Promise.all([
+        window.storage.set('users', JSON.stringify(users), true),
+        window.storage.set('habits', JSON.stringify(habits), true),
+        window.storage.set('completions', JSON.stringify(completions), true),
+        window.storage.set('crystals', JSON.stringify(crystals), true),
+        window.storage.set('habitBoardMode', JSON.stringify(habitBoardMode), true),
+        window.storage.set('weeklyStakes', JSON.stringify(weeklyStakes), true),
+        window.storage.set('weeklyHistory', JSON.stringify(weeklyHistory), true)
+      ]);
+    } catch (err) {
+      console.error('Error saving data:', err);
+    }
+  };
+
+  const handleSignup = () => {
+    setError('');
+    setSuccess('');
+
+    if (!signupForm.username || !signupForm.password) {
+      setError('Please fill in all fields');
+      return;
+    }
+
+    if (signupForm.password !== signupForm.confirmPassword) {
+      setError('Passwords do not match');
+      return;
+    }
+
+    if (users.find(u => u.username === signupForm.username)) {
+      setError('Username already exists');
+      return;
+    }
+
+    const newUser = {
+      id: Date.now().toString(),
+      username: signupForm.username,
+      password: signupForm.password // In production, this would be hashed
+    };
+
+    setUsers([...users, newUser]);
+    setSuccess('Account created! Please log in.');
+    setSignupForm({ username: '', password: '', confirmPassword: '' });
+    setView('login');
+  };
+
+  const handleLogin = () => {
+    setError('');
+    const user = users.find(u => 
+      u.username === loginForm.username && u.password === loginForm.password
+    );
+
+    if (!user) {
+      setError('Invalid username or password');
+      return;
+    }
+
+    setCurrentUser(user);
+    setView('dashboard');
+    setLoginForm({ username: '', password: '' });
+  };
+
+  const handleLogout = () => {
+    setCurrentUser(null);
+    setView('login');
+  };
+
+  const addHabit = () => {
+    if (!newHabit.name) return;
+    
+    const habit = {
+      id: Date.now().toString(),
+      name: newHabit.name,
+      points: parseInt(newHabit.points) || 10,
+      category: newHabit.category,
+      isRepeatable: newHabit.isRepeatable,
+      maxCompletions: parseInt(newHabit.maxCompletions) || 1,
+      createdBy: currentUser.id,
+      approvedBy: habitBoardMode === 'shared' ? 'all' : [] // In custom mode, needs approval
+    };
+
+    setHabits([...habits, habit]);
+    setNewHabit({ name: '', points: 10, category: 'Mind', isRepeatable: false, maxCompletions: 1 });
+    
+    // If custom mode, notify that approval is needed
+    if (habitBoardMode === 'custom') {
+      setSuccess('Habit created! Waiting for approval from other users.');
+      setTimeout(() => setSuccess(''), 3000);
+    }
+  };
+
+  const addDefaultHabits = () => {
+    const defaultHabits = [
+      // Mind
+      { id: 'default-1', name: 'Study/homework (per hour)', points: 15, category: 'Mind', isRepeatable: true, maxCompletions: 10, createdBy: 'system', approvedBy: 'all' },
+      { id: 'default-2', name: 'Learn something new', points: 20, category: 'Mind', isRepeatable: false, maxCompletions: 1, createdBy: 'system', approvedBy: 'all' },
+      { id: 'default-3', name: 'Side project', points: 20, category: 'Mind', isRepeatable: false, maxCompletions: 1, createdBy: 'system', approvedBy: 'all' },
+      { id: 'default-4', name: 'Reading (per 30 mins)', points: 10, category: 'Mind', isRepeatable: true, maxCompletions: 10, createdBy: 'system', approvedBy: 'all' },
+      // Body
+      { id: 'default-5', name: 'Exercise (per 30 mins)', points: 10, category: 'Body', isRepeatable: true, maxCompletions: 10, createdBy: 'system', approvedBy: 'all' },
+      { id: 'default-6', name: 'Water (per glass)', points: 1, category: 'Body', isRepeatable: true, maxCompletions: 8, createdBy: 'system', approvedBy: 'all' },
+      { id: 'default-7', name: 'Eating healthy all day', points: 15, category: 'Body', isRepeatable: false, maxCompletions: 1, createdBy: 'system', approvedBy: 'all' },
+      { id: 'default-8', name: 'Sleeping well and early', points: 15, category: 'Body', isRepeatable: false, maxCompletions: 1, createdBy: 'system', approvedBy: 'all' },
+      { id: 'default-9', name: 'Stretching (5 mins)', points: 10, category: 'Body', isRepeatable: false, maxCompletions: 1, createdBy: 'system', approvedBy: 'all' },
+      // Spirit
+      { id: 'default-10', name: 'Meditation (per min)', points: 3, category: 'Spirit', isRepeatable: true, maxCompletions: 30, createdBy: 'system', approvedBy: 'all' },
+      { id: 'default-11', name: 'Journaling (per 5 mins)', points: 5, category: 'Spirit', isRepeatable: true, maxCompletions: 2, createdBy: 'system', approvedBy: 'all' },
+      { id: 'default-12', name: 'No social media', points: 15, category: 'Spirit', isRepeatable: false, maxCompletions: 1, createdBy: 'system', approvedBy: 'all' },
+      { id: 'default-13', name: 'No video games', points: 10, category: 'Spirit', isRepeatable: false, maxCompletions: 1, createdBy: 'system', approvedBy: 'all' }
+    ];
+    
+    setHabits(defaultHabits);
+  };
+
+  const deleteHabit = (habitId) => {
+    setHabits(habits.filter(h => h.id !== habitId));
+    setCompletions(completions.filter(c => c.habitId !== habitId));
+  };
+
+  const approveHabit = (habitId) => {
+    setHabits(habits.map(h => {
+      if (h.id === habitId) {
+        const approved = Array.isArray(h.approvedBy) ? [...h.approvedBy, currentUser.id] : [currentUser.id];
+        return { ...h, approvedBy: approved };
+      }
+      return h;
+    }));
+  };
+
+  const rejectHabit = (habitId) => {
+    setHabits(habits.filter(h => h.id !== habitId));
+  };
+
+  const getPendingApprovals = () => {
+    if (habitBoardMode === 'shared') return [];
+    return habits.filter(h => {
+      if (!h) return false;
+      if (h.approvedBy === 'all') return false;
+      if (!h.approvedBy || !h.createdBy) return false; // Skip old habits
+      if (h.createdBy === currentUser.id) return false; // Don't need to approve your own
+      if (!Array.isArray(h.approvedBy)) return false;
+      return !h.approvedBy.includes(currentUser.id);
+    });
+  };
+
+  const getMyHabits = () => {
+    if (habitBoardMode === 'shared') {
+      // In shared mode, everyone uses all approved habits
+      return habits.filter(h => {
+        if (!h) return false;
+        // If habit doesn't have approval system (old habit), include it
+        if (!h.hasOwnProperty('approvedBy')) return true;
+        return h.approvedBy === 'all';
+      });
+    } else {
+      // In custom mode, use habits you created or approved
+      return habits.filter(h => {
+        if (!h) return false;
+        // If habit doesn't have approval system (old habit), include it
+        if (!h.hasOwnProperty('approvedBy') || !h.hasOwnProperty('createdBy')) return true;
+        if (h.approvedBy === 'all') return true;
+        if (h.createdBy === currentUser.id) return true;
+        return Array.isArray(h.approvedBy) && h.approvedBy.includes(currentUser.id);
+      });
+    }
+  };
+
+  const isHabitApprovedForUser = (habit, userId) => {
+    if (!habit) return false;
+    if (habit.approvedBy === 'all') return true;
+    if (habit.createdBy === userId) return true;
+    if (!habit.approvedBy) return true; // Old habits without approval system
+    return Array.isArray(habit.approvedBy) && habit.approvedBy.includes(userId);
+  };
+
+  const toggleCompletion = (habitId) => {
+    const today = new Date().toISOString().split('T')[0];
+    const habit = habits.find(h => h.id === habitId);
+    if (!habit) return;
+
+    const existingCompletion = completions.find(
+      c => c.userId === currentUser.id && c.habitId === habitId && c.date === today
+    );
+
+    if (existingCompletion) {
+      if (habit.isRepeatable && existingCompletion.count < habit.maxCompletions) {
+        // Increment count
+        setCompletions(completions.map(c => 
+          c.id === existingCompletion.id 
+            ? { ...c, count: c.count + 1 }
+            : c
+        ));
+      } else {
+        // Remove completion (reset to 0)
+        setCompletions(completions.filter(c => c.id !== existingCompletion.id));
+      }
+    } else {
+      // Add new completion
+      const completion = {
+        id: Date.now().toString(),
+        userId: currentUser.id,
+        habitId: habitId,
+        date: today,
+        count: 1
+      };
+      setCompletions([...completions, completion]);
+    }
+  };
+
+  const getCompletionCount = (habitId) => {
+    const today = new Date().toISOString().split('T')[0];
+    const completion = completions.find(
+      c => c.userId === currentUser.id && c.habitId === habitId && c.date === today
+    );
+    return completion ? completion.count : 0;
+  };
+
+  const getTodayPoints = (userId) => {
+    const today = new Date().toISOString().split('T')[0];
+    const todayCompletions = completions.filter(c => {
+      if (c.userId !== userId || c.date !== today) return false;
+      const habit = habits.find(h => h.id === c.habitId);
+      return habit && isHabitApprovedForUser(habit, userId);
+    });
+    return todayCompletions.reduce((sum, c) => {
+      const habit = habits.find(h => h.id === c.habitId);
+      return sum + (habit?.points || 0) * (c.count || 1);
+    }, 0);
+  };
+
+  const getCategoryPoints = (userId, category, date = null) => {
+    const targetDate = date || new Date().toISOString().split('T')[0];
+    const categoryCompletions = completions.filter(c => {
+      if (c.userId !== userId || c.date !== targetDate) return false;
+      const habit = habits.find(h => h.id === c.habitId);
+      if (!habit || habit.category !== category) return false;
+      // Only count if habit is approved for this user
+      return isHabitApprovedForUser(habit, userId);
+    });
+    return categoryCompletions.reduce((sum, c) => {
+      const habit = habits.find(h => h.id === c.habitId);
+      return sum + (habit?.points || 0) * (c.count || 1);
+    }, 0);
+  };
+
+  const getDailyOverallWinner = () => {
+    if (users.length < 2) return null;
+    
+    const categoryWinners = getTodayCategoryWinners();
+    const userWins = {};
+    
+    users.forEach(user => {
+      userWins[user.id] = 0;
+    });
+    
+    // Count category wins for each user
+    Object.values(categoryWinners).forEach(winner => {
+      if (winner && winner !== 'tie') {
+        userWins[winner.id] = (userWins[winner.id] || 0) + 1;
+      }
+    });
+    
+    // Find user with most category wins
+    let maxWins = -1;
+    let overallWinner = null;
+    let tie = false;
+    
+    Object.entries(userWins).forEach(([userId, wins]) => {
+      if (wins > maxWins) {
+        maxWins = wins;
+        overallWinner = users.find(u => u.id === userId);
+        tie = false;
+      } else if (wins === maxWins && wins > 0) {
+        tie = true;
+      }
+    });
+    
+    // If tie in categories, use total points as tiebreaker
+    if (tie) {
+      let maxPoints = -1;
+      users.forEach(user => {
+        const points = getTodayPoints(user.id);
+        if (points > maxPoints) {
+          maxPoints = points;
+          overallWinner = user;
+        }
+      });
+    }
+    
+    return overallWinner;
+  };
+
+  const getWeekPoints = (userId) => {
+    const today = new Date();
+    const weekAgo = new Date(today);
+    weekAgo.setDate(weekAgo.getDate() - 7);
+    
+    const weekCompletions = completions.filter(c => {
+      if (c.userId !== userId) return false;
+      const completionDate = new Date(c.date);
+      return completionDate >= weekAgo && completionDate <= today;
+    });
+
+    return weekCompletions.reduce((sum, c) => {
+      const habit = habits.find(h => h.id === c.habitId);
+      return sum + (habit?.points || 0) * (c.count || 1);
+    }, 0);
+  };
+
+  const getDailyWinner = () => {
+    if (users.length === 0) return null;
+    return users.reduce((winner, user) => {
+      const userPoints = getTodayPoints(user.id);
+      const winnerPoints = getTodayPoints(winner.id);
+      return userPoints > winnerPoints ? user : winner;
+    });
+  };
+
+  const getWeeklyLeaderboard = () => {
+    return users
+      .map(user => ({
+        ...user,
+        crystals: getWeekCrystals(user.id),
+        shards: getWeekPoints(user.id)
+      }))
+      .sort((a, b) => {
+        // Sort by crystals first, then shards as tiebreaker
+        if (b.crystals !== a.crystals) return b.crystals - a.crystals;
+        return b.shards - a.shards;
+      });
+  };
+
+  // Login/Signup View
+  if (view === 'login' || view === 'signup') {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
+        <div className="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-md">
+          <div className="flex items-center justify-center mb-6">
+            <Trophy className="text-yellow-500 mr-2" size={32} />
+            <h1 className="text-3xl font-bold text-gray-800">Accountability Tracker</h1>
+          </div>
+
+          {error && (
+            <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded mb-4">
+              {error}
+            </div>
+          )}
+
+          {success && (
+            <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded mb-4">
+              {success}
+            </div>
+          )}
+
+          {view === 'login' ? (
+            <div>
+              <h2 className="text-xl font-semibold mb-4 text-gray-700">Log In</h2>
+              <input
+                type="text"
+                placeholder="Username"
+                value={loginForm.username}
+                onChange={(e) => setLoginForm({ ...loginForm, username: e.target.value })}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg mb-3 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                onKeyPress={(e) => e.key === 'Enter' && handleLogin()}
+              />
+              <input
+                type="password"
+                placeholder="Password"
+                value={loginForm.password}
+                onChange={(e) => setLoginForm({ ...loginForm, password: e.target.value })}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg mb-4 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                onKeyPress={(e) => e.key === 'Enter' && handleLogin()}
+              />
+              <button
+                onClick={handleLogin}
+                className="w-full bg-blue-600 text-white py-2 rounded-lg font-semibold hover:bg-blue-700 transition mb-3"
+              >
+                Log In
+              </button>
+              <button
+                onClick={() => { setView('signup'); setError(''); }}
+                className="w-full bg-gray-100 text-gray-700 py-2 rounded-lg font-semibold hover:bg-gray-200 transition"
+              >
+                Create New Account
+              </button>
+            </div>
+          ) : (
+            <div>
+              <h2 className="text-xl font-semibold mb-4 text-gray-700">Sign Up</h2>
+              <input
+                type="text"
+                placeholder="Username"
+                value={signupForm.username}
+                onChange={(e) => setSignupForm({ ...signupForm, username: e.target.value })}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg mb-3 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+              <input
+                type="password"
+                placeholder="Password"
+                value={signupForm.password}
+                onChange={(e) => setSignupForm({ ...signupForm, password: e.target.value })}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg mb-3 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+              <input
+                type="password"
+                placeholder="Confirm Password"
+                value={signupForm.confirmPassword}
+                onChange={(e) => setSignupForm({ ...signupForm, confirmPassword: e.target.value })}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg mb-4 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                onKeyPress={(e) => e.key === 'Enter' && handleSignup()}
+              />
+              <button
+                onClick={handleSignup}
+                className="w-full bg-green-600 text-white py-2 rounded-lg font-semibold hover:bg-green-700 transition mb-3"
+              >
+                Create Account
+              </button>
+              <button
+                onClick={() => { setView('login'); setError(''); setSuccess(''); }}
+                className="w-full bg-gray-100 text-gray-700 py-2 rounded-lg font-semibold hover:bg-gray-200 transition"
+              >
+                Back to Log In
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  // Dashboard View
+  const dailyWinner = getDailyOverallWinner();
+  const categoryWinners = getTodayCategoryWinners() || { Mind: null, Body: null, Spirit: null };
+  const weeklyLeaderboard = getWeeklyLeaderboard();
+  const myTodayPoints = getTodayPoints(currentUser.id);
+  const myWeekPoints = getWeekPoints(currentUser.id);
+  const myCategoryScores = getTodayCategoryScores(currentUser.id);
+  const myCrystals = getTodayCrystals(currentUser.id);
+  const myWeekCrystals = getWeekCrystals(currentUser.id);
+  const myAllTimeCrystals = getAllTimeCrystals(currentUser.id);
+  const myWeeklyWins = getWeeklyWins(currentUser.id);
+  const isPerfectDay = myCrystals.Mind && myCrystals.Body && myCrystals.Spirit;
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
+      <div className="max-w-6xl mx-auto">
+        {/* Header */}
+        <div className="bg-white rounded-2xl shadow-lg p-6 mb-6">
+          <div className="flex items-center justify-between flex-wrap gap-4">
+            <div className="flex items-center">
+              <Trophy className="text-yellow-500 mr-3" size={36} />
+              <div>
+                <h1 className="text-2xl font-bold text-gray-800">TRAX</h1>
+                <p className="text-gray-600">Welcome back, {currentUser.username}!</p>
+              </div>
+            </div>
+            <div className="flex gap-2 items-center flex-wrap">
+              {/* Habit Board Mode Selector */}
+              <div className="flex items-center gap-2 px-3 py-2 bg-gray-100 rounded-lg">
+                <span className="text-sm font-semibold text-gray-700">Board:</span>
+                <select
+                  value={habitBoardMode}
+                  onChange={(e) => setHabitBoardMode(e.target.value)}
+                  className="bg-white border border-gray-300 rounded px-2 py-1 text-sm font-medium"
+                >
+                  <option value="shared">Shared</option>
+                  <option value="custom">Custom</option>
+                </select>
+              </div>
+              
+              <button
+                onClick={() => setShowStakesModal(true)}
+                className="flex items-center px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition"
+              >
+                <Trophy size={18} className="mr-2" />
+                Stakes
+              </button>
+              
+              <button
+                onClick={() => setShowHelp(true)}
+                className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
+              >
+                <HelpCircle size={18} className="mr-2" />
+                Help
+              </button>
+              <button
+                onClick={addDefaultHabits}
+                className="flex items-center px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition"
+              >
+                <Plus size={18} className="mr-2" />
+                Load Defaults
+              </button>
+              <button
+                onClick={handleLogout}
+                className="flex items-center px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition"
+              >
+                <LogOut size={18} className="mr-2" />
+                Logout
+              </button>
+            </div>
+          </div>
+          
+          {/* Mode Explanation */}
+          {habitBoardMode === 'custom' && (
+            <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+              <p className="text-sm text-blue-800">
+                <strong>Custom Mode:</strong> Each person can create their own habits. Other users must approve your habits to ensure fairness.
+              </p>
+            </div>
+          )}
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Left Column - Habits */}
+          <div className="lg:col-span-2 space-y-6">
+            {/* Pending Approvals */}
+            {habitBoardMode === 'custom' && getPendingApprovals().length > 0 && (
+              <div className="bg-yellow-50 border-2 border-yellow-400 rounded-2xl shadow-lg p-6">
+                <h2 className="text-xl font-bold text-yellow-900 mb-4 flex items-center">
+                  ⚠️ Pending Approvals ({getPendingApprovals().length})
+                </h2>
+                <div className="space-y-3">
+                  {getPendingApprovals().map(habit => {
+                    const creator = users.find(u => u.id === habit.createdBy);
+                    return (
+                      <div key={habit.id} className="bg-white p-4 rounded-lg border-2 border-yellow-300">
+                        <div className="flex items-start justify-between">
+                          <div className="flex-1">
+                            <p className="font-bold text-gray-900">{habit.name}</p>
+                            <p className="text-sm text-gray-600">{habit.category} • {habit.points} shards</p>
+                            <p className="text-xs text-gray-500 mt-1">
+                              Created by: {creator?.username || 'Unknown'}
+                              {habit.isRepeatable && ` • Repeatable (max: ${habit.maxCompletions})`}
+                            </p>
+                          </div>
+                          <div className="flex gap-2 ml-4">
+                            <button
+                              onClick={() => approveHabit(habit.id)}
+                              className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition text-sm font-semibold"
+                            >
+                              ✓ Approve
+                            </button>
+                            <button
+                              onClick={() => rejectHabit(habit.id)}
+                              className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition text-sm font-semibold"
+                            >
+                              ✗ Reject
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+                <p className="text-sm text-yellow-800 mt-4">
+                  💡 Review these habits to ensure fair competition. Approve habits that seem reasonable, reject ones that seem unfair.
+                </p>
+              </div>
+            )}
+
+            {/* Add Habit */}
+            <div className="bg-white rounded-2xl shadow-lg p-6">
+              <h2 className="text-xl font-bold text-gray-800 mb-4 flex items-center">
+                <Plus className="mr-2" size={24} />
+                Add New Habit
+              </h2>
+              <div className="space-y-4">
+                {/* Habit Name */}
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    Habit Name
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g., Go to gym, Read a book"
+                    value={newHabit.name}
+                    onChange={(e) => setNewHabit({ ...newHabit, name: e.target.value })}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    onKeyPress={(e) => e.key === 'Enter' && !newHabit.isRepeatable && addHabit()}
+                  />
+                </div>
+
+                {/* Category and Shards */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">
+                      Category
+                    </label>
+                    <select
+                      value={newHabit.category}
+                      onChange={(e) => setNewHabit({ ...newHabit, category: e.target.value })}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    >
+                      <option value="Mind">🧠 Mind</option>
+                      <option value="Body">💪 Body</option>
+                      <option value="Spirit">✨ Spirit</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">
+                      Shards
+                    </label>
+                    <input
+                      type="number"
+                      placeholder="10"
+                      value={newHabit.points}
+                      onChange={(e) => setNewHabit({ ...newHabit, points: e.target.value })}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                </div>
+
+                {/* Repeatable Toggle */}
+                <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
+                  <label className="flex items-center cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={newHabit.isRepeatable}
+                      onChange={(e) => setNewHabit({ 
+                        ...newHabit, 
+                        isRepeatable: e.target.checked,
+                        maxCompletions: e.target.checked ? 5 : 1 
+                      })}
+                      className="w-5 h-5 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                    />
+                    <span className="ml-3">
+                      <span className="font-semibold text-gray-900">Repeatable Habit</span>
+                      <span className="block text-sm text-gray-600">Can be completed multiple times per day</span>
+                    </span>
+                  </label>
+
+                  {/* Max Completions (only show if repeatable) */}
+                  {newHabit.isRepeatable && (
+                    <div className="mt-3 pl-8">
+                      <label className="block text-sm font-semibold text-gray-700 mb-2">
+                        Daily Limit
+                      </label>
+                      <div className="flex items-center gap-3">
+                        <input
+                          type="number"
+                          min="1"
+                          max="100"
+                          value={newHabit.maxCompletions}
+                          onChange={(e) => setNewHabit({ ...newHabit, maxCompletions: e.target.value })}
+                          className="w-24 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        />
+                        <span className="text-sm text-gray-600">
+                          times per day (e.g., drink 8 glasses of water)
+                        </span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Preview */}
+                {newHabit.name && (
+                  <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
+                    <p className="text-sm font-semibold text-blue-900 mb-1">Preview:</p>
+                    <p className="text-gray-800">
+                      <strong>{newHabit.name}</strong> • {newHabit.category} • {newHabit.points} shards
+                      {newHabit.isRepeatable && ` • Repeatable (max: ${newHabit.maxCompletions}x)`}
+                    </p>
+                  </div>
+                )}
+
+                {/* Add Button */}
+                <button
+                  onClick={addHabit}
+                  disabled={!newHabit.name}
+                  className={`w-full py-3 rounded-lg font-semibold transition ${
+                    newHabit.name
+                      ? 'bg-blue-600 text-white hover:bg-blue-700'
+                      : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                  }`}
+                >
+                  Add Habit
+                </button>
+              </div>
+            </div>
+
+            {/* Today's Habits */}
+            <div className="bg-white rounded-2xl shadow-lg p-6">
+              <h2 className="text-xl font-bold text-gray-800 mb-4 flex items-center">
+                <Target className="mr-2" size={24} />
+                Today's Habits
+              </h2>
+              {habits.length === 0 ? (
+                <div className="text-center py-8">
+                  <p className="text-gray-500 mb-4">No habits yet. Get started by loading defaults or creating your own!</p>
+                  <button
+                    onClick={addDefaultHabits}
+                    className="px-6 py-3 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition"
+                  >
+                    Load Default Habits
+                  </button>
+                  <p className="text-sm text-gray-400 mt-3">or create custom habits above</p>
+                </div>
+              ) : (
+                <div className="space-y-6">
+                  {/* Mind Category */}
+                  {getMyHabits().filter(h => h.category === 'Mind').length > 0 && (
+                    <div>
+                      <h3 className="text-lg font-semibold text-gray-700 mb-3 flex items-center">
+                        🧠 Mind
+                      </h3>
+                      <div className="space-y-2">
+                        {getMyHabits().filter(h => h.category === 'Mind').map(habit => {
+                          const count = getCompletionCount(habit.id);
+                          const isCompleted = count > 0;
+                          const isMaxed = habit.isRepeatable && count >= (habit.maxCompletions || 1);
+                          
+                          return (
+                            <div
+                              key={habit.id}
+                              className={`flex items-center justify-between p-4 rounded-lg border-2 transition ${
+                                isCompleted
+                                  ? 'bg-green-50 border-green-400'
+                                  : 'bg-gray-50 border-gray-200'
+                              }`}
+                            >
+                              <div className="flex items-center flex-1">
+                                <div className="flex items-center gap-2 mr-3">
+                                  <button
+                                    onClick={() => {
+                                      if (isCompleted) {
+                                        const today = new Date().toISOString().split('T')[0];
+                                        const completion = completions.find(c => 
+                                          c.userId === currentUser.id && c.habitId === habit.id && c.date === today
+                                        );
+                                        if (completion && completion.count > 1) {
+                                          setCompletions(completions.map(c => 
+                                            c.id === completion.id ? { ...c, count: c.count - 1 } : c
+                                          ));
+                                        } else {
+                                          setCompletions(completions.filter(c => c.id !== completion.id));
+                                        }
+                                      }
+                                    }}
+                                    className={`w-12 h-12 rounded-full border-2 flex items-center justify-center transition font-bold text-xl ${
+                                      isCompleted
+                                        ? 'bg-red-500 border-red-500 text-white hover:bg-red-600'
+                                        : 'border-gray-300 text-gray-400 cursor-not-allowed'
+                                    }`}
+                                    disabled={!isCompleted}
+                                  >
+                                    −
+                                  </button>
+                                  <button
+                                    onClick={() => toggleCompletion(habit.id)}
+                                    className={`w-12 h-12 rounded-full border-2 flex items-center justify-center transition font-bold text-xl ${
+                                      isCompleted
+                                        ? isMaxed
+                                          ? 'bg-green-600 border-green-600 text-white'
+                                          : 'bg-green-500 border-green-500 text-white'
+                                        : 'border-gray-300 hover:border-blue-500 text-gray-400'
+                                    }`}
+                                  >
+                                    {isCompleted ? count : '+'}
+                                  </button>
+                                </div>
+                                <div>
+                                  <p className={`font-semibold ${isCompleted ? 'text-green-800' : 'text-gray-800'}`}>
+                                    {habit.name}
+                                  </p>
+                                  <p className="text-sm text-gray-600">
+                                    {habit.points || 0} shards {habit.isRepeatable && count > 0 && `× ${count}`}
+                                    {habit.isRepeatable && ` (max: ${habit.maxCompletions || 1})`}
+                                  </p>
+                                </div>
+                              </div>
+                              <button
+                                onClick={() => deleteHabit(habit.id)}
+                                className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition"
+                              >
+                                <Trash2 size={18} />
+                              </button>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+                  
+                  {/* Body Category */}
+                  {getMyHabits().filter(h => h.category === 'Body').length > 0 && (
+                    <div>
+                      <h3 className="text-lg font-semibold text-gray-700 mb-3 flex items-center">
+                        💪 Body
+                      </h3>
+                      <div className="space-y-2">
+                        {getMyHabits().filter(h => h.category === 'Body').map(habit => {
+                          const count = getCompletionCount(habit.id);
+                          const isCompleted = count > 0;
+                          const isMaxed = habit.isRepeatable && count >= (habit.maxCompletions || 1);
+                          
+                          return (
+                            <div
+                              key={habit.id}
+                              className={`flex items-center justify-between p-4 rounded-lg border-2 transition ${
+                                isCompleted
+                                  ? 'bg-green-50 border-green-400'
+                                  : 'bg-gray-50 border-gray-200'
+                              }`}
+                            >
+                              <div className="flex items-center flex-1">
+                                <div className="flex items-center gap-2 mr-3">
+                                  <button
+                                    onClick={() => {
+                                      if (isCompleted) {
+                                        const today = new Date().toISOString().split('T')[0];
+                                        const completion = completions.find(c => 
+                                          c.userId === currentUser.id && c.habitId === habit.id && c.date === today
+                                        );
+                                        if (completion && completion.count > 1) {
+                                          setCompletions(completions.map(c => 
+                                            c.id === completion.id ? { ...c, count: c.count - 1 } : c
+                                          ));
+                                        } else {
+                                          setCompletions(completions.filter(c => c.id !== completion.id));
+                                        }
+                                      }
+                                    }}
+                                    className={`w-12 h-12 rounded-full border-2 flex items-center justify-center transition font-bold text-xl ${
+                                      isCompleted
+                                        ? 'bg-red-500 border-red-500 text-white hover:bg-red-600'
+                                        : 'border-gray-300 text-gray-400 cursor-not-allowed'
+                                    }`}
+                                    disabled={!isCompleted}
+                                  >
+                                    −
+                                  </button>
+                                  <button
+                                    onClick={() => toggleCompletion(habit.id)}
+                                    className={`w-12 h-12 rounded-full border-2 flex items-center justify-center transition font-bold text-xl ${
+                                      isCompleted
+                                        ? isMaxed
+                                          ? 'bg-green-600 border-green-600 text-white'
+                                          : 'bg-green-500 border-green-500 text-white'
+                                        : 'border-gray-300 hover:border-blue-500 text-gray-400'
+                                    }`}
+                                  >
+                                    {isCompleted ? count : '+'}
+                                  </button>
+                                </div>
+                                <div>
+                                  <p className={`font-semibold ${isCompleted ? 'text-green-800' : 'text-gray-800'}`}>
+                                    {habit.name}
+                                  </p>
+                                  <p className="text-sm text-gray-600">
+                                    {habit.points || 0} shards {habit.isRepeatable && count > 0 && `× ${count}`}
+                                    {habit.isRepeatable && ` (max: ${habit.maxCompletions || 1})`}
+                                  </p>
+                                </div>
+                              </div>
+                              <button
+                                onClick={() => deleteHabit(habit.id)}
+                                className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition"
+                              >
+                                <Trash2 size={18} />
+                              </button>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+                  
+                  {/* Spirit Category */}
+                  {getMyHabits().filter(h => h.category === 'Spirit').length > 0 && (
+                    <div>
+                      <h3 className="text-lg font-semibold text-gray-700 mb-3 flex items-center">
+                        ✨ Spirit
+                      </h3>
+                      <div className="space-y-2">
+                        {getMyHabits().filter(h => h.category === 'Spirit').map(habit => {
+                          const count = getCompletionCount(habit.id);
+                          const isCompleted = count > 0;
+                          const isMaxed = habit.isRepeatable && count >= (habit.maxCompletions || 1);
+                          
+                          return (
+                            <div
+                              key={habit.id}
+                              className={`flex items-center justify-between p-4 rounded-lg border-2 transition ${
+                                isCompleted
+                                  ? 'bg-green-50 border-green-400'
+                                  : 'bg-gray-50 border-gray-200'
+                              }`}
+                            >
+                              <div className="flex items-center flex-1">
+                                <div className="flex items-center gap-2 mr-3">
+                                  <button
+                                    onClick={() => {
+                                      if (isCompleted) {
+                                        const today = new Date().toISOString().split('T')[0];
+                                        const completion = completions.find(c => 
+                                          c.userId === currentUser.id && c.habitId === habit.id && c.date === today
+                                        );
+                                        if (completion && completion.count > 1) {
+                                          setCompletions(completions.map(c => 
+                                            c.id === completion.id ? { ...c, count: c.count - 1 } : c
+                                          ));
+                                        } else {
+                                          setCompletions(completions.filter(c => c.id !== completion.id));
+                                        }
+                                      }
+                                    }}
+                                    className={`w-12 h-12 rounded-full border-2 flex items-center justify-center transition font-bold text-xl ${
+                                      isCompleted
+                                        ? 'bg-red-500 border-red-500 text-white hover:bg-red-600'
+                                        : 'border-gray-300 text-gray-400 cursor-not-allowed'
+                                    }`}
+                                    disabled={!isCompleted}
+                                  >
+                                    −
+                                  </button>
+                                  <button
+                                    onClick={() => toggleCompletion(habit.id)}
+                                    className={`w-12 h-12 rounded-full border-2 flex items-center justify-center transition font-bold text-xl ${
+                                      isCompleted
+                                        ? isMaxed
+                                          ? 'bg-green-600 border-green-600 text-white'
+                                          : 'bg-green-500 border-green-500 text-white'
+                                        : 'border-gray-300 hover:border-blue-500 text-gray-400'
+                                    }`}
+                                  >
+                                    {isCompleted ? count : '+'}
+                                  </button>
+                                </div>
+                                <div>
+                                  <p className={`font-semibold ${isCompleted ? 'text-green-800' : 'text-gray-800'}`}>
+                                    {habit.name}
+                                  </p>
+                                  <p className="text-sm text-gray-600">
+                                    {habit.points || 0} shards {habit.isRepeatable && count > 0 && `× ${count}`}
+                                    {habit.isRepeatable && ` (max: ${habit.maxCompletions || 1})`}
+                                  </p>
+                                </div>
+                              </div>
+                              <button
+                                onClick={() => deleteHabit(habit.id)}
+                                className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition"
+                              >
+                                <Trash2 size={18} />
+                              </button>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Right Column - Leaderboard */}
+          <div className="space-y-6">
+            {/* My Crystals Today */}
+            <div className="bg-gradient-to-br from-purple-600 to-indigo-600 rounded-2xl shadow-lg p-6 text-white">
+              <h2 className="text-lg font-semibold mb-4 flex items-center">
+                <Trophy className="mr-2" size={20} />
+                Today's Crystals
+              </h2>
+              <div className="space-y-3">
+                <div className={`flex items-center justify-between p-3 rounded-lg ${myCrystals.Mind ? 'bg-white bg-opacity-20' : 'bg-black bg-opacity-20'}`}>
+                  <div className="flex items-center">
+                    <span className="text-2xl mr-2">🔵</span>
+                    <div>
+                      <p className="font-semibold">Mind Crystal</p>
+                      <p className="text-sm opacity-90">{myCategoryScores.Mind} shards</p>
+                    </div>
+                  </div>
+                  {myCrystals.Mind && <Check className="text-green-300" size={24} />}
+                </div>
+                <div className={`flex items-center justify-between p-3 rounded-lg ${myCrystals.Body ? 'bg-white bg-opacity-20' : 'bg-black bg-opacity-20'}`}>
+                  <div className="flex items-center">
+                    <span className="text-2xl mr-2">🔴</span>
+                    <div>
+                      <p className="font-semibold">Body Crystal</p>
+                      <p className="text-sm opacity-90">{myCategoryScores.Body} shards</p>
+                    </div>
+                  </div>
+                  {myCrystals.Body && <Check className="text-green-300" size={24} />}
+                </div>
+                <div className={`flex items-center justify-between p-3 rounded-lg ${myCrystals.Spirit ? 'bg-white bg-opacity-20' : 'bg-black bg-opacity-20'}`}>
+                  <div className="flex items-center">
+                    <span className="text-2xl mr-2">🟡</span>
+                    <div>
+                      <p className="font-semibold">Spirit Crystal</p>
+                      <p className="text-sm opacity-90">{myCategoryScores.Spirit} shards</p>
+                    </div>
+                  </div>
+                  {myCrystals.Spirit && <Check className="text-green-300" size={24} />}
+                </div>
+              </div>
+              {isPerfectDay && (
+                <div className="mt-4 bg-gradient-to-r from-yellow-400 to-orange-400 text-gray-900 p-3 rounded-lg text-center font-bold">
+                  ✨ PERFECT DAY! ✨
+                </div>
+              )}
+            </div>
+
+            {/* Weekly Crystal Count */}
+            <div className="bg-gradient-to-br from-yellow-400 to-orange-400 rounded-2xl shadow-lg p-6 text-gray-900">
+              <h2 className="text-lg font-semibold mb-4">
+                Crystal Collection
+              </h2>
+              <div className="space-y-4">
+                <div className="bg-white bg-opacity-30 rounded-lg p-4">
+                  <p className="text-sm font-semibold mb-1">This Week</p>
+                  <p className="text-5xl font-bold">{myWeekCrystals} 💎</p>
+                </div>
+                <div className="bg-white bg-opacity-20 rounded-lg p-3">
+                  <p className="text-xs font-semibold mb-1">All-Time</p>
+                  <p className="text-2xl font-bold">{myAllTimeCrystals} 💎</p>
+                </div>
+                <div className="bg-white bg-opacity-20 rounded-lg p-3">
+                  <p className="text-xs font-semibold mb-1">Weekly Wins</p>
+                  <p className="text-2xl font-bold">🏆 {myWeeklyWins}</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Category Crystal Awards */}
+            {categoryWinners && users.length > 1 && (
+              <div className="bg-white rounded-2xl shadow-lg p-6">
+                <h2 className="text-lg font-semibold mb-4 text-gray-800">Today's Crystal Awards</h2>
+                <div className="space-y-3">
+                  <div className={`flex items-center justify-between p-3 rounded-lg ${categoryWinners.Mind ? 'bg-blue-50' : 'bg-gray-100'}`}>
+                    <div className="flex items-center">
+                      <span className="text-2xl mr-2">🔵</span>
+                      <span className="font-semibold text-gray-700">Mind Crystal</span>
+                    </div>
+                    <span className={`font-bold ${categoryWinners.Mind ? 'text-blue-700' : 'text-gray-500'}`}>
+                      {categoryWinners.Mind ? categoryWinners.Mind.username : 'TIE - No Winner'}
+                    </span>
+                  </div>
+                  <div className={`flex items-center justify-between p-3 rounded-lg ${categoryWinners.Body ? 'bg-red-50' : 'bg-gray-100'}`}>
+                    <div className="flex items-center">
+                      <span className="text-2xl mr-2">🔴</span>
+                      <span className="font-semibold text-gray-700">Body Crystal</span>
+                    </div>
+                    <span className={`font-bold ${categoryWinners.Body ? 'text-red-700' : 'text-gray-500'}`}>
+                      {categoryWinners.Body ? categoryWinners.Body.username : 'TIE - No Winner'}
+                    </span>
+                  </div>
+                  <div className={`flex items-center justify-between p-3 rounded-lg ${categoryWinners.Spirit ? 'bg-yellow-50' : 'bg-gray-100'}`}>
+                    <div className="flex items-center">
+                      <span className="text-2xl mr-2">🟡</span>
+                      <span className="font-semibold text-gray-700">Spirit Crystal</span>
+                    </div>
+                    <span className={`font-bold ${categoryWinners.Spirit ? 'text-amber-700' : 'text-gray-500'}`}>
+                      {categoryWinners.Spirit ? categoryWinners.Spirit.username : 'TIE - No Winner'}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Today's Winner */}
+            {dailyWinner && users.length > 1 && (
+              <div className="bg-gradient-to-br from-yellow-400 to-orange-400 rounded-2xl shadow-lg p-6 text-white">
+                <h2 className="text-lg font-semibold mb-2 flex items-center">
+                  <Trophy className="mr-2" size={20} />
+                  Today's Champion
+                </h2>
+                <p className="text-2xl font-bold mb-1">{dailyWinner.username}</p>
+                <p className="text-sm text-yellow-100">Most crystals won!</p>
+              </div>
+            )}
+
+            {/* Weekly Leaderboard */}
+            <div className="bg-white rounded-2xl shadow-lg p-6">
+              <h2 className="text-xl font-bold text-gray-800 mb-4 flex items-center">
+                <Users className="mr-2" size={24} />
+                Weekly Leaderboard
+              </h2>
+              {users.length === 0 ? (
+                <p className="text-gray-500 text-center py-4">No users yet</p>
+              ) : (
+                <div className="space-y-3">
+                  {weeklyLeaderboard.map((user, index) => (
+                    <div
+                      key={user.id}
+                      onClick={() => setViewingCompetitor(user)}
+                      className={`flex items-center justify-between p-3 rounded-lg cursor-pointer transition hover:shadow-md ${
+                        user.id === currentUser.id
+                          ? 'bg-blue-50 border-2 border-blue-400'
+                          : 'bg-gray-50 hover:bg-gray-100'
+                      }`}
+                    >
+                      <div className="flex items-center">
+                        <div
+                          className={`w-10 h-10 rounded-full flex items-center justify-center font-bold mr-3 ${
+                            index === 0
+                              ? 'bg-yellow-400 text-yellow-900'
+                              : index === 1
+                              ? 'bg-gray-300 text-gray-700'
+                              : index === 2
+                              ? 'bg-orange-400 text-orange-900'
+                              : 'bg-gray-200 text-gray-600'
+                          }`}
+                        >
+                          {index + 1}
+                        </div>
+                        <div>
+                          <p className="font-semibold text-gray-800">{user.username}</p>
+                          <p className="text-xs text-gray-500">Click to view details</p>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <p className="font-bold text-blue-600 text-lg">{user.crystals} 💎</p>
+                        <p className="text-xs text-gray-500">{user.shards} shards</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Competitor Details Modal */}
+        {viewingCompetitor && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+            <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+              <div className="p-6">
+                <div className="flex items-center justify-between mb-6">
+                  <div>
+                    <h2 className="text-2xl font-bold text-gray-800">{viewingCompetitor.username}</h2>
+                    <p className="text-gray-600">Competitor Stats</p>
+                  </div>
+                  <button
+                    onClick={() => setViewingCompetitor(null)}
+                    className="text-gray-500 hover:text-gray-700 text-2xl"
+                  >
+                    ×
+                  </button>
+                </div>
+
+                {/* Today's Stats */}
+                <div className="grid grid-cols-2 gap-4 mb-6">
+                  <div className="bg-blue-50 p-4 rounded-lg">
+                    <p className="text-sm text-blue-800 font-semibold">Today's Shards</p>
+                    <p className="text-3xl font-bold text-blue-900">{getTodayPoints(viewingCompetitor.id)}</p>
+                  </div>
+                  <div className="bg-purple-50 p-4 rounded-lg">
+                    <p className="text-sm text-purple-800 font-semibold">This Week's Crystals</p>
+                    <p className="text-3xl font-bold text-purple-900">{getWeekCrystals(viewingCompetitor.id)} 💎</p>
+                  </div>
+                </div>
+
+                {/* Today's Crystals */}
+                <div className="bg-gradient-to-r from-blue-500 to-purple-600 rounded-xl p-6 mb-6 text-white">
+                  <h3 className="text-lg font-bold mb-3">Today's Crystals</h3>
+                  <div className="flex gap-4 justify-center">
+                    {(() => {
+                      const crystalsToday = getTodayCrystals(viewingCompetitor.id);
+                      return (
+                        <>
+                          <div className={`text-center ${crystalsToday.Mind ? 'opacity-100' : 'opacity-30'}`}>
+                            <div className="text-4xl mb-1">🔵</div>
+                            <p className="text-sm">Mind</p>
+                            {crystalsToday.Mind && <p className="text-xs">✓ Won</p>}
+                          </div>
+                          <div className={`text-center ${crystalsToday.Body ? 'opacity-100' : 'opacity-30'}`}>
+                            <div className="text-4xl mb-1">🔴</div>
+                            <p className="text-sm">Body</p>
+                            {crystalsToday.Body && <p className="text-xs">✓ Won</p>}
+                          </div>
+                          <div className={`text-center ${crystalsToday.Spirit ? 'opacity-100' : 'opacity-30'}`}>
+                            <div className="text-4xl mb-1">🟡</div>
+                            <p className="text-sm">Spirit</p>
+                            {crystalsToday.Spirit && <p className="text-xs">✓ Won</p>}
+                          </div>
+                        </>
+                      );
+                    })()}
+                  </div>
+                </div>
+
+                {/* Category Breakdown */}
+                <div className="bg-gray-50 rounded-xl p-6 mb-6">
+                  <h3 className="text-lg font-bold text-gray-800 mb-4">Today's Category Points</h3>
+                  <div className="space-y-3">
+                    {(() => {
+                      const categoryScores = getTodayCategoryScores(viewingCompetitor.id);
+                      return (
+                        <>
+                          <div className="flex items-center justify-between p-3 bg-blue-50 rounded-lg">
+                            <span className="font-semibold text-gray-800">🧠 Mind</span>
+                            <span className="font-bold text-blue-700">{categoryScores.Mind} shards</span>
+                          </div>
+                          <div className="flex items-center justify-between p-3 bg-red-50 rounded-lg">
+                            <span className="font-semibold text-gray-800">💪 Body</span>
+                            <span className="font-bold text-red-700">{categoryScores.Body} shards</span>
+                          </div>
+                          <div className="flex items-center justify-between p-3 bg-yellow-50 rounded-lg">
+                            <span className="font-semibold text-gray-800">✨ Spirit</span>
+                            <span className="font-bold text-amber-700">{categoryScores.Spirit} shards</span>
+                          </div>
+                        </>
+                      );
+                    })()}
+                  </div>
+                </div>
+
+                {/* All-Time Stats */}
+                <div className="bg-gradient-to-r from-yellow-400 to-orange-400 rounded-xl p-6 text-gray-900">
+                  <h3 className="text-lg font-bold mb-3">All-Time Stats</h3>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <p className="text-sm font-semibold opacity-80">Total Crystals</p>
+                      <p className="text-2xl font-bold">{getAllTimeCrystals(viewingCompetitor.id)} 💎</p>
+                    </div>
+                    <div>
+                      <p className="text-sm font-semibold opacity-80">Weekly Wins</p>
+                      <p className="text-2xl font-bold">🏆 {getWeeklyWins(viewingCompetitor.id)}</p>
+                    </div>
+                  </div>
+                </div>
+
+                <button
+                  onClick={() => setViewingCompetitor(null)}
+                  className="mt-6 w-full bg-gray-200 text-gray-700 py-3 rounded-lg font-semibold hover:bg-gray-300 transition"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Celebration Popup */}
+        {showCelebration && (
+          <div className="fixed inset-0 flex items-center justify-center z-50 pointer-events-none">
+            <div className="bg-gradient-to-r from-yellow-400 to-orange-500 text-white px-8 py-6 rounded-2xl shadow-2xl animate-bounce">
+              <p className="text-2xl font-bold text-center">{celebrationMessage}</p>
+            </div>
+          </div>
+        )}
+
+        {/* Tutorial Modal */}
+        {showTutorial && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+            <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full p-8">
+              <h2 className="text-3xl font-bold text-gray-800 mb-6 text-center">
+                Welcome to TRAX! 🎯
+              </h2>
+              
+              <div className="space-y-6">
+                <div className="bg-blue-50 p-6 rounded-xl">
+                  <h3 className="text-xl font-bold text-blue-900 mb-3">How It Works</h3>
+                  <ol className="space-y-2 text-gray-700">
+                    <li><strong>1.</strong> Complete habits to earn <strong>shards</strong> in three categories: Mind 🧠, Body 💪, and Spirit ✨</li>
+                    <li><strong>2.</strong> Win a <strong>crystal 💎</strong> by having the most shards in a category each day</li>
+                    <li><strong>3.</strong> Collect the most crystals this week to be the <strong>champion!</strong></li>
+                  </ol>
+                </div>
+
+                <div className="bg-purple-50 p-6 rounded-xl">
+                  <h3 className="text-xl font-bold text-purple-900 mb-3">Competing</h3>
+                  <p className="text-gray-700">
+                    Invite friends to create accounts and compete! The person with the most crystals at the end of each week wins. 
+                    Decide your own stakes - loser buys coffee, winner picks the movie, or whatever you agree on!
+                  </p>
+                </div>
+
+                <div className="bg-green-50 p-6 rounded-xl">
+                  <h3 className="text-xl font-bold text-green-900 mb-3">Perfect Day ✨</h3>
+                  <p className="text-gray-700">
+                    Win all 3 crystals in one day for ultimate bragging rights!
+                  </p>
+                </div>
+              </div>
+
+              <button
+                onClick={() => setShowTutorial(false)}
+                className="mt-8 w-full bg-blue-600 text-white py-4 rounded-lg font-bold text-lg hover:bg-blue-700 transition"
+              >
+                Let's Go! 🚀
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Stakes & History Modal */}
+        {showStakesModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+            <div className="bg-white rounded-2xl shadow-2xl max-w-3xl w-full max-h-[90vh] overflow-y-auto">
+              <div className="p-6">
+                <div className="flex items-center justify-between mb-6">
+                  <h2 className="text-2xl font-bold text-gray-800 flex items-center">
+                    <Trophy className="mr-2 text-purple-600" size={28} />
+                    Stakes & Winners
+                  </h2>
+                  <button
+                    onClick={() => setShowStakesModal(false)}
+                    className="text-gray-500 hover:text-gray-700 text-2xl"
+                  >
+                    ×
+                  </button>
+                </div>
+
+                {/* Set This Week's Stakes */}
+                <div className="bg-purple-50 rounded-xl p-6 mb-6">
+                  <h3 className="text-lg font-bold text-purple-900 mb-3">This Week's Stakes</h3>
+                  <p className="text-sm text-purple-800 mb-3">
+                    What's on the line? Loser buys coffee? Winner picks the movie? Set the stakes!
+                  </p>
+                  <div className="flex gap-3">
+                    <input
+                      type="text"
+                      placeholder="e.g., Loser buys dinner, $20 bet, Winner picks movie..."
+                      value={weeklyStakes}
+                      onChange={(e) => setWeeklyStakes(e.target.value)}
+                      className="flex-1 px-4 py-3 border-2 border-purple-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
+                    />
+                    <button
+                      onClick={() => {
+                        setShowStakesModal(false);
+                        if (weeklyStakes) {
+                          setCelebrationMessage(`Stakes set! ${weeklyStakes}`);
+                          setShowCelebration(true);
+                          setTimeout(() => setShowCelebration(false), 3000);
+                        }
+                      }}
+                      className="px-6 py-3 bg-purple-600 text-white rounded-lg font-semibold hover:bg-purple-700 transition"
+                    >
+                      Save
+                    </button>
+                  </div>
+                  {weeklyStakes && (
+                    <div className="mt-4 p-4 bg-white rounded-lg border-2 border-purple-300">
+                      <p className="font-semibold text-purple-900">Current Stakes:</p>
+                      <p className="text-gray-800 text-lg">{weeklyStakes}</p>
+                    </div>
+                  )}
+                </div>
+
+                {/* Current Week Leader */}
+                {users.length > 1 && (
+                  <div className="bg-gradient-to-r from-yellow-400 to-orange-400 rounded-xl p-6 mb-6 text-white">
+                    <h3 className="text-lg font-bold mb-2">This Week's Leader</h3>
+                    {getCurrentWeekWinner() ? (
+                      <div>
+                        <p className="text-3xl font-bold">{getCurrentWeekWinner().username}</p>
+                        <p className="text-sm opacity-90">
+                          {getWeekCrystals(getCurrentWeekWinner().id)} crystals • {getWeekPoints(getCurrentWeekWinner().id)} shards
+                        </p>
+                      </div>
+                    ) : (
+                      <p className="text-xl">It's a tie! Keep competing!</p>
+                    )}
+                  </div>
+                )}
+
+                {/* Winner History */}
+                <div className="bg-gray-50 rounded-xl p-6">
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-lg font-bold text-gray-800">Winner History</h3>
+                    {weeklyHistory.length > 0 && (
+                      <button
+                        onClick={recordWeeklyWinner}
+                        className="px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-semibold hover:bg-green-700 transition"
+                      >
+                        Record This Week
+                      </button>
+                    )}
+                  </div>
+                  
+                  {weeklyHistory.length === 0 ? (
+                    <p className="text-gray-500 text-center py-8">
+                      No history yet. Complete this week and record the winner!
+                    </p>
+                  ) : (
+                    <div className="space-y-3">
+                      {weeklyHistory.map((record, index) => (
+                        <div key={record.weekKey} className="bg-white p-4 rounded-lg border-2 border-gray-200">
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <p className="font-bold text-gray-900">
+                                {index === 0 ? '🏆' : `${index + 1}.`} {record.winnerName}
+                              </p>
+                              <p className="text-sm text-gray-600">
+                                Week ending {new Date(record.weekEnding).toLocaleDateString()} • {record.crystals} crystals
+                              </p>
+                              <p className="text-sm text-purple-700 font-semibold mt-1">
+                                Stakes: {record.stakes}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                <button
+                  onClick={() => setShowStakesModal(false)}
+                  className="mt-6 w-full bg-gray-200 text-gray-700 py-3 rounded-lg font-semibold hover:bg-gray-300 transition"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Help Modal */}
+        {showHelp && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+            <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+              <div className="p-6">
+                <div className="flex items-center justify-between mb-6">
+                  <h2 className="text-2xl font-bold text-gray-800 flex items-center">
+                    <HelpCircle className="mr-2 text-blue-600" size={28} />
+                    How to Use Accountability Tracker
+                  </h2>
+                  <button
+                    onClick={() => setShowHelp(false)}
+                    className="text-gray-500 hover:text-gray-700 text-2xl"
+                  >
+                    ×
+                  </button>
+                </div>
+
+                <div className="space-y-6">
+                  <section>
+                    <h3 className="text-lg font-semibold text-gray-800 mb-2">💎 Crystal System Explained</h3>
+                    <p className="text-gray-700 mb-3">
+                      Win crystals by dominating categories! Complete habits to earn shards in Mind, Body, and Spirit categories. 
+                      The person with the most shards in each category at the end of the day wins that category's crystal.
+                    </p>
+                    <div className="space-y-2 text-gray-700">
+                      <p><strong>🔵 Mind Crystal:</strong> Most shards in Mind category (studying, learning, reading)</p>
+                      <p><strong>🔴 Body Crystal:</strong> Most shards in Body category (exercise, nutrition, sleep)</p>
+                      <p><strong>🟡 Spirit Crystal:</strong> Most shards in Spirit category (meditation, journaling, digital detox)</p>
+                      <p><strong>⚠️ Ties:</strong> If you tie in a category, NO ONE gets that crystal. Push harder to avoid ties!</p>
+                      <p><strong>✨ Perfect Day:</strong> Win all 3 crystals in one day for ultimate bragging rights!</p>
+                    </div>
+                  </section>
+
+                  <section>
+                    <h3 className="text-lg font-semibold text-gray-800 mb-2">🏆 How to Win</h3>
+                    <p className="text-gray-700 mb-2">
+                      <strong>Daily Winner:</strong> Person who collects the most crystals that day wins the day.
+                    </p>
+                    <p className="text-gray-700 mb-2">
+                      <strong>Weekly Winner:</strong> Person with the most crystals collected over 7 days wins the week.
+                    </p>
+                    <p className="text-gray-700 mb-2">
+                      <strong>Tiebreaker:</strong> If crystal counts tie at the end of the week, total shards wins. If that ties too, next person to complete a habit wins!
+                    </p>
+                    <p className="text-gray-700">
+                      Focus on balanced growth to win multiple crystals each day!
+                    </p>
+                  </section>
+
+                  <section>
+                    <h3 className="text-lg font-semibold text-gray-800 mb-2">📊 Tracking Your Progress</h3>
+                    <p className="text-gray-700 mb-2">
+                      <strong>This Week:</strong> Crystals reset each week for fresh competition
+                    </p>
+                    <p className="text-gray-700 mb-2">
+                      <strong>All-Time:</strong> Your total crystals ever earned (lifetime bragging rights!)
+                    </p>
+                    <p className="text-gray-700">
+                      <strong>Weekly Wins:</strong> How many weeks you've been the champion 🏆
+                    </p>
+                  </section>
+
+                  <section>
+                    <h3 className="text-lg font-semibold text-gray-800 mb-2">✅ Completing Habits</h3>
+                    <ul className="text-gray-700 space-y-2">
+                      <li><strong>+ Button (Green):</strong> Click to complete a habit or add another completion</li>
+                      <li><strong>− Button (Red):</strong> Click to subtract a completion if you made a mistake</li>
+                      <li><strong>Count Display:</strong> The green button shows how many times you've completed the habit</li>
+                      <li><strong>Repeatable Habits:</strong> Keep clicking + to add more completions (number increases each time)</li>
+                      <li><strong>Maximum Caps:</strong> Some habits have max limits (e.g., water maxes at 8 glasses, meditation at 30 minutes)</li>
+                      <li><strong>Non-repeatable Habits:</strong> Can only be completed once per day (button turns darker green when maxed)</li>
+                    </ul>
+                  </section>
+
+                  <section>
+                    <h3 className="text-lg font-semibold text-gray-800 mb-2">⚡ What are Shards?</h3>
+                    <p className="text-gray-700">
+                      Shards are the points you earn for completing habits. Each habit is worth a certain number of shards. 
+                      Your total shards in each category (Mind/Body/Spirit) determine if you win that crystal. 
+                      More shards = better chance to win crystals!
+                    </p>
+                  </section>
+
+                  <section>
+                    <h3 className="text-lg font-semibold text-gray-800 mb-2">➕ Adding Custom Habits</h3>
+                    <p className="text-gray-700">
+                      Use the "Add New Habit" section to create your own habits. Choose the category (Mind/Body/Spirit), 
+                      set the shard value, and decide if it's repeatable. Customize the app to fit your goals!
+                    </p>
+                  </section>
+
+                  <section>
+                    <h3 className="text-lg font-semibold text-gray-800 mb-2">🔄 Managing Habits</h3>
+                    <ul className="text-gray-700 space-y-2">
+                      <li><strong>Load Defaults:</strong> Instantly add 13 pre-configured habits (replaces current habits)</li>
+                      <li><strong>Delete Individual:</strong> Click the trash icon next to any habit to remove it</li>
+                    </ul>
+                  </section>
+
+                  <section>
+                    <h3 className="text-lg font-semibold text-gray-800 mb-2">🏆 Competition Features</h3>
+                    <p className="text-gray-700">
+                      Your progress syncs across all devices. Friends can log in from anywhere to track their habits. 
+                      Check the leaderboards to see who's winning each crystal and who's collected the most crystals this week!
+                    </p>
+                  </section>
+
+                  <section>
+                    <h3 className="text-lg font-semibold text-gray-800 mb-2">💡 Pro Tips</h3>
+                    <ul className="text-gray-700 space-y-1">
+                      <li>• Balance all three categories to maximize crystal collection</li>
+                      <li>• Check off habits throughout the day, not just at the end</li>
+                      <li>• Focus on consistency - collect crystals every day to win the week</li>
+                      <li>• Use the crystal awards section to see which categories need more focus</li>
+                      <li>• A "Perfect Day" (all 3 crystals) is worth more than dominating one category</li>
+                    </ul>
+                  </section>
+
+                  <section>
+                    <h3 className="text-lg font-semibold text-gray-800 mb-2">🎯 Habit Board Modes</h3>
+                    <div className="space-y-3 text-gray-700">
+                      <div>
+                        <p className="font-semibold">Shared Mode (Default)</p>
+                        <p className="text-sm">Everyone tracks the same habits with the same point values. Fair and simple.</p>
+                      </div>
+                      <div>
+                        <p className="font-semibold">Custom Mode</p>
+                        <p className="text-sm">Each person can create personalized habits. Other users must approve your habits to prevent cheating. Example: You can't give yourself 100 shards for breathing!</p>
+                      </div>
+                      <div className="bg-yellow-50 p-3 rounded-lg border border-yellow-200">
+                        <p className="text-sm font-semibold text-yellow-900">Approval Process:</p>
+                        <p className="text-sm text-yellow-800">When someone creates a habit in Custom Mode, all other users see it in "Pending Approvals" and can approve or reject it.</p>
+                      </div>
+                    </div>
+                  </section>
+                </div>
+
+                <button
+                  onClick={() => setShowHelp(false)}
+                  className="mt-6 w-full bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700 transition"
+                >
+                  Got it!
+                </button>
+                
+                <button
+                  onClick={() => {
+                    setShowHelp(false);
+                    setShowTutorial(true);
+                  }}
+                  className="mt-3 w-full bg-gray-200 text-gray-700 py-2 rounded-lg font-semibold hover:bg-gray-300 transition"
+                >
+                  Show Tutorial Again
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
