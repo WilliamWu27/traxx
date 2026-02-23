@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Clock, Trophy, Circle, CheckCircle, Plus, X, HelpCircle, LogOut } from 'lucide-react';
+import { Clock, Circle, CheckCircle, Plus, X, HelpCircle, LogOut, Users, Copy, Check } from 'lucide-react';
 import { auth, db } from './firebase';
 import { 
   createUserWithEmailAndPassword, 
@@ -31,10 +31,16 @@ export default function TraxApp() {
   const [username, setUsername] = useState('');
   const [error, setError] = useState('');
   
+  // Room State
+  const [currentRoom, setCurrentRoom] = useState(null);
+  const [roomCode, setRoomCode] = useState('');
+  const [showRoomModal, setShowRoomModal] = useState(false);
+  const [copied, setCopied] = useState(false);
+  
   // App Data
   const [habits, setHabits] = useState([]);
   const [completions, setCompletions] = useState([]);
-  const [users, setUsers] = useState([]);
+  const [roomMembers, setRoomMembers] = useState([]);
   const [stakes, setStakes] = useState('');
   
   // UI State
@@ -51,14 +57,37 @@ export default function TraxApp() {
     maxCompletions: 1
   });
 
+  // Generate room code
+  const generateRoomCode = () => {
+    const adjectives = ['SWIFT', 'BRAVE', 'BRIGHT', 'SHARP', 'COOL', 'WILD', 'BOLD', 'QUICK'];
+    const nouns = ['TIGER', 'EAGLE', 'SHARK', 'WOLF', 'HAWK', 'LION', 'BEAR', 'FOX'];
+    const adj = adjectives[Math.floor(Math.random() * adjectives.length)];
+    const noun = nouns[Math.floor(Math.random() * nouns.length)];
+    const num = Math.floor(Math.random() * 100);
+    return `${adj}-${noun}-${num}`;
+  };
+
   // Auth listener
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (user) {
         const userDoc = await getDoc(doc(db, 'users', user.uid));
         if (userDoc.exists()) {
-          setCurrentUser({ id: user.uid, ...userDoc.data() });
-          setView('dashboard');
+          const userData = { id: user.uid, ...userDoc.data() };
+          setCurrentUser(userData);
+          
+          // Check if user has a room
+          if (userData.roomId) {
+            const roomDoc = await getDoc(doc(db, 'rooms', userData.roomId));
+            if (roomDoc.exists()) {
+              setCurrentRoom({ id: roomDoc.id, ...roomDoc.data() });
+              setView('dashboard');
+            } else {
+              setShowRoomModal(true);
+            }
+          } else {
+            setShowRoomModal(true);
+          }
         }
       } else {
         setCurrentUser(null);
@@ -71,35 +100,42 @@ export default function TraxApp() {
 
   // Real-time data listeners
   useEffect(() => {
-    if (!currentUser) return;
+    if (!currentUser || !currentRoom) return;
 
-    const habitsUnsub = onSnapshot(collection(db, 'habits'), (snapshot) => {
+    // Listen to habits in this room
+    const habitsQuery = query(collection(db, 'habits'), where('roomId', '==', currentRoom.id));
+    const habitsUnsub = onSnapshot(habitsQuery, (snapshot) => {
       setHabits(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     });
 
+    // Listen to completions in this room
     const today = new Date().toISOString().split('T')[0];
     const completionsQuery = query(
       collection(db, 'completions'),
+      where('roomId', '==', currentRoom.id),
       where('date', '>=', today)
     );
     const completionsUnsub = onSnapshot(completionsQuery, (snapshot) => {
       setCompletions(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     });
 
-    const usersUnsub = onSnapshot(collection(db, 'users'), (snapshot) => {
-      setUsers(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    // Listen to room members
+    const membersQuery = query(collection(db, 'users'), where('roomId', '==', currentRoom.id));
+    const membersUnsub = onSnapshot(membersQuery, (snapshot) => {
+      setRoomMembers(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     });
 
-    getDoc(doc(db, 'settings', 'stakes')).then(doc => {
-      if (doc.exists()) setStakes(doc.data().value || '');
+    // Listen to stakes
+    getDoc(doc(db, 'rooms', currentRoom.id)).then(doc => {
+      if (doc.exists()) setStakes(doc.data().stakes || '');
     });
 
     return () => {
       habitsUnsub();
       completionsUnsub();
-      usersUnsub();
+      membersUnsub();
     };
-  }, [currentUser]);
+  }, [currentUser, currentRoom]);
 
   // Auth Functions
   const handleSignup = async (e) => {
@@ -139,6 +175,57 @@ export default function TraxApp() {
     setView('login');
   };
 
+  // Room Functions
+  const createRoom = async () => {
+    const code = generateRoomCode();
+    const roomData = {
+      code: code,
+      createdBy: currentUser.id,
+      createdAt: new Date().toISOString(),
+      stakes: ''
+    };
+
+    await setDoc(doc(db, 'rooms', code), roomData);
+    await updateDoc(doc(db, 'users', currentUser.id), { roomId: code });
+    
+    setCurrentRoom({ id: code, ...roomData });
+    setShowRoomModal(false);
+    setView('dashboard');
+  };
+
+  const joinRoom = async () => {
+    const code = roomCode.trim().toUpperCase();
+    if (!code) {
+      setError('Please enter a room code');
+      return;
+    }
+
+    const roomDoc = await getDoc(doc(db, 'rooms', code));
+    if (!roomDoc.exists()) {
+      setError('Room not found');
+      return;
+    }
+
+    await updateDoc(doc(db, 'users', currentUser.id), { roomId: code });
+    setCurrentRoom({ id: code, ...roomDoc.data() });
+    setShowRoomModal(false);
+    setView('dashboard');
+  };
+
+  const copyRoomCode = () => {
+    navigator.clipboard.writeText(currentRoom.code);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  const leaveRoom = async () => {
+    if (!window.confirm('Leave this competition room?')) return;
+    
+    await updateDoc(doc(db, 'users', currentUser.id), { roomId: null });
+    setCurrentRoom(null);
+    setShowRoomModal(true);
+  };
+
   // Habit Functions
   const addHabit = async () => {
     if (!newHabit.name.trim()) return;
@@ -149,6 +236,7 @@ export default function TraxApp() {
       points: parseInt(newHabit.points) || 10,
       isRepeatable: newHabit.isRepeatable,
       maxCompletions: parseInt(newHabit.maxCompletions) || 1,
+      roomId: currentRoom.id,
       createdBy: currentUser.id,
       createdAt: new Date().toISOString()
     });
@@ -181,6 +269,7 @@ export default function TraxApp() {
       await setDoc(doc(db, 'completions', Date.now().toString()), {
         userId: currentUser.id,
         habitId: habitId,
+        roomId: currentRoom.id,
         date: today,
         count: 1
       });
@@ -203,18 +292,18 @@ export default function TraxApp() {
 
   const getTodayCrystals = (userId) => {
     const crystals = { Mind: false, Body: false, Spirit: false };
-    if (users.length < 2) return crystals;
+    if (roomMembers.length < 2) return crystals;
 
     ['Mind', 'Body', 'Spirit'].forEach(category => {
       let maxPoints = -1;
       let winner = null;
       let tie = false;
 
-      users.forEach(user => {
-        const points = getCategoryPoints(user.id, category);
+      roomMembers.forEach(member => {
+        const points = getCategoryPoints(member.id, category);
         if (points > maxPoints) {
           maxPoints = points;
-          winner = user;
+          winner = member;
           tie = false;
         } else if (points === maxPoints && points > 0) {
           tie = true;
@@ -266,20 +355,19 @@ export default function TraxApp() {
     );
   }
 
-  // Continue in App2.jsx...
-  const myCrystals = currentUser ? getTodayCrystals(currentUser.id) : {};
-  const myPoints = currentUser ? getTodayPoints(currentUser.id) : 0;
+  const myCrystals = currentUser && currentRoom ? getTodayCrystals(currentUser.id) : {};
+  const myPoints = currentUser && currentRoom ? getTodayPoints(currentUser.id) : 0;
   const isPerfect = myCrystals.Mind && myCrystals.Body && myCrystals.Spirit;
 
   return (
     <>
       {!currentUser ? (
-        // Auth View - LOGIN/SIGNUP
+        // LOGIN/SIGNUP
         <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
           <div className="w-full max-w-md">
             <div className="text-center mb-8">
               <h1 className="text-4xl font-light text-gray-900 mb-2">TRAX</h1>
-              <p className="text-gray-500">Compete. Track. Win.</p>
+              <p className="text-gray-500">Compete with friends. Build better habits.</p>
             </div>
 
             <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-8">
@@ -356,8 +444,54 @@ export default function TraxApp() {
             </div>
           </div>
         </div>
+      ) : showRoomModal ? (
+        // ROOM SELECTION
+        <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+          <div className="w-full max-w-md">
+            <div className="text-center mb-8">
+              <h1 className="text-3xl font-light text-gray-900 mb-2">Join or Create a Room</h1>
+              <p className="text-gray-500">Compete with your friends in a private room</p>
+            </div>
+
+            <div className="space-y-4">
+              {/* Create Room */}
+              <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+                <h2 className="font-medium text-gray-900 mb-2">Create New Room</h2>
+                <p className="text-sm text-gray-500 mb-4">Start a new competition and invite friends</p>
+                <button
+                  onClick={createRoom}
+                  className="w-full bg-gray-900 text-white py-3 rounded-lg hover:bg-gray-800 transition"
+                >
+                  Create Room
+                </button>
+              </div>
+
+              {/* Join Room */}
+              <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+                <h2 className="font-medium text-gray-900 mb-2">Join Existing Room</h2>
+                <p className="text-sm text-gray-500 mb-4">Enter the code shared by your friend</p>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    placeholder="ROOM-CODE-123"
+                    value={roomCode}
+                    onChange={(e) => setRoomCode(e.target.value.toUpperCase())}
+                    className="flex-1 px-4 py-3 border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400"
+                  />
+                  <button
+                    onClick={joinRoom}
+                    className="px-6 py-3 bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition"
+                  >
+                    Join
+                  </button>
+                </div>
+                {error && <p className="text-red-500 text-sm mt-2">{error}</p>}
+              </div>
+            </div>
+          </div>
+        </div>
       ) : (
-        // DASHBOARD
+        // DASHBOARD (continues in next response due to length...)
         <div className="min-h-screen bg-gray-50">
           {/* Header */}
           <div className="bg-white border-b border-gray-200">
@@ -368,6 +502,13 @@ export default function TraxApp() {
                   <p className="text-sm text-gray-500">{currentUser.username}</p>
                 </div>
                 <div className="flex items-center gap-3">
+                  <button
+                    onClick={() => setShowRoomModal(true)}
+                    className="flex items-center gap-2 px-3 py-2 text-sm border border-gray-200 rounded-lg hover:bg-gray-50 transition"
+                  >
+                    <Users size={16} />
+                    <span className="hidden sm:inline">{currentRoom?.code}</span>
+                  </button>
                   <button onClick={() => setShowHelp(true)} className="p-2 text-gray-400 hover:text-gray-600 transition">
                     <HelpCircle size={20} />
                   </button>
@@ -492,19 +633,44 @@ export default function TraxApp() {
 
               {/* Sidebar */}
               <div className="space-y-6">
-                {users.length > 1 && (
+                {/* Room Info */}
+                <div className="bg-white rounded-lg border border-gray-200 p-6">
+                  <h2 className="text-sm font-medium text-gray-500 mb-4">ROOM CODE</h2>
+                  <div className="flex items-center gap-2 mb-3">
+                    <code className="flex-1 px-3 py-2 bg-gray-50 rounded border border-gray-200 font-mono text-sm">
+                      {currentRoom?.code}
+                    </code>
+                    <button
+                      onClick={copyRoomCode}
+                      className="p-2 hover:bg-gray-100 rounded transition"
+                      title="Copy code"
+                    >
+                      {copied ? <Check size={18} className="text-green-600" /> : <Copy size={18} className="text-gray-400" />}
+                    </button>
+                  </div>
+                  <p className="text-xs text-gray-500 mb-3">Share this code with friends to invite them</p>
+                  <button
+                    onClick={leaveRoom}
+                    className="text-sm text-red-600 hover:text-red-700"
+                  >
+                    Leave Room
+                  </button>
+                </div>
+
+                {/* Leaderboard */}
+                {roomMembers.length > 1 && (
                   <div className="bg-white rounded-lg border border-gray-200 p-6">
                     <h2 className="text-sm font-medium text-gray-500 mb-4">LEADERBOARD</h2>
                     <div className="space-y-2">
-                      {users
-                        .map(user => ({ user, points: getTodayPoints(user.id) }))
+                      {roomMembers
+                        .map(member => ({ member, points: getTodayPoints(member.id) }))
                         .sort((a, b) => b.points - a.points)
                         .map((item, index) => (
                           <button
-                            key={item.user.id}
-                            onClick={() => setShowCompetitor(item.user)}
+                            key={item.member.id}
+                            onClick={() => setShowCompetitor(item.member)}
                             className={`w-full text-left p-3 rounded-lg transition ${
-                              item.user.id === currentUser.id ? 'bg-gray-100' : 'hover:bg-gray-50'
+                              item.member.id === currentUser.id ? 'bg-gray-100' : 'hover:bg-gray-50'
                             }`}
                           >
                             <div className="flex items-center justify-between">
@@ -512,7 +678,7 @@ export default function TraxApp() {
                                 <div className="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center text-sm font-medium text-gray-600">
                                   {index + 1}
                                 </div>
-                                <div className="text-sm text-gray-900">{item.user.username}</div>
+                                <div className="text-sm text-gray-900">{item.member.username}</div>
                               </div>
                               <div className="text-sm text-gray-500">{item.points}</div>
                             </div>
@@ -522,6 +688,7 @@ export default function TraxApp() {
                   </div>
                 )}
 
+                {/* Stakes */}
                 <div className="bg-white rounded-lg border border-gray-200 p-6">
                   <h2 className="text-sm font-medium text-gray-500 mb-4">STAKES</h2>
                   <input
@@ -530,7 +697,7 @@ export default function TraxApp() {
                     value={stakes}
                     onChange={async (e) => {
                       setStakes(e.target.value);
-                      await setDoc(doc(db, 'settings', 'stakes'), { value: e.target.value });
+                      await updateDoc(doc(db, 'rooms', currentRoom.id), { stakes: e.target.value });
                     }}
                     className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400 text-sm"
                   />
@@ -539,7 +706,7 @@ export default function TraxApp() {
             </div>
           </div>
 
-          {/* Add Habit Modal */}
+          {/* Modals - Add Habit, Competitor, Help (same as before) */}
           {showAddHabit && (
             <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
               <div className="bg-white rounded-lg max-w-md w-full p-6">
@@ -604,7 +771,6 @@ export default function TraxApp() {
             </div>
           )}
 
-          {/* Competitor Modal */}
           {showCompetitor && (
             <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
               <div className="bg-white rounded-lg max-w-md w-full p-6">
@@ -638,7 +804,6 @@ export default function TraxApp() {
             </div>
           )}
 
-          {/* Help Modal */}
           {showHelp && (
             <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
               <div className="bg-white rounded-lg max-w-2xl w-full p-6 max-h-[90vh] overflow-y-auto">
@@ -649,6 +814,10 @@ export default function TraxApp() {
                   </button>
                 </div>
                 <div className="space-y-6 text-sm text-gray-600">
+                  <div>
+                    <h3 className="font-medium text-gray-900 mb-2">Competition Rooms</h3>
+                    <p>Create a private room and share the code with friends. Only people in your room can see and compete with each other.</p>
+                  </div>
                   <div>
                     <h3 className="font-medium text-gray-900 mb-2">The Basics</h3>
                     <p>Complete habits to earn points. Win categories to earn crystals. Most crystals wins the week.</p>
@@ -662,10 +831,6 @@ export default function TraxApp() {
                   <div>
                     <h3 className="font-medium text-gray-900 mb-2">Winning</h3>
                     <p>Win a category by having the most points in it each day. Win the week by earning the most crystals.</p>
-                  </div>
-                  <div>
-                    <h3 className="font-medium text-gray-900 mb-2">Stakes</h3>
-                    <p>Set what's at stake each week. Loser buys coffee? Winner picks the movie? You decide!</p>
                   </div>
                 </div>
               </div>
