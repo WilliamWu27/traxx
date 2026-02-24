@@ -37,6 +37,7 @@ export default function TraxApp() {
   const [roomMembers, setRoomMembers] = useState([]);
   const [showAddHabit, setShowAddHabit] = useState(false);
   const [showCompetitor, setShowCompetitor] = useState(null);
+  const [loading, setLoading] = useState(false);
   const [newHabit, setNewHabit] = useState({
     name: '',
     category: 'Mind',
@@ -57,22 +58,27 @@ export default function TraxApp() {
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (user) {
-        const userDoc = await getDoc(doc(db, 'users', user.uid));
-        if (userDoc.exists()) {
-          const userData = { id: user.uid, ...userDoc.data() };
-          setCurrentUser(userData);
-          
-          if (userData.roomId) {
-            const roomDoc = await getDoc(doc(db, 'rooms', userData.roomId));
-            if (roomDoc.exists()) {
-              setCurrentRoom({ id: roomDoc.id, ...roomDoc.data() });
-              setView('dashboard');
+        try {
+          const userDoc = await getDoc(doc(db, 'users', user.uid));
+          if (userDoc.exists()) {
+            const userData = { id: user.uid, ...userDoc.data() };
+            setCurrentUser(userData);
+            
+            if (userData.roomId) {
+              const roomDoc = await getDoc(doc(db, 'rooms', userData.roomId));
+              if (roomDoc.exists()) {
+                setCurrentRoom({ id: roomDoc.id, ...roomDoc.data() });
+                setView('dashboard');
+              } else {
+                setShowRoomModal(true);
+              }
             } else {
               setShowRoomModal(true);
             }
-          } else {
-            setShowRoomModal(true);
           }
+        } catch (err) {
+          console.error('Auth error:', err);
+          setError(err.message);
         }
       } else {
         setCurrentUser(null);
@@ -115,10 +121,14 @@ export default function TraxApp() {
   const handleSignup = async (e) => {
     e.preventDefault();
     setError('');
+    setLoading(true);
+    
     if (!username.trim()) {
       setError('Username required');
+      setLoading(false);
       return;
     }
+
     try {
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       await setDoc(doc(db, 'users', userCredential.user.uid), {
@@ -127,49 +137,92 @@ export default function TraxApp() {
         createdAt: new Date().toISOString()
       });
     } catch (err) {
+      console.error('Signup error:', err);
       setError(err.message);
+    } finally {
+      setLoading(false);
     }
   };
 
   const handleLogin = async (e) => {
     e.preventDefault();
     setError('');
+    setLoading(true);
+    
     try {
       await signInWithEmailAndPassword(auth, email, password);
     } catch (err) {
+      console.error('Login error:', err);
       setError('Invalid email or password');
+    } finally {
+      setLoading(false);
     }
   };
 
   const createRoom = async () => {
-    const code = generateRoomCode();
-    await setDoc(doc(db, 'rooms', code), {
-      code: code,
-      createdBy: currentUser.id,
-      createdAt: new Date().toISOString()
-    });
-    await updateDoc(doc(db, 'users', currentUser.id), { roomId: code });
-    setCurrentRoom({ id: code, code: code });
-    setShowRoomModal(false);
-    setShowInviteModal(true);
-    setView('dashboard');
+    setError('');
+    setLoading(true);
+    
+    try {
+      const code = generateRoomCode();
+      console.log('Creating room with code:', code);
+      
+      await setDoc(doc(db, 'rooms', code), {
+        code: code,
+        createdBy: currentUser.id,
+        createdAt: new Date().toISOString()
+      });
+      
+      await updateDoc(doc(db, 'users', currentUser.id), { roomId: code });
+      
+      setCurrentRoom({ id: code, code: code });
+      setShowRoomModal(false);
+      setShowInviteModal(true);
+      setView('dashboard');
+      
+      console.log('Room created successfully');
+    } catch (err) {
+      console.error('Create room error:', err);
+      setError('Failed to create room: ' + err.message);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const joinRoom = async () => {
+    setError('');
+    setLoading(true);
+    
     const code = roomCode.trim().toUpperCase();
     if (!code) {
       setError('Enter room code');
+      setLoading(false);
       return;
     }
-    const roomDoc = await getDoc(doc(db, 'rooms', code));
-    if (!roomDoc.exists()) {
-      setError('Room not found');
-      return;
+    
+    try {
+      console.log('Joining room:', code);
+      
+      const roomDoc = await getDoc(doc(db, 'rooms', code));
+      if (!roomDoc.exists()) {
+        setError('Room not found');
+        setLoading(false);
+        return;
+      }
+      
+      await updateDoc(doc(db, 'users', currentUser.id), { roomId: code });
+      
+      setCurrentRoom({ id: code, ...roomDoc.data() });
+      setShowRoomModal(false);
+      setView('dashboard');
+      
+      console.log('Joined room successfully');
+    } catch (err) {
+      console.error('Join room error:', err);
+      setError('Failed to join room: ' + err.message);
+    } finally {
+      setLoading(false);
     }
-    await updateDoc(doc(db, 'users', currentUser.id), { roomId: code });
-    setCurrentRoom({ id: code, ...roomDoc.data() });
-    setShowRoomModal(false);
-    setView('dashboard');
   };
 
   const copyCode = () => {
@@ -180,23 +233,34 @@ export default function TraxApp() {
 
   const addHabit = async () => {
     if (!newHabit.name.trim()) return;
-    await setDoc(doc(db, 'habits', Date.now().toString()), {
-      name: newHabit.name.trim(),
-      category: newHabit.category,
-      points: parseInt(newHabit.points) || 10,
-      isRepeatable: newHabit.isRepeatable,
-      maxCompletions: parseInt(newHabit.maxCompletions) || 1,
-      roomId: currentRoom.id,
-      createdBy: currentUser.id,
-      createdAt: new Date().toISOString()
-    });
-    setNewHabit({ name: '', category: 'Mind', points: 10, isRepeatable: false, maxCompletions: 1 });
-    setShowAddHabit(false);
+    
+    try {
+      await setDoc(doc(db, 'habits', Date.now().toString()), {
+        name: newHabit.name.trim(),
+        category: newHabit.category,
+        points: parseInt(newHabit.points) || 10,
+        isRepeatable: newHabit.isRepeatable,
+        maxCompletions: parseInt(newHabit.maxCompletions) || 1,
+        roomId: currentRoom.id,
+        createdBy: currentUser.id,
+        createdAt: new Date().toISOString()
+      });
+      
+      setNewHabit({ name: '', category: 'Mind', points: 10, isRepeatable: false, maxCompletions: 1 });
+      setShowAddHabit(false);
+    } catch (err) {
+      console.error('Add habit error:', err);
+      setError('Failed to add habit');
+    }
   };
 
   const deleteHabit = async (habitId) => {
     if (!window.confirm('Delete?')) return;
-    await deleteDoc(doc(db, 'habits', habitId));
+    try {
+      await deleteDoc(doc(db, 'habits', habitId));
+    } catch (err) {
+      console.error('Delete habit error:', err);
+    }
   };
 
   const toggleCompletion = async (habitId) => {
@@ -208,20 +272,24 @@ export default function TraxApp() {
       c => c.userId === currentUser.id && c.habitId === habitId && c.date === today
     );
 
-    if (existing) {
-      if (habit.isRepeatable && existing.count < habit.maxCompletions) {
-        await updateDoc(doc(db, 'completions', existing.id), { count: existing.count + 1 });
+    try {
+      if (existing) {
+        if (habit.isRepeatable && existing.count < habit.maxCompletions) {
+          await updateDoc(doc(db, 'completions', existing.id), { count: existing.count + 1 });
+        } else {
+          await deleteDoc(doc(db, 'completions', existing.id));
+        }
       } else {
-        await deleteDoc(doc(db, 'completions', existing.id));
+        await setDoc(doc(db, 'completions', Date.now().toString()), {
+          userId: currentUser.id,
+          habitId: habitId,
+          roomId: currentRoom.id,
+          date: today,
+          count: 1
+        });
       }
-    } else {
-      await setDoc(doc(db, 'completions', Date.now().toString()), {
-        userId: currentUser.id,
-        habitId: habitId,
-        roomId: currentRoom.id,
-        date: today,
-        count: 1
-      });
+    } catch (err) {
+      console.error('Toggle completion error:', err);
     }
   };
 
@@ -321,6 +389,7 @@ export default function TraxApp() {
                     onChange={(e) => setEmail(e.target.value)}
                     className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400"
                     required
+                    disabled={loading}
                   />
                   <input
                     type="password"
@@ -329,15 +398,21 @@ export default function TraxApp() {
                     onChange={(e) => setPassword(e.target.value)}
                     className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400"
                     required
+                    disabled={loading}
                   />
                   {error && <p className="text-red-500 text-sm">{error}</p>}
-                  <button type="submit" className="w-full bg-gray-900 text-white py-3 rounded-lg hover:bg-gray-800">
-                    Log In
+                  <button 
+                    type="submit" 
+                    className="w-full bg-gray-900 text-white py-3 rounded-lg hover:bg-gray-800 disabled:opacity-50"
+                    disabled={loading}
+                  >
+                    {loading ? 'Loading...' : 'Log In'}
                   </button>
                   <button
                     type="button"
                     onClick={() => { setView('signup'); setError(''); }}
                     className="w-full text-gray-600 py-3 hover:text-gray-900"
+                    disabled={loading}
                   >
                     Create Account
                   </button>
@@ -351,6 +426,7 @@ export default function TraxApp() {
                     onChange={(e) => setUsername(e.target.value)}
                     className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400"
                     required
+                    disabled={loading}
                   />
                   <input
                     type="email"
@@ -359,6 +435,7 @@ export default function TraxApp() {
                     onChange={(e) => setEmail(e.target.value)}
                     className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400"
                     required
+                    disabled={loading}
                   />
                   <input
                     type="password"
@@ -368,15 +445,21 @@ export default function TraxApp() {
                     className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400"
                     required
                     minLength={6}
+                    disabled={loading}
                   />
                   {error && <p className="text-red-500 text-sm">{error}</p>}
-                  <button type="submit" className="w-full bg-gray-900 text-white py-3 rounded-lg hover:bg-gray-800">
-                    Sign Up
+                  <button 
+                    type="submit" 
+                    className="w-full bg-gray-900 text-white py-3 rounded-lg hover:bg-gray-800 disabled:opacity-50"
+                    disabled={loading}
+                  >
+                    {loading ? 'Loading...' : 'Sign Up'}
                   </button>
                   <button
                     type="button"
                     onClick={() => { setView('login'); setError(''); }}
                     className="w-full text-gray-600 py-3 hover:text-gray-900"
+                    disabled={loading}
                   >
                     Back
                   </button>
@@ -388,13 +471,19 @@ export default function TraxApp() {
       ) : showRoomModal ? (
         <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
           <div className="w-full max-w-md space-y-4">
+            <div className="text-center mb-4">
+              <h1 className="text-2xl font-light text-gray-900 mb-2">Welcome, {currentUser.username}</h1>
+              <p className="text-gray-500 text-sm">Create or join a competition room</p>
+            </div>
+
             <div className="bg-white rounded-lg border border-gray-200 p-6">
               <h2 className="font-medium text-gray-900 mb-4">Create Room</h2>
               <button
                 onClick={createRoom}
-                className="w-full bg-gray-900 text-white py-3 rounded-lg hover:bg-gray-800"
+                className="w-full bg-gray-900 text-white py-3 rounded-lg hover:bg-gray-800 disabled:opacity-50"
+                disabled={loading}
               >
-                Create
+                {loading ? 'Creating...' : 'Create'}
               </button>
             </div>
 
@@ -408,12 +497,14 @@ export default function TraxApp() {
                   onChange={(e) => setRoomCode(e.target.value.toUpperCase())}
                   className="flex-1 px-4 py-3 border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400"
                   maxLength={6}
+                  disabled={loading}
                 />
                 <button
                   onClick={joinRoom}
-                  className="px-6 py-3 bg-gray-900 text-white rounded-lg hover:bg-gray-800"
+                  className="px-6 py-3 bg-gray-900 text-white rounded-lg hover:bg-gray-800 disabled:opacity-50"
+                  disabled={loading}
                 >
-                  Join
+                  {loading ? '...' : 'Join'}
                 </button>
               </div>
               {error && <p className="text-red-500 text-sm mt-2">{error}</p>}
@@ -596,7 +687,7 @@ export default function TraxApp() {
               <div className="bg-white rounded-lg max-w-md w-full p-8">
                 <div className="text-center">
                   <h2 className="text-2xl font-light text-gray-900 mb-2">Invite Friends</h2>
-                  <p className="text-sm text-gray-500 mb-6">Share this code to compete together</p>
+                  <p className="text-sm text-gray-500 mb-6">Share this code</p>
                   
                   <div className="mb-6">
                     <code className="inline-block px-6 py-4 bg-gray-900 text-white text-3xl font-mono rounded-lg tracking-widest">
