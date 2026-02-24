@@ -1,38 +1,18 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+import { initializeApp } from 'firebase/app';
+import { getAuth } from 'firebase/auth';
+import { getFirestore } from 'firebase/firestore';
 
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
+const firebaseConfig = {
+  apiKey: "AIzaSyA7tZeM76MJYZlh-eX2PKrcj77VbR5XsPE",
+  authDomain: "trytraxapp.firebaseapp.com",
+  projectId: "trytraxapp",
+  storageBucket: "trytraxapp.firebasestorage.app",
+  messagingSenderId: "312292654300",
+  appId: "1:312292654300:web:c0a04772874ea4be67c819",
+  measurementId: "G-6BDD662RXP"
+};
 
-* {
-  box-sizing: border-box;
-  margin: 0;
-  padding: 0;
-}
+const app = initializeApp(firebaseConfig);
 
-body {
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
-    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
-    sans-serif;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-}
-
-#root {
-  min-height: 100vh;
-}
-
-@keyframes bounce {
-  0%, 100% {
-    transform: translateY(-25%);
-    animation-timing-function: cubic-bezier(0.8, 0, 1, 1);
-  }
-  50% {
-    transform: translateY(0);
-    animation-timing-function: cubic-bezier(0, 0, 0.2, 1);
-  }
-}
-
-.animate-bounce {
-  animation: bounce 1s infinite;
-}
+export const auth = getAuth(app);
+export const db = getFirestore(app);
