@@ -1,33 +1,13 @@
-# Making the Invite Feature More Visible
-
-## Current Issue
-The room code is in a small sidebar card. Users might miss it.
-
-## Solutions to Add:
-
-### 1. Add "Invite Friends" Button to Header
-```jsx
-<button className="bg-blue-600 text-white px-4 py-2 rounded-lg">
-  Invite Friends
-</button>
-```
-
-### 2. Show Invite Modal with:
-- Large room code
-- Copy button
-- Shareable text message
-- "Share via..." options
-
-### 3. First-time Prompt
-After creating room, show:
-"Your room is ready! Invite friends to compete"
-
-### 4. Empty State
-If you're the only person in room:
-"You're competing alone! Invite friends to make it fun"
-
-## Quick Fix for Now:
-
-Look in the right sidebar for "ROOM CODE" section.
-The code is there - click the copy button to share it!
-
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="TRAX - Compete with friends on habits. Earn crystals, win stakes, build better habits together." />
+    <title>TRAX - Habit Competition Tracker</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.jsx"></script>
+  </body>
+</html>
