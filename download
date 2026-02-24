@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Clock, Circle, CheckCircle, Plus, X, HelpCircle, LogOut, Users, Copy, Check } from 'lucide-react';
+import { Clock, Circle, CheckCircle, Plus, X, LogOut, Copy, Check, UserPlus } from 'lucide-react';
 import { auth, db } from './firebase';
 import { 
   createUserWithEmailAndPassword, 
@@ -20,35 +20,23 @@ import {
 } from 'firebase/firestore';
 
 export default function TraxApp() {
-  // Auth State
   const [currentUser, setCurrentUser] = useState(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [view, setView] = useState('login');
-  
-  // Form State
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [username, setUsername] = useState('');
   const [error, setError] = useState('');
-  
-  // Room State
   const [currentRoom, setCurrentRoom] = useState(null);
   const [roomCode, setRoomCode] = useState('');
   const [showRoomModal, setShowRoomModal] = useState(false);
+  const [showInviteModal, setShowInviteModal] = useState(false);
   const [copied, setCopied] = useState(false);
-  
-  // App Data
   const [habits, setHabits] = useState([]);
   const [completions, setCompletions] = useState([]);
   const [roomMembers, setRoomMembers] = useState([]);
-  const [stakes, setStakes] = useState('');
-  
-  // UI State
   const [showAddHabit, setShowAddHabit] = useState(false);
-  const [showHelp, setShowHelp] = useState(false);
   const [showCompetitor, setShowCompetitor] = useState(null);
-  
-  // New Habit Form
   const [newHabit, setNewHabit] = useState({
     name: '',
     category: 'Mind',
@@ -57,17 +45,15 @@ export default function TraxApp() {
     maxCompletions: 1
   });
 
-  // Generate room code
   const generateRoomCode = () => {
-    const adjectives = ['SWIFT', 'BRAVE', 'BRIGHT', 'SHARP', 'COOL', 'WILD', 'BOLD', 'QUICK'];
-    const nouns = ['TIGER', 'EAGLE', 'SHARK', 'WOLF', 'HAWK', 'LION', 'BEAR', 'FOX'];
-    const adj = adjectives[Math.floor(Math.random() * adjectives.length)];
-    const noun = nouns[Math.floor(Math.random() * nouns.length)];
-    const num = Math.floor(Math.random() * 100);
-    return `${adj}-${noun}-${num}`;
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+    let code = '';
+    for (let i = 0; i < 6; i++) {
+      code += chars[Math.floor(Math.random() * chars.length)];
+    }
+    return code;
   };
 
-  // Auth listener
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (user) {
@@ -76,7 +62,6 @@ export default function TraxApp() {
           const userData = { id: user.uid, ...userDoc.data() };
           setCurrentUser(userData);
           
-          // Check if user has a room
           if (userData.roomId) {
             const roomDoc = await getDoc(doc(db, 'rooms', userData.roomId));
             if (roomDoc.exists()) {
@@ -94,21 +79,17 @@ export default function TraxApp() {
       }
       setAuthLoading(false);
     });
-
     return unsubscribe;
   }, []);
 
-  // Real-time data listeners
   useEffect(() => {
     if (!currentUser || !currentRoom) return;
 
-    // Listen to habits in this room
     const habitsQuery = query(collection(db, 'habits'), where('roomId', '==', currentRoom.id));
     const habitsUnsub = onSnapshot(habitsQuery, (snapshot) => {
       setHabits(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     });
 
-    // Listen to completions in this room
     const today = new Date().toISOString().split('T')[0];
     const completionsQuery = query(
       collection(db, 'completions'),
@@ -119,15 +100,9 @@ export default function TraxApp() {
       setCompletions(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     });
 
-    // Listen to room members
     const membersQuery = query(collection(db, 'users'), where('roomId', '==', currentRoom.id));
     const membersUnsub = onSnapshot(membersQuery, (snapshot) => {
       setRoomMembers(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-    });
-
-    // Listen to stakes
-    getDoc(doc(db, 'rooms', currentRoom.id)).then(doc => {
-      if (doc.exists()) setStakes(doc.data().stakes || '');
     });
 
     return () => {
@@ -137,16 +112,13 @@ export default function TraxApp() {
     };
   }, [currentUser, currentRoom]);
 
-  // Auth Functions
   const handleSignup = async (e) => {
     e.preventDefault();
     setError('');
-    
     if (!username.trim()) {
       setError('Username required');
       return;
     }
-
     try {
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       await setDoc(doc(db, 'users', userCredential.user.uid), {
@@ -162,7 +134,6 @@ export default function TraxApp() {
   const handleLogin = async (e) => {
     e.preventDefault();
     setError('');
-    
     try {
       await signInWithEmailAndPassword(auth, email, password);
     } catch (err) {
@@ -170,66 +141,45 @@ export default function TraxApp() {
     }
   };
 
-  const handleLogout = () => {
-    signOut(auth);
-    setView('login');
-  };
-
-  // Room Functions
   const createRoom = async () => {
     const code = generateRoomCode();
-    const roomData = {
+    await setDoc(doc(db, 'rooms', code), {
       code: code,
       createdBy: currentUser.id,
-      createdAt: new Date().toISOString(),
-      stakes: ''
-    };
-
-    await setDoc(doc(db, 'rooms', code), roomData);
+      createdAt: new Date().toISOString()
+    });
     await updateDoc(doc(db, 'users', currentUser.id), { roomId: code });
-    
-    setCurrentRoom({ id: code, ...roomData });
+    setCurrentRoom({ id: code, code: code });
     setShowRoomModal(false);
+    setShowInviteModal(true);
     setView('dashboard');
   };
 
   const joinRoom = async () => {
     const code = roomCode.trim().toUpperCase();
     if (!code) {
-      setError('Please enter a room code');
+      setError('Enter room code');
       return;
     }
-
     const roomDoc = await getDoc(doc(db, 'rooms', code));
     if (!roomDoc.exists()) {
       setError('Room not found');
       return;
     }
-
     await updateDoc(doc(db, 'users', currentUser.id), { roomId: code });
     setCurrentRoom({ id: code, ...roomDoc.data() });
     setShowRoomModal(false);
     setView('dashboard');
   };
 
-  const copyRoomCode = () => {
+  const copyCode = () => {
     navigator.clipboard.writeText(currentRoom.code);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const leaveRoom = async () => {
-    if (!window.confirm('Leave this competition room?')) return;
-    
-    await updateDoc(doc(db, 'users', currentUser.id), { roomId: null });
-    setCurrentRoom(null);
-    setShowRoomModal(true);
-  };
-
-  // Habit Functions
   const addHabit = async () => {
     if (!newHabit.name.trim()) return;
-
     await setDoc(doc(db, 'habits', Date.now().toString()), {
       name: newHabit.name.trim(),
       category: newHabit.category,
@@ -240,13 +190,12 @@ export default function TraxApp() {
       createdBy: currentUser.id,
       createdAt: new Date().toISOString()
     });
-    
     setNewHabit({ name: '', category: 'Mind', points: 10, isRepeatable: false, maxCompletions: 1 });
     setShowAddHabit(false);
   };
 
   const deleteHabit = async (habitId) => {
-    if (!window.confirm('Delete this habit?')) return;
+    if (!window.confirm('Delete?')) return;
     await deleteDoc(doc(db, 'habits', habitId));
   };
 
@@ -276,7 +225,6 @@ export default function TraxApp() {
     }
   };
 
-  // Stats Functions
   const getCategoryPoints = (userId, category) => {
     const today = new Date().toISOString().split('T')[0];
     return completions
@@ -297,16 +245,13 @@ export default function TraxApp() {
     ['Mind', 'Body', 'Spirit'].forEach(category => {
       let maxPoints = -1;
       let winner = null;
-      let tie = false;
 
       roomMembers.forEach(member => {
         const points = getCategoryPoints(member.id, category);
         if (points > maxPoints) {
           maxPoints = points;
           winner = member;
-          tie = false;
         } else if (points === maxPoints && points > 0) {
-          tie = true;
           winner = null;
         }
       });
@@ -340,10 +285,8 @@ export default function TraxApp() {
     const midnight = new Date(now);
     midnight.setHours(24, 0, 0, 0);
     const diff = midnight - now;
-    
     const hours = Math.floor(diff / (1000 * 60 * 60));
     const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
-    
     return `${hours}h ${minutes}m`;
   };
 
@@ -357,20 +300,18 @@ export default function TraxApp() {
 
   const myCrystals = currentUser && currentRoom ? getTodayCrystals(currentUser.id) : {};
   const myPoints = currentUser && currentRoom ? getTodayPoints(currentUser.id) : 0;
-  const isPerfect = myCrystals.Mind && myCrystals.Body && myCrystals.Spirit;
 
   return (
     <>
       {!currentUser ? (
-        // LOGIN/SIGNUP
         <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
           <div className="w-full max-w-md">
             <div className="text-center mb-8">
               <h1 className="text-4xl font-light text-gray-900 mb-2">TRAX</h1>
-              <p className="text-gray-500">Compete with friends. Build better habits.</p>
+              <p className="text-gray-400 text-sm">Compete. Track. Win.</p>
             </div>
 
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-8">
+            <div className="bg-white rounded-lg border border-gray-200 p-8">
               {view === 'login' ? (
                 <form onSubmit={handleLogin} className="space-y-4">
                   <input
@@ -390,13 +331,13 @@ export default function TraxApp() {
                     required
                   />
                   {error && <p className="text-red-500 text-sm">{error}</p>}
-                  <button type="submit" className="w-full bg-gray-900 text-white py-3 rounded-lg hover:bg-gray-800 transition">
+                  <button type="submit" className="w-full bg-gray-900 text-white py-3 rounded-lg hover:bg-gray-800">
                     Log In
                   </button>
                   <button
                     type="button"
                     onClick={() => { setView('signup'); setError(''); }}
-                    className="w-full text-gray-600 py-3 hover:text-gray-900 transition"
+                    className="w-full text-gray-600 py-3 hover:text-gray-900"
                   >
                     Create Account
                   </button>
@@ -421,7 +362,7 @@ export default function TraxApp() {
                   />
                   <input
                     type="password"
-                    placeholder="Password (min 6 characters)"
+                    placeholder="Password"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400"
@@ -429,15 +370,15 @@ export default function TraxApp() {
                     minLength={6}
                   />
                   {error && <p className="text-red-500 text-sm">{error}</p>}
-                  <button type="submit" className="w-full bg-gray-900 text-white py-3 rounded-lg hover:bg-gray-800 transition">
+                  <button type="submit" className="w-full bg-gray-900 text-white py-3 rounded-lg hover:bg-gray-800">
                     Sign Up
                   </button>
                   <button
                     type="button"
                     onClick={() => { setView('login'); setError(''); }}
-                    className="w-full text-gray-600 py-3 hover:text-gray-900 transition"
+                    className="w-full text-gray-600 py-3 hover:text-gray-900"
                   >
-                    Back to Login
+                    Back
                   </button>
                 </form>
               )}
@@ -445,74 +386,56 @@ export default function TraxApp() {
           </div>
         </div>
       ) : showRoomModal ? (
-        // ROOM SELECTION
         <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
-          <div className="w-full max-w-md">
-            <div className="text-center mb-8">
-              <h1 className="text-3xl font-light text-gray-900 mb-2">Join or Create a Room</h1>
-              <p className="text-gray-500">Compete with your friends in a private room</p>
+          <div className="w-full max-w-md space-y-4">
+            <div className="bg-white rounded-lg border border-gray-200 p-6">
+              <h2 className="font-medium text-gray-900 mb-4">Create Room</h2>
+              <button
+                onClick={createRoom}
+                className="w-full bg-gray-900 text-white py-3 rounded-lg hover:bg-gray-800"
+              >
+                Create
+              </button>
             </div>
 
-            <div className="space-y-4">
-              {/* Create Room */}
-              <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-                <h2 className="font-medium text-gray-900 mb-2">Create New Room</h2>
-                <p className="text-sm text-gray-500 mb-4">Start a new competition and invite friends</p>
+            <div className="bg-white rounded-lg border border-gray-200 p-6">
+              <h2 className="font-medium text-gray-900 mb-4">Join Room</h2>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  placeholder="CODE"
+                  value={roomCode}
+                  onChange={(e) => setRoomCode(e.target.value.toUpperCase())}
+                  className="flex-1 px-4 py-3 border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400"
+                  maxLength={6}
+                />
                 <button
-                  onClick={createRoom}
-                  className="w-full bg-gray-900 text-white py-3 rounded-lg hover:bg-gray-800 transition"
+                  onClick={joinRoom}
+                  className="px-6 py-3 bg-gray-900 text-white rounded-lg hover:bg-gray-800"
                 >
-                  Create Room
+                  Join
                 </button>
               </div>
-
-              {/* Join Room */}
-              <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-                <h2 className="font-medium text-gray-900 mb-2">Join Existing Room</h2>
-                <p className="text-sm text-gray-500 mb-4">Enter the code shared by your friend</p>
-                <div className="flex gap-2">
-                  <input
-                    type="text"
-                    placeholder="ROOM-CODE-123"
-                    value={roomCode}
-                    onChange={(e) => setRoomCode(e.target.value.toUpperCase())}
-                    className="flex-1 px-4 py-3 border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400"
-                  />
-                  <button
-                    onClick={joinRoom}
-                    className="px-6 py-3 bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition"
-                  >
-                    Join
-                  </button>
-                </div>
-                {error && <p className="text-red-500 text-sm mt-2">{error}</p>}
-              </div>
+              {error && <p className="text-red-500 text-sm mt-2">{error}</p>}
             </div>
           </div>
         </div>
       ) : (
-        // DASHBOARD (continues in next response due to length...)
         <div className="min-h-screen bg-gray-50">
           {/* Header */}
           <div className="bg-white border-b border-gray-200">
             <div className="max-w-7xl mx-auto px-4 py-4">
               <div className="flex items-center justify-between">
-                <div>
-                  <h1 className="text-2xl font-light text-gray-900">TRAX</h1>
-                  <p className="text-sm text-gray-500">{currentUser.username}</p>
-                </div>
+                <h1 className="text-2xl font-light text-gray-900">TRAX</h1>
                 <div className="flex items-center gap-3">
                   <button
-                    onClick={() => setShowRoomModal(true)}
-                    className="flex items-center gap-2 px-3 py-2 text-sm border border-gray-200 rounded-lg hover:bg-gray-50 transition"
+                    onClick={() => setShowInviteModal(true)}
+                    className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
                   >
-                    <Users size={16} />
-                    <span className="hidden sm:inline">{currentRoom?.code}</span>
+                    <UserPlus size={18} />
+                    <span className="hidden sm:inline">Invite</span>
                   </button>
-                  <button onClick={() => setShowHelp(true)} className="p-2 text-gray-400 hover:text-gray-600 transition">
-                    <HelpCircle size={20} />
-                  </button>
-                  <button onClick={handleLogout} className="p-2 text-gray-400 hover:text-gray-600 transition">
+                  <button onClick={() => signOut(auth)} className="p-2 text-gray-400 hover:text-gray-600">
                     <LogOut size={20} />
                   </button>
                 </div>
@@ -521,49 +444,39 @@ export default function TraxApp() {
           </div>
 
           <div className="max-w-7xl mx-auto px-4 py-8">
-            {/* Stats Bar */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+            {/* Stats */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
               <div className="bg-white rounded-lg border border-gray-200 p-4">
-                <div className="flex items-center gap-2 text-gray-500 text-sm mb-1">
-                  <Clock size={14} />
-                  <span>Day resets in</span>
+                <div className="flex items-center gap-2 text-gray-400 text-xs mb-1">
+                  <Clock size={12} />
+                  <span>Resets</span>
                 </div>
-                <div className="text-2xl font-light text-gray-900">{getTimeUntilMidnight()}</div>
+                <div className="text-xl font-light text-gray-900">{getTimeUntilMidnight()}</div>
               </div>
 
               <div className="bg-white rounded-lg border border-gray-200 p-4">
-                <div className="text-gray-500 text-sm mb-1">Today's Points</div>
-                <div className="text-2xl font-light text-gray-900">{myPoints}</div>
+                <div className="text-gray-400 text-xs mb-1">Points</div>
+                <div className="text-xl font-light text-gray-900">{myPoints}</div>
               </div>
 
               <div className="bg-white rounded-lg border border-gray-200 p-4 md:col-span-2">
-                <div className="text-gray-500 text-sm mb-2">Today's Crystals</div>
+                <div className="text-gray-400 text-xs mb-2">Crystals</div>
                 <div className="flex items-center gap-3">
-                  <div className={`flex items-center gap-1 ${myCrystals.Mind ? 'text-blue-600' : 'text-gray-300'}`}>
-                    <Circle size={20} fill="currentColor" />
-                    <span className="text-sm">Mind</span>
-                  </div>
-                  <div className={`flex items-center gap-1 ${myCrystals.Body ? 'text-red-600' : 'text-gray-300'}`}>
-                    <Circle size={20} fill="currentColor" />
-                    <span className="text-sm">Body</span>
-                  </div>
-                  <div className={`flex items-center gap-1 ${myCrystals.Spirit ? 'text-amber-600' : 'text-gray-300'}`}>
-                    <Circle size={20} fill="currentColor" />
-                    <span className="text-sm">Spirit</span>
-                  </div>
-                  {isPerfect && <span className="ml-auto text-yellow-600 text-sm font-medium">Perfect Day!</span>}
+                  <Circle size={16} fill="currentColor" className={myCrystals.Mind ? 'text-blue-600' : 'text-gray-300'} />
+                  <Circle size={16} fill="currentColor" className={myCrystals.Body ? 'text-red-600' : 'text-gray-300'} />
+                  <Circle size={16} fill="currentColor" className={myCrystals.Spirit ? 'text-amber-600' : 'text-gray-300'} />
                 </div>
               </div>
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-              {/* Habits List */}
+              {/* Habits */}
               <div className="lg:col-span-2 space-y-6">
                 {['Mind', 'Body', 'Spirit'].map(category => {
                   const categoryHabits = habits.filter(h => h.category === category);
                   if (categoryHabits.length === 0) return null;
 
-                  const colorMap = {
+                  const colors = {
                     Mind: { border: 'border-blue-300', bg: 'bg-blue-50', text: 'text-blue-600' },
                     Body: { border: 'border-red-300', bg: 'bg-red-50', text: 'text-red-600' },
                     Spirit: { border: 'border-amber-300', bg: 'bg-amber-50', text: 'text-amber-600' }
@@ -571,7 +484,7 @@ export default function TraxApp() {
 
                   return (
                     <div key={category}>
-                      <h2 className="text-sm font-medium text-gray-500 mb-3">{category.toUpperCase()}</h2>
+                      <h2 className="text-xs font-medium text-gray-400 mb-3">{category.toUpperCase()}</h2>
                       <div className="space-y-2">
                         {categoryHabits.map(habit => {
                           const count = getCompletionCount(habit.id);
@@ -580,26 +493,26 @@ export default function TraxApp() {
                           return (
                             <div
                               key={habit.id}
-                              className={`bg-white border rounded-lg p-4 flex items-center justify-between transition ${
-                                isComplete ? `${colorMap[category].border} ${colorMap[category].bg}` : 'border-gray-200'
+                              className={`bg-white border rounded-lg p-4 flex items-center justify-between ${
+                                isComplete ? `${colors[category].border} ${colors[category].bg}` : 'border-gray-200'
                               }`}
                             >
                               <button onClick={() => toggleCompletion(habit.id)} className="flex items-center gap-3 flex-1">
                                 {isComplete ? (
-                                  <CheckCircle size={20} className={colorMap[category].text} />
+                                  <CheckCircle size={20} className={colors[category].text} />
                                 ) : (
                                   <Circle size={20} className="text-gray-300" />
                                 )}
                                 <div className="text-left">
-                                  <div className="text-gray-900">{habit.name}</div>
-                                  <div className="text-xs text-gray-500">
-                                    {habit.points} pts
+                                  <div className="text-gray-900 text-sm">{habit.name}</div>
+                                  <div className="text-xs text-gray-400">
+                                    {habit.points}
                                     {habit.isRepeatable && ` • ${count}/${habit.maxCompletions}`}
                                   </div>
                                 </div>
                               </button>
-                              <button onClick={() => deleteHabit(habit.id)} className="p-2 text-gray-400 hover:text-red-600 transition">
-                                <X size={16} />
+                              <button onClick={() => deleteHabit(habit.id)} className="p-2 text-gray-300 hover:text-red-600">
+                                <X size={14} />
                               </button>
                             </div>
                           );
@@ -611,56 +524,30 @@ export default function TraxApp() {
 
                 {habits.length === 0 ? (
                   <div className="text-center py-12">
-                    <p className="text-gray-400 mb-4">No habits yet</p>
                     <button
                       onClick={() => setShowAddHabit(true)}
-                      className="inline-flex items-center gap-2 px-6 py-3 bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition"
+                      className="inline-flex items-center gap-2 px-6 py-3 bg-gray-900 text-white rounded-lg hover:bg-gray-800"
                     >
                       <Plus size={20} />
-                      Add Your First Habit
+                      Add Habit
                     </button>
                   </div>
                 ) : (
                   <button
                     onClick={() => setShowAddHabit(true)}
-                    className="w-full border-2 border-dashed border-gray-300 rounded-lg p-4 text-gray-400 hover:border-gray-400 hover:text-gray-600 transition flex items-center justify-center gap-2"
+                    className="w-full border-2 border-dashed border-gray-200 rounded-lg p-4 text-gray-400 hover:border-gray-300 hover:text-gray-600 flex items-center justify-center gap-2"
                   >
-                    <Plus size={20} />
-                    <span>Add Habit</span>
+                    <Plus size={16} />
+                    <span className="text-sm">Add</span>
                   </button>
                 )}
               </div>
 
-              {/* Sidebar */}
+              {/* Leaderboard */}
               <div className="space-y-6">
-                {/* Room Info */}
-                <div className="bg-white rounded-lg border border-gray-200 p-6">
-                  <h2 className="text-sm font-medium text-gray-500 mb-4">ROOM CODE</h2>
-                  <div className="flex items-center gap-2 mb-3">
-                    <code className="flex-1 px-3 py-2 bg-gray-50 rounded border border-gray-200 font-mono text-sm">
-                      {currentRoom?.code}
-                    </code>
-                    <button
-                      onClick={copyRoomCode}
-                      className="p-2 hover:bg-gray-100 rounded transition"
-                      title="Copy code"
-                    >
-                      {copied ? <Check size={18} className="text-green-600" /> : <Copy size={18} className="text-gray-400" />}
-                    </button>
-                  </div>
-                  <p className="text-xs text-gray-500 mb-3">Share this code with friends to invite them</p>
-                  <button
-                    onClick={leaveRoom}
-                    className="text-sm text-red-600 hover:text-red-700"
-                  >
-                    Leave Room
-                  </button>
-                </div>
-
-                {/* Leaderboard */}
                 {roomMembers.length > 1 && (
                   <div className="bg-white rounded-lg border border-gray-200 p-6">
-                    <h2 className="text-sm font-medium text-gray-500 mb-4">LEADERBOARD</h2>
+                    <h2 className="text-xs font-medium text-gray-400 mb-4">LEADERBOARD</h2>
                     <div className="space-y-2">
                       {roomMembers
                         .map(member => ({ member, points: getTodayPoints(member.id) }))
@@ -669,18 +556,18 @@ export default function TraxApp() {
                           <button
                             key={item.member.id}
                             onClick={() => setShowCompetitor(item.member)}
-                            className={`w-full text-left p-3 rounded-lg transition ${
-                              item.member.id === currentUser.id ? 'bg-gray-100' : 'hover:bg-gray-50'
+                            className={`w-full text-left p-3 rounded-lg ${
+                              item.member.id === currentUser.id ? 'bg-gray-50' : 'hover:bg-gray-50'
                             }`}
                           >
                             <div className="flex items-center justify-between">
                               <div className="flex items-center gap-3">
-                                <div className="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center text-sm font-medium text-gray-600">
+                                <div className="w-6 h-6 rounded-full bg-gray-200 flex items-center justify-center text-xs font-medium text-gray-600">
                                   {index + 1}
                                 </div>
                                 <div className="text-sm text-gray-900">{item.member.username}</div>
                               </div>
-                              <div className="text-sm text-gray-500">{item.points}</div>
+                              <div className="text-sm text-gray-400">{item.points}</div>
                             </div>
                           </button>
                         ))}
@@ -688,25 +575,55 @@ export default function TraxApp() {
                   </div>
                 )}
 
-                {/* Stakes */}
-                <div className="bg-white rounded-lg border border-gray-200 p-6">
-                  <h2 className="text-sm font-medium text-gray-500 mb-4">STAKES</h2>
-                  <input
-                    type="text"
-                    placeholder="What's at stake this week?"
-                    value={stakes}
-                    onChange={async (e) => {
-                      setStakes(e.target.value);
-                      await updateDoc(doc(db, 'rooms', currentRoom.id), { stakes: e.target.value });
-                    }}
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400 text-sm"
-                  />
-                </div>
+                {roomMembers.length === 1 && (
+                  <div className="bg-white rounded-lg border border-gray-200 p-6">
+                    <p className="text-sm text-gray-500 mb-3">Competing alone?</p>
+                    <button
+                      onClick={() => setShowInviteModal(true)}
+                      className="w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 text-sm"
+                    >
+                      Invite Friends
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
           </div>
 
-          {/* Modals - Add Habit, Competitor, Help (same as before) */}
+          {/* Invite Modal */}
+          {showInviteModal && (
+            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+              <div className="bg-white rounded-lg max-w-md w-full p-8">
+                <div className="text-center">
+                  <h2 className="text-2xl font-light text-gray-900 mb-2">Invite Friends</h2>
+                  <p className="text-sm text-gray-500 mb-6">Share this code to compete together</p>
+                  
+                  <div className="mb-6">
+                    <code className="inline-block px-6 py-4 bg-gray-900 text-white text-3xl font-mono rounded-lg tracking-widest">
+                      {currentRoom?.code}
+                    </code>
+                  </div>
+
+                  <button
+                    onClick={copyCode}
+                    className="w-full mb-4 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center justify-center gap-2"
+                  >
+                    {copied ? <Check size={20} /> : <Copy size={20} />}
+                    {copied ? 'Copied!' : 'Copy Code'}
+                  </button>
+
+                  <button
+                    onClick={() => setShowInviteModal(false)}
+                    className="w-full text-gray-600 py-2 hover:text-gray-900"
+                  >
+                    Close
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Add Habit Modal */}
           {showAddHabit && (
             <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
               <div className="bg-white rounded-lg max-w-md w-full p-6">
@@ -749,7 +666,7 @@ export default function TraxApp() {
                   {newHabit.isRepeatable && (
                     <input
                       type="number"
-                      placeholder="Max completions per day"
+                      placeholder="Max per day"
                       value={newHabit.maxCompletions}
                       onChange={(e) => setNewHabit({ ...newHabit, maxCompletions: e.target.value })}
                       className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400"
@@ -758,11 +675,11 @@ export default function TraxApp() {
                   <div className="flex gap-3 pt-4">
                     <button
                       onClick={() => setShowAddHabit(false)}
-                      className="flex-1 px-4 py-3 border border-gray-200 rounded-lg hover:bg-gray-50 transition"
+                      className="flex-1 px-4 py-3 border border-gray-200 rounded-lg hover:bg-gray-50"
                     >
                       Cancel
                     </button>
-                    <button onClick={addHabit} className="flex-1 px-4 py-3 bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition">
+                    <button onClick={addHabit} className="flex-1 px-4 py-3 bg-gray-900 text-white rounded-lg hover:bg-gray-800">
                       Add
                     </button>
                   </div>
@@ -771,6 +688,7 @@ export default function TraxApp() {
             </div>
           )}
 
+          {/* Competitor Modal */}
           {showCompetitor && (
             <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
               <div className="bg-white rounded-lg max-w-md w-full p-6">
@@ -784,53 +702,20 @@ export default function TraxApp() {
                   <div className="grid grid-cols-3 gap-3">
                     <div className="text-center p-4 bg-blue-50 rounded-lg">
                       <div className="text-2xl font-light text-blue-600">{getCategoryPoints(showCompetitor.id, 'Mind')}</div>
-                      <div className="text-xs text-gray-500 mt-1">Mind</div>
+                      <div className="text-xs text-gray-400 mt-1">Mind</div>
                     </div>
                     <div className="text-center p-4 bg-red-50 rounded-lg">
                       <div className="text-2xl font-light text-red-600">{getCategoryPoints(showCompetitor.id, 'Body')}</div>
-                      <div className="text-xs text-gray-500 mt-1">Body</div>
+                      <div className="text-xs text-gray-400 mt-1">Body</div>
                     </div>
                     <div className="text-center p-4 bg-amber-50 rounded-lg">
                       <div className="text-2xl font-light text-amber-600">{getCategoryPoints(showCompetitor.id, 'Spirit')}</div>
-                      <div className="text-xs text-gray-500 mt-1">Spirit</div>
+                      <div className="text-xs text-gray-400 mt-1">Spirit</div>
                     </div>
                   </div>
                   <div className="text-center p-4 bg-gray-50 rounded-lg">
                     <div className="text-3xl font-light text-gray-900">{getTodayPoints(showCompetitor.id)}</div>
-                    <div className="text-sm text-gray-500 mt-1">Total Points Today</div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {showHelp && (
-            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-              <div className="bg-white rounded-lg max-w-2xl w-full p-6 max-h-[90vh] overflow-y-auto">
-                <div className="flex items-center justify-between mb-6">
-                  <h2 className="text-xl font-light text-gray-900">How TRAX Works</h2>
-                  <button onClick={() => setShowHelp(false)} className="text-gray-400 hover:text-gray-600">
-                    <X size={24} />
-                  </button>
-                </div>
-                <div className="space-y-6 text-sm text-gray-600">
-                  <div>
-                    <h3 className="font-medium text-gray-900 mb-2">Competition Rooms</h3>
-                    <p>Create a private room and share the code with friends. Only people in your room can see and compete with each other.</p>
-                  </div>
-                  <div>
-                    <h3 className="font-medium text-gray-900 mb-2">The Basics</h3>
-                    <p>Complete habits to earn points. Win categories to earn crystals. Most crystals wins the week.</p>
-                  </div>
-                  <div>
-                    <h3 className="font-medium text-gray-900 mb-2">Three Categories</h3>
-                    <p><strong>Mind:</strong> Learning, studying, reading</p>
-                    <p><strong>Body:</strong> Exercise, nutrition, sleep</p>
-                    <p><strong>Spirit:</strong> Meditation, journaling, mindfulness</p>
-                  </div>
-                  <div>
-                    <h3 className="font-medium text-gray-900 mb-2">Winning</h3>
-                    <p>Win a category by having the most points in it each day. Win the week by earning the most crystals.</p>
+                    <div className="text-sm text-gray-400 mt-1">Total</div>
                   </div>
                 </div>
               </div>

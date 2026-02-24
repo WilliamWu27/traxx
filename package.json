@@ -1,25 +1,33 @@
-{
-  "name": "trax",
-  "version": "1.0.0",
-  "private": true,
-  "scripts": {
-    "dev": "vite",
-    "build": "vite build",
-    "preview": "vite preview"
-  },
-  "dependencies": {
-    "react": "^18.2.0",
-    "react-dom": "^18.2.0",
-    "lucide-react": "^0.263.1",
-    "firebase": "^10.7.1"
-  },
-  "devDependencies": {
-    "@types/react": "^18.2.0",
-    "@types/react-dom": "^18.2.0",
-    "@vitejs/plugin-react": "^4.0.0",
-    "autoprefixer": "^10.4.14",
-    "postcss": "^8.4.24",
-    "tailwindcss": "^3.3.2",
-    "vite": "^4.3.9"
-  }
-}
+# Making the Invite Feature More Visible
+
+## Current Issue
+The room code is in a small sidebar card. Users might miss it.
+
+## Solutions to Add:
+
+### 1. Add "Invite Friends" Button to Header
+```jsx
+<button className="bg-blue-600 text-white px-4 py-2 rounded-lg">
+  Invite Friends
+</button>
+```
+
+### 2. Show Invite Modal with:
+- Large room code
+- Copy button
+- Shareable text message
+- "Share via..." options
+
+### 3. First-time Prompt
+After creating room, show:
+"Your room is ready! Invite friends to compete"
+
+### 4. Empty State
+If you're the only person in room:
+"You're competing alone! Invite friends to make it fun"
+
+## Quick Fix for Now:
+
+Look in the right sidebar for "ROOM CODE" section.
+The code is there - click the copy button to share it!
+
