@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Clock, Circle, CheckCircle, Plus, X, LogOut, Copy, Check, UserPlus } from 'lucide-react';
+import { Clock, Circle, CheckCircle, Plus, X, LogOut, Copy, Check, UserPlus, HelpCircle } from 'lucide-react';
 import { auth, db } from './firebase';
 import { 
   createUserWithEmailAndPassword, 
@@ -16,7 +16,8 @@ import {
   deleteDoc,
   updateDoc,
   query,
-  where
+  where,
+  getDocs
 } from 'firebase/firestore';
 
 export default function TraxApp() {
@@ -31,6 +32,7 @@ export default function TraxApp() {
   const [roomCode, setRoomCode] = useState('');
   const [showRoomModal, setShowRoomModal] = useState(false);
   const [showInviteModal, setShowInviteModal] = useState(false);
+  const [showHelp, setShowHelp] = useState(false);
   const [copied, setCopied] = useState(false);
   const [habits, setHabits] = useState([]);
   const [completions, setCompletions] = useState([]);
@@ -53,6 +55,47 @@ export default function TraxApp() {
       code += chars[Math.floor(Math.random() * chars.length)];
     }
     return code;
+  };
+
+  const loadDefaultHabits = async () => {
+    const defaultHabits = [
+      { name: 'Study (1hr)', category: 'Mind', points: 15, isRepeatable: true, maxCompletions: 5 },
+      { name: 'Read (30min)', category: 'Mind', points: 10, isRepeatable: true, maxCompletions: 4 },
+      { name: 'Learn something new', category: 'Mind', points: 20, isRepeatable: false, maxCompletions: 1 },
+      { name: 'Exercise (30min)', category: 'Body', points: 15, isRepeatable: true, maxCompletions: 4 },
+      { name: 'Water (glass)', category: 'Body', points: 2, isRepeatable: true, maxCompletions: 8 },
+      { name: 'Healthy eating', category: 'Body', points: 15, isRepeatable: false, maxCompletions: 1 },
+      { name: 'Sleep 8hrs', category: 'Body', points: 15, isRepeatable: false, maxCompletions: 1 },
+      { name: 'Meditate (10min)', category: 'Spirit', points: 15, isRepeatable: true, maxCompletions: 3 },
+      { name: 'Journal', category: 'Spirit', points: 10, isRepeatable: false, maxCompletions: 1 },
+      { name: 'No social media', category: 'Spirit', points: 15, isRepeatable: false, maxCompletions: 1 },
+    ];
+
+    try {
+      // Check if habits already exist for this room
+      const habitsQuery = query(collection(db, 'habits'), where('roomId', '==', currentRoom.id));
+      const existingHabits = await getDocs(habitsQuery);
+      
+      if (existingHabits.size > 0) {
+        setError('Habits already loaded');
+        setTimeout(() => setError(''), 2000);
+        return;
+      }
+
+      for (const habit of defaultHabits) {
+        await setDoc(doc(db, 'habits', `${currentRoom.id}-${Date.now()}-${Math.random()}`), {
+          ...habit,
+          roomId: currentRoom.id,
+          createdBy: currentUser.id,
+          createdAt: new Date().toISOString()
+        });
+      }
+      
+      setShowAddHabit(false);
+    } catch (err) {
+      console.error('Load defaults error:', err);
+      setError('Failed to load defaults');
+    }
   };
 
   useEffect(() => {
@@ -165,8 +208,6 @@ export default function TraxApp() {
     
     try {
       const code = generateRoomCode();
-      console.log('Creating room with code:', code);
-      
       await setDoc(doc(db, 'rooms', code), {
         code: code,
         createdBy: currentUser.id,
@@ -179,8 +220,6 @@ export default function TraxApp() {
       setShowRoomModal(false);
       setShowInviteModal(true);
       setView('dashboard');
-      
-      console.log('Room created successfully');
     } catch (err) {
       console.error('Create room error:', err);
       setError('Failed to create room: ' + err.message);
@@ -201,8 +240,6 @@ export default function TraxApp() {
     }
     
     try {
-      console.log('Joining room:', code);
-      
       const roomDoc = await getDoc(doc(db, 'rooms', code));
       if (!roomDoc.exists()) {
         setError('Room not found');
@@ -215,8 +252,6 @@ export default function TraxApp() {
       setCurrentRoom({ id: code, ...roomDoc.data() });
       setShowRoomModal(false);
       setView('dashboard');
-      
-      console.log('Joined room successfully');
     } catch (err) {
       console.error('Join room error:', err);
       setError('Failed to join room: ' + err.message);
@@ -526,6 +561,12 @@ export default function TraxApp() {
                     <UserPlus size={18} />
                     <span className="hidden sm:inline">Invite</span>
                   </button>
+                  <button
+                    onClick={() => setShowHelp(true)}
+                    className="p-2 text-gray-400 hover:text-gray-600"
+                  >
+                    <HelpCircle size={20} />
+                  </button>
                   <button onClick={() => signOut(auth)} className="p-2 text-gray-400 hover:text-gray-600">
                     <LogOut size={20} />
                   </button>
@@ -615,6 +656,7 @@ export default function TraxApp() {
 
                 {habits.length === 0 ? (
                   <div className="text-center py-12">
+                    <p className="text-gray-400 text-sm mb-4">No habits yet</p>
                     <button
                       onClick={() => setShowAddHabit(true)}
                       className="inline-flex items-center gap-2 px-6 py-3 bg-gray-900 text-white rounded-lg hover:bg-gray-800"
@@ -681,44 +723,22 @@ export default function TraxApp() {
             </div>
           </div>
 
-          {/* Invite Modal */}
-          {showInviteModal && (
-            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-              <div className="bg-white rounded-lg max-w-md w-full p-8">
-                <div className="text-center">
-                  <h2 className="text-2xl font-light text-gray-900 mb-2">Invite Friends</h2>
-                  <p className="text-sm text-gray-500 mb-6">Share this code</p>
-                  
-                  <div className="mb-6">
-                    <code className="inline-block px-6 py-4 bg-gray-900 text-white text-3xl font-mono rounded-lg tracking-widest">
-                      {currentRoom?.code}
-                    </code>
-                  </div>
-
-                  <button
-                    onClick={copyCode}
-                    className="w-full mb-4 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center justify-center gap-2"
-                  >
-                    {copied ? <Check size={20} /> : <Copy size={20} />}
-                    {copied ? 'Copied!' : 'Copy Code'}
-                  </button>
-
-                  <button
-                    onClick={() => setShowInviteModal(false)}
-                    className="w-full text-gray-600 py-2 hover:text-gray-900"
-                  >
-                    Close
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
-
           {/* Add Habit Modal */}
           {showAddHabit && (
             <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
               <div className="bg-white rounded-lg max-w-md w-full p-6">
                 <h2 className="text-xl font-light text-gray-900 mb-4">Add Habit</h2>
+                
+                {/* Load Defaults Button */}
+                {habits.length === 0 && (
+                  <button
+                    onClick={loadDefaultHabits}
+                    className="w-full mb-4 px-4 py-3 bg-blue-50 text-blue-700 border border-blue-200 rounded-lg hover:bg-blue-100 text-sm"
+                  >
+                    Load Default Habits
+                  </button>
+                )}
+                
                 <div className="space-y-4">
                   <input
                     type="text"
@@ -763,6 +783,7 @@ export default function TraxApp() {
                       className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400"
                     />
                   )}
+                  {error && <p className="text-red-500 text-sm">{error}</p>}
                   <div className="flex gap-3 pt-4">
                     <button
                       onClick={() => setShowAddHabit(false)}
@@ -774,6 +795,69 @@ export default function TraxApp() {
                       Add
                     </button>
                   </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Help Modal */}
+          {showHelp && (
+            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+              <div className="bg-white rounded-lg max-w-md w-full p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className="text-xl font-light text-gray-900">How TRAX Works</h2>
+                  <button onClick={() => setShowHelp(false)} className="text-gray-400 hover:text-gray-600">
+                    <X size={24} />
+                  </button>
+                </div>
+                <div className="space-y-4 text-sm text-gray-600">
+                  <div>
+                    <p className="font-medium text-gray-900 mb-1">Complete habits, earn points</p>
+                    <p>Win each category (Mind/Body/Spirit) daily to earn a crystal</p>
+                  </div>
+                  <div>
+                    <p className="font-medium text-gray-900 mb-1">Compete with friends</p>
+                    <p>Share your room code to invite others. Most crystals wins the week</p>
+                  </div>
+                  <div>
+                    <p className="font-medium text-gray-900 mb-1">Categories</p>
+                    <p><strong>Mind:</strong> Learning, reading, studying</p>
+                    <p><strong>Body:</strong> Exercise, nutrition, sleep</p>
+                    <p><strong>Spirit:</strong> Meditation, journaling, mindfulness</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Invite Modal */}
+          {showInviteModal && (
+            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+              <div className="bg-white rounded-lg max-w-md w-full p-8">
+                <div className="text-center">
+                  <h2 className="text-2xl font-light text-gray-900 mb-2">Invite Friends</h2>
+                  <p className="text-sm text-gray-500 mb-6">Share this code</p>
+                  
+                  <div className="mb-6">
+                    <code className="inline-block px-6 py-4 bg-gray-900 text-white text-3xl font-mono rounded-lg tracking-widest">
+                      {currentRoom?.code}
+                    </code>
+                  </div>
+
+                  <button
+                    onClick={copyCode}
+                    className="w-full mb-4 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center justify-center gap-2"
+                  >
+                    {copied ? <Check size={20} /> : <Copy size={20} />}
+                    {copied ? 'Copied!' : 'Copy Code'}
+                  </button>
+
+                  <button
+                    onClick={() => setShowInviteModal(false)}
+                    className="w-full text-gray-600 py-2 hover:text-gray-900"
+                  >
+                    Close
+                  </button>
                 </div>
               </div>
             </div>
