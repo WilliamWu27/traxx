@@ -1,11 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Clock, Plus, X, LogOut, Copy, Check, UserPlus, HelpCircle, Trophy, User, Flame, Zap, Star, TrendingUp, ArrowLeftRight, Edit3, Calendar, ChevronLeft, ChevronRight, Crown, Target, ArrowUp, ArrowDown, Minus as MinusIcon } from 'lucide-react';
+import { Clock, Plus, X, LogOut, Copy, Check, UserPlus, HelpCircle, Trophy, User, Flame, Zap, Star, TrendingUp, ArrowLeftRight, Edit3, Calendar, ChevronLeft, ChevronRight, Crown, Target, ArrowUp, ArrowDown, Minus as MinusIcon, GripVertical, BarChart3, Sun, Moon } from 'lucide-react';
 import { auth, db } from './firebase';
 import {
   createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, sendPasswordResetEmail
 } from 'firebase/auth';
 import {
-  collection, doc, setDoc, getDoc, onSnapshot, deleteDoc, updateDoc, query, where, getDocs, arrayUnion, arrayRemove
+  collection, doc, setDoc, getDoc, onSnapshot, deleteDoc, updateDoc, query, where, getDocs, arrayUnion, arrayRemove, orderBy, limit
 } from 'firebase/firestore';
 
 // ─── CONFETTI ───
@@ -18,7 +18,7 @@ function ConfettiCanvas({ trigger }) {
     const ctx = canvas.getContext('2d');
     canvas.width = window.innerWidth; canvas.height = window.innerHeight;
     const colors = ['#f43f5e','#3b82f6','#10b981','#f59e0b','#8b5cf6','#ec4899','#06b6d4','#84cc16'];
-    const particles = Array.from({length:120}, () => ({
+    const particles = Array.from({length:180}, () => ({
       x: Math.random()*canvas.width, y: -20-Math.random()*200, w: 4+Math.random()*6, h: 8+Math.random()*12,
       vx: (Math.random()-0.5)*6, vy: 2+Math.random()*4, rot: Math.random()*360, rotV: (Math.random()-0.5)*12,
       color: colors[Math.floor(Math.random()*colors.length)], life: 1
@@ -51,11 +51,12 @@ function ProgressRing({ progress, size = 56, stroke = 4, color = '#3b82f6' }) {
 }
 
 // ─── MODAL WRAPPER ───
-function Modal({ show, onClose, children, wide }) {
+function Modal({ show, onClose, children, wide, dark = true }) {
   if (!show) return null;
+  const mbg = dark ? 'bg-[#12121a] border-white/[0.06]' : 'bg-white border-gray-200';
   return (
     <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 z-50" onClick={onClose}>
-      <div className={'bg-[#12121a] rounded-2xl w-full p-6 border border-white/[0.06] shadow-2xl max-h-[85vh] overflow-y-auto ' + (wide ? 'max-w-md' : 'max-w-sm')} onClick={e => e.stopPropagation()}>
+      <div className={`rounded-2xl w-full p-6 border shadow-2xl max-h-[85vh] overflow-y-auto ${mbg} ` + (wide ? 'max-w-md' : 'max-w-sm')} onClick={e => e.stopPropagation()}>
         {children}
       </div>
     </div>
@@ -113,15 +114,47 @@ export default function TraxApp() {
   const [editHabitData, setEditHabitData] = useState({});
   const [weeklyWinner, setWeeklyWinner] = useState(null);
   const [yesterdayPoints, setYesterdayPoints] = useState(0);
+  const [dateKey, setDateKey] = useState(getToday());
+  const [editMode, setEditMode] = useState(false);
+  const [habitOrder, setHabitOrder] = useState([]);
+  const [showWeeklyRecap, setShowWeeklyRecap] = useState(false);
+  const [lastWeekData, setLastWeekData] = useState(null);
+  const [darkMode, setDarkMode] = useState(() => {
+    try { const stored = localStorage.getItem('trax-theme'); return stored ? stored === 'dark' : true; } catch { return true; }
+  });
+  const [roomCategories, setRoomCategories] = useState([]);
+  const [showAddCategory, setShowAddCategory] = useState(false);
+  const [newCatName, setNewCatName] = useState('');
+  const [newCatColor, setNewCatColor] = useState(0);
+  const [newCatIcon, setNewCatIcon] = useState('⭐');
+  const [maxedHabit, setMaxedHabit] = useState(null); // for maxout animation // triggers re-subscribe at midnight
 
   // ─── HELPERS ───
   const genCode = () => { const c = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; let r = ''; for (let i=0;i<6;i++) r+=c[Math.floor(Math.random()*c.length)]; return r; };
-  const getWeekStart = () => { const n = new Date(), d = n.getDay(), diff = n.getDate()-d+(d===0?-6:1); const m = new Date(n); m.setDate(diff); m.setHours(0,0,0,0); return m.toISOString().split('T')[0]; };
-  const getWeekEnd = () => { const ws = getWeekStart(); const d = new Date(ws); d.setDate(d.getDate()+6); return d.toISOString().split('T')[0]; };
-  const getToday = () => new Date().toISOString().split('T')[0];
-  const getYesterday = () => { const d = new Date(); d.setDate(d.getDate()-1); return d.toISOString().split('T')[0]; };
+  const getWeekStart = () => { const n = new Date(), d = n.getDay(), diff = n.getDate()-d+(d===0?-6:1); const m = new Date(n); m.setDate(diff); m.setHours(0,0,0,0); return formatDateStr(m); };
+  const getWeekEnd = () => { const ws = getWeekStart(); const d = new Date(ws+'T12:00:00'); d.setDate(d.getDate()+6); return formatDateStr(d); };
+  const getToday = () => { const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0'); };
+  const getYesterday = () => { const d = new Date(); d.setDate(d.getDate()-1); return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0'); };
+  const formatDateStr = (d) => d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
   const formatDate = (ds) => { const d = new Date(ds+'T12:00:00'); return d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }); };
   const getDaysUntilSunday = () => { const d = new Date(); const day = d.getDay(); return day === 0 ? 0 : 7 - day; };
+  const getLastWeekStart = () => { const d = new Date(getWeekStart()+'T12:00:00'); d.setDate(d.getDate()-7); return formatDateStr(d); };
+  const getLastWeekEnd = () => { const d = new Date(getWeekStart()+'T12:00:00'); d.setDate(d.getDate()-1); return formatDateStr(d); };
+  const toggleTheme = () => { const next = !darkMode; setDarkMode(next); try { localStorage.setItem('trax-theme', next ? 'dark' : 'light'); } catch {} };
+  const getOrderedHabits = (cat) => {
+    const ch = habits.filter(h=>h.category===cat);
+    if (!habitOrder.length) return ch;
+    return [...ch].sort((a,b)=>{const ai=habitOrder.indexOf(a.id),bi=habitOrder.indexOf(b.id);if(ai===-1&&bi===-1)return 0;if(ai===-1)return 1;if(bi===-1)return-1;return ai-bi;});
+  };
+  const saveHabitOrder = async (cat, newOrderedHabits) => {
+    const orderId = currentUser.id+'_'+currentRoom.id;
+    const otherIds = habitOrder.filter(id=>{const h=habits.find(x=>x.id===id);return h&&h.category!==cat;});
+    const newIds = newOrderedHabits.map(h=>h.id);
+    const allOrdered = [];
+    allCatNames.forEach(c=>{if(c===cat)allOrdered.push(...newIds);else{const catIds=otherIds.filter(id=>{const h=habits.find(x=>x.id===id);return h?.category===c;});const unordered=habits.filter(h=>h.category===c&&!catIds.includes(h.id)).map(h=>h.id);allOrdered.push(...catIds,...unordered);}});
+    setHabitOrder(allOrdered);
+    try{await setDoc(doc(db,'habitOrder',orderId),{order:allOrdered,userId:currentUser.id,roomId:currentRoom.id});}catch(err){console.error(err);}
+  };
   const getGreeting = () => { const h = new Date().getHours(); if(h<5) return 'Burning the midnight oil'; if(h<12) return 'Good morning'; if(h<17) return 'Good afternoon'; if(h<21) return 'Good evening'; return 'Night owl mode'; };
   const getMotivation = () => {
     const msgs = ["Let's crush it today","Every rep counts","Build the future you","Small wins, big results","Discipline equals freedom","Level up today","Outwork yesterday","Stay locked in","The grind pays off","Consistency beats talent","One day or day one","Make it count","Your only limit is you","Champions train daily","Focus mode activated"];
@@ -196,8 +229,35 @@ export default function TraxApp() {
       setRoomMembers(prev => { const ids = new Set(prev.map(m=>m.id)); const nw = s.docs.map(d=>({id:d.id,...d.data()})).filter(m=>!ids.has(m.id)); return [...prev,...nw]; });
     });
     const u6 = onSnapshot(doc(db, 'stakes', currentRoom.id), s => { if(s.exists()) setRoomStakes({id:s.id,...s.data()}); else setRoomStakes(null); });
-    return () => { u1(); u2(); u3(); u4(); u5(); u6(); };
-  }, [currentUser, currentRoom]);
+    // Habit order listener
+    const u7 = onSnapshot(doc(db, 'habitOrder', currentUser.id+'_'+currentRoom.id), s => { if(s.exists()) setHabitOrder(s.data().order||[]); else setHabitOrder([]); });
+    // Room categories listener
+    const u8 = onSnapshot(doc(db, 'roomCategories', currentRoom.id), s => { if(s.exists()) setRoomCategories(s.data().categories||[]); else setRoomCategories([]); });
+    return () => { u1(); u2(); u3(); u4(); u5(); u6(); u7(); u8(); };
+  }, [currentUser, currentRoom, dateKey]);
+
+  // ─── LAST WEEK DATA (for recap) ───
+  useEffect(() => {
+    if (!currentUser || !currentRoom || roomMembers.length < 1) return;
+    const loadLastWeek = async () => {
+      try {
+        const lws = getLastWeekStart(), lwe = getLastWeekEnd();
+        const snap = await getDocs(query(collection(db,'completions'), where('roomId','==',currentRoom.id), where('date','>=',lws), where('date','<=',lwe)));
+        const comps = snap.docs.map(d=>({id:d.id,...d.data()}));
+        if (!comps.length) { setLastWeekData(null); return; }
+        const scores = roomMembers.map(m => {
+          const mc = comps.filter(c=>c.userId===m.id);
+          const pts = mc.reduce((s,c)=>{const h=habits.find(x=>x.id===c.habitId);return s+((h?.points||c.habitPoints||0)*(c.count||1));},0);
+          const catPts = {}; allCatNames.forEach(c => catPts[c] = 0);
+          mc.forEach(c=>{const h=habits.find(x=>x.id===c.habitId);const cat=h?.category||c.habitCategory||'Mind';catPts[cat]+=(h?.points||c.habitPoints||0)*(c.count||1);});
+          const activeDays = [...new Set(mc.map(c=>c.date))].length;
+          return {member:m, pts, catPts, activeDays, completions:mc.length};
+        }).sort((a,b)=>b.pts-a.pts);
+        setLastWeekData({scores, dateRange: formatDate(lws)+' — '+formatDate(lwe)});
+      } catch { setLastWeekData(null); }
+    };
+    loadLastWeek();
+  }, [currentUser, currentRoom, roomMembers, habits]);
 
   // ─── STREAK + YESTERDAY ───
   useEffect(() => {
@@ -205,13 +265,13 @@ export default function TraxApp() {
     const calc = async () => {
       try {
         const ago = new Date(); ago.setDate(ago.getDate()-60);
-        const snap = await getDocs(query(collection(db, 'completions'), where('userId', '==', currentUser.id), where('date', '>=', ago.toISOString().split('T')[0])));
+        const snap = await getDocs(query(collection(db, 'completions'), where('userId', '==', currentUser.id), where('date', '>=', formatDateStr(ago))));
         const dates = [...new Set(snap.docs.map(d=>d.data().date))].sort().reverse();
         let streak = 0;
         const today = getToday(), yStr = getYesterday();
         if (dates.includes(today) || dates.includes(yStr)) {
           let check = dates.includes(today) ? new Date() : new Date(Date.now()-86400000);
-          while (dates.includes(check.toISOString().split('T')[0])) { streak++; check.setDate(check.getDate()-1); }
+          while (dates.includes(formatDateStr(check))) { streak++; check.setDate(check.getDate()-1); }
         }
         // Yesterday's points for solo mode
         const yComps = snap.docs.filter(d => d.data().date === yStr && d.data().roomId === currentRoom.id);
@@ -250,10 +310,17 @@ export default function TraxApp() {
     } else setWeeklyWinner(null);
   }, [roomMembers, allCompletions, habits, currentRoom]);
 
-  // ─── TIMER ───
+  // ─── TIMER + MIDNIGHT RESET ───
   useEffect(() => {
-    const update = () => { const n=new Date(), m=new Date(n); m.setHours(24,0,0,0); const d=m-n; setTimeDisplay(Math.floor(d/3600000)+'h '+Math.floor((d%3600000)/60000)+'m'); };
-    update(); const iv=setInterval(update,60000); return()=>clearInterval(iv);
+    const update = () => {
+      const n = new Date(), m = new Date(n); m.setHours(24,0,0,0);
+      const d = m - n;
+      setTimeDisplay(Math.floor(d/3600000)+'h '+Math.floor((d%3600000)/60000)+'m');
+      // Check if date changed (midnight crossed) — triggers re-subscribe
+      const today = getToday();
+      setDateKey(prev => { if (prev !== today) return today; return prev; });
+    };
+    update(); const iv = setInterval(update, 30000); return () => clearInterval(iv);
   }, []);
 
   // ─── AUTH HANDLERS ───
@@ -356,14 +423,14 @@ export default function TraxApp() {
     const t = getToday(), h = habits.find(x=>x.id===hid); if(!h) return;
     const max = h.isRepeatable ? (h.maxCompletions||1) : 1;
     const ex = getExisting(hid);
+    const triggerMaxed = () => { setConfettiTrigger(v=>v+1); setMaxedHabit(hid); setTimeout(()=>setMaxedHabit(null),1500); };
     try {
       if (ex) {
-        if (ex.count < max) { await updateDoc(doc(db, 'completions', ex.id), { count: ex.count+1 }); if(ex.count+1>=max) setConfettiTrigger(v=>v+1); }
+        if (ex.count < max) { await updateDoc(doc(db, 'completions', ex.id), { count: ex.count+1 }); if(ex.count+1>=max) triggerMaxed(); }
       } else {
         const cid = currentUser.id+'_'+hid+'_'+t;
-        // Store habit name & points on completion doc so history survives habit deletion
         await setDoc(doc(db, 'completions', cid), { userId: currentUser.id, habitId: hid, roomId: currentRoom.id, date: t, count: 1, habitName: h.name, habitPoints: h.points, habitCategory: h.category });
-        if (max===1) setConfettiTrigger(v=>v+1);
+        if (max===1) triggerMaxed();
       }
     } catch (err) { console.error(err); }
   };
@@ -383,7 +450,7 @@ export default function TraxApp() {
   const shiftHistoryDate = (dir) => {
     const d = new Date(historyDate+'T12:00:00');
     d.setDate(d.getDate()+dir);
-    const ds = d.toISOString().split('T')[0];
+    const ds = formatDateStr(d);
     if (ds > getToday()) return;
     loadHistoryDate(ds);
   };
@@ -391,13 +458,13 @@ export default function TraxApp() {
   // ─── SCORING ───
   const getCatPts = (uid, cat) => completions.filter(c=>c.userId===uid&&c.date===getToday()).reduce((s,c)=>{ const h=habits.find(x=>x.id===c.habitId); if(h&&h.category===cat) return s+(h.points*(c.count||1)); return s; },0);
   const getTodayCrystals = (uid) => {
-    const cr = { Mind:false, Body:false, Spirit:false };
+    const cr = {}; allCatNames.forEach(c => cr[c] = false);
     // Solo mode: earn crystal if you beat yesterday's category points
     if (roomMembers.length < 2) {
-      ['Mind','Body','Spirit'].forEach(cat => { if(getCatPts(uid,cat) > 0) cr[cat] = true; });
+      allCatNames.forEach(cat => { if(getCatPts(uid,cat) > 0) cr[cat] = true; });
       return cr;
     }
-    ['Mind','Body','Spirit'].forEach(cat => {
+    allCatNames.forEach(cat => {
       let mx=-1, w=null;
       roomMembers.forEach(m=>{ const p=getCatPts(m.id,cat); if(p>mx){mx=p;w=m;}else if(p===mx&&p>0)w=null; });
       if(w&&w.id===uid) cr[cat]=true;
@@ -409,7 +476,7 @@ export default function TraxApp() {
   const getWeeklyCrystals = (uid) => {
     let t=0; const ws=getWeekStart(), td=getToday();
     const dates=[...new Set(allCompletions.filter(c=>c.date>=ws&&c.date<=td).map(c=>c.date))];
-    dates.forEach(date=>{ ['Mind','Body','Spirit'].forEach(cat=>{
+    dates.forEach(date=>{ allCatNames.forEach(cat=>{
       let mx=-1, w=null;
       roomMembers.forEach(m=>{ const p=allCompletions.filter(c=>c.userId===m.id&&c.date===date).reduce((s,c)=>{const h=habits.find(x=>x.id===c.habitId);if(h&&h.category===cat)return s+(h.points*(c.count||1));return s;},0); if(p>mx){mx=p;w=m;}else if(p===mx&&p>0)w=null; });
       if(w&&w.id===uid) t++;
@@ -420,11 +487,49 @@ export default function TraxApp() {
   const getDailyProgress = () => { if(!habits.length)return 0; let tm=0,td=0; habits.forEach(h=>{const mx=h.isRepeatable?(h.maxCompletions||1):1;tm+=mx;td+=Math.min(getCount(h.id),mx);}); return tm>0?td/tm:0; };
   const getLeaderboard = () => roomMembers.map(m=>({member:m,todayPts:getTodayPts(m.id),weeklyPts:getWeeklyPts(m.id),crystals:getTodayCrystals(m.id),weeklyCrystals:getWeeklyCrystals(m.id)})).sort((a,b)=>leaderboardTab==='today'?b.todayPts-a.todayPts:b.weeklyPts-a.weeklyPts);
 
-  // ─── THEMES ───
-  const CT = {
-    Mind: { neon:'#3b82f6', glow:'shadow-blue-500/30', bg:'bg-blue-500', bgS:'bg-blue-500/10', bgM:'bg-blue-500/20', bdr:'border-blue-500/30', txt:'text-blue-400', txtB:'text-blue-300', pill:'bg-blue-500/20 text-blue-300', icon:'\u{1F9E0}', label:'MIND' },
-    Body: { neon:'#f97316', glow:'shadow-orange-500/30', bg:'bg-orange-500', bgS:'bg-orange-500/10', bgM:'bg-orange-500/20', bdr:'border-orange-500/30', txt:'text-orange-400', txtB:'text-orange-300', pill:'bg-orange-500/20 text-orange-300', icon:'\u{1F4AA}', label:'BODY' },
-    Spirit: { neon:'#10b981', glow:'shadow-emerald-500/30', bg:'bg-emerald-500', bgS:'bg-emerald-500/10', bgM:'bg-emerald-500/20', bdr:'border-emerald-500/30', txt:'text-emerald-400', txtB:'text-emerald-300', pill:'bg-emerald-500/20 text-emerald-300', icon:'\u2728', label:'SPIRIT' }
+  // ─── CATEGORY SYSTEM ───
+  const COLOR_PALETTE = [
+    { name:'Blue', neon:'#3b82f6', bg:'bg-blue-500', bgS:'bg-blue-500/10', bgM:'bg-blue-500/20', bdr:'border-blue-500/30', txt:'text-blue-400', txtB:'text-blue-300', pill:'bg-blue-500/20 text-blue-300', glow:'shadow-blue-500/30' },
+    { name:'Orange', neon:'#f97316', bg:'bg-orange-500', bgS:'bg-orange-500/10', bgM:'bg-orange-500/20', bdr:'border-orange-500/30', txt:'text-orange-400', txtB:'text-orange-300', pill:'bg-orange-500/20 text-orange-300', glow:'shadow-orange-500/30' },
+    { name:'Emerald', neon:'#10b981', bg:'bg-emerald-500', bgS:'bg-emerald-500/10', bgM:'bg-emerald-500/20', bdr:'border-emerald-500/30', txt:'text-emerald-400', txtB:'text-emerald-300', pill:'bg-emerald-500/20 text-emerald-300', glow:'shadow-emerald-500/30' },
+    { name:'Purple', neon:'#8b5cf6', bg:'bg-violet-500', bgS:'bg-violet-500/10', bgM:'bg-violet-500/20', bdr:'border-violet-500/30', txt:'text-violet-400', txtB:'text-violet-300', pill:'bg-violet-500/20 text-violet-300', glow:'shadow-violet-500/30' },
+    { name:'Pink', neon:'#ec4899', bg:'bg-pink-500', bgS:'bg-pink-500/10', bgM:'bg-pink-500/20', bdr:'border-pink-500/30', txt:'text-pink-400', txtB:'text-pink-300', pill:'bg-pink-500/20 text-pink-300', glow:'shadow-pink-500/30' },
+    { name:'Cyan', neon:'#06b6d4', bg:'bg-cyan-500', bgS:'bg-cyan-500/10', bgM:'bg-cyan-500/20', bdr:'border-cyan-500/30', txt:'text-cyan-400', txtB:'text-cyan-300', pill:'bg-cyan-500/20 text-cyan-300', glow:'shadow-cyan-500/30' },
+    { name:'Rose', neon:'#f43f5e', bg:'bg-rose-500', bgS:'bg-rose-500/10', bgM:'bg-rose-500/20', bdr:'border-rose-500/30', txt:'text-rose-400', txtB:'text-rose-300', pill:'bg-rose-500/20 text-rose-300', glow:'shadow-rose-500/30' },
+    { name:'Amber', neon:'#f59e0b', bg:'bg-amber-500', bgS:'bg-amber-500/10', bgM:'bg-amber-500/20', bdr:'border-amber-500/30', txt:'text-amber-400', txtB:'text-amber-300', pill:'bg-amber-500/20 text-amber-300', glow:'shadow-amber-500/30' },
+  ];
+  const ICON_OPTIONS = ['🧠','💪','✨','⭐','📚','🎨','💼','🏃','🧘','💰','🎯','❤️','🌱','🔬','🎮','🍎'];
+  const DEFAULT_CATEGORIES = [
+    { name:'Mind', colorIdx:0, icon:'🧠' },
+    { name:'Body', colorIdx:1, icon:'💪' },
+    { name:'Spirit', colorIdx:2, icon:'✨' },
+  ];
+  const activeCategories = roomCategories.length > 0 ? roomCategories : DEFAULT_CATEGORIES;
+  const getCT = (catName) => {
+    const cat = activeCategories.find(c=>c.name===catName);
+    const ci = cat ? cat.colorIdx : 0;
+    const p = COLOR_PALETTE[ci % COLOR_PALETTE.length];
+    return { ...p, icon: cat?.icon || '⭐', label: (catName||'').toUpperCase() };
+  };
+  // Backward compat: CT object for the 3 defaults
+  const CT = {};
+  activeCategories.forEach(c => { CT[c.name] = getCT(c.name); });
+  const allCatNames = activeCategories.map(c=>c.name);
+
+  const addCategory = async () => {
+    if (!newCatName.trim() || activeCategories.find(c=>c.name.toLowerCase()===newCatName.trim().toLowerCase())) return;
+    const updated = [...activeCategories, { name: newCatName.trim(), colorIdx: newCatColor, icon: newCatIcon }];
+    try {
+      await setDoc(doc(db, 'roomCategories', currentRoom.id), { categories: updated });
+      setNewCatName(''); setNewCatColor(0); setNewCatIcon('⭐'); setShowAddCategory(false);
+    } catch { setError('Failed to add category'); }
+  };
+  const deleteCategory = async (catName) => {
+    const catHabits = habits.filter(h=>h.category===catName);
+    if (catHabits.length > 0) { setError('Delete habits in this category first'); setTimeout(()=>setError(''),2000); return; }
+    if (['Mind','Body','Spirit'].includes(catName)) { setError("Can't delete default categories"); setTimeout(()=>setError(''),2000); return; }
+    const updated = activeCategories.filter(c=>c.name!==catName);
+    try { await setDoc(doc(db, 'roomCategories', currentRoom.id), { categories: updated }); } catch {}
   };
   const stakePresets = [
     { type:'custom', label:'Custom', desc:'Set your own', ph:'e.g. Loser does 50 pushups' },
@@ -433,7 +538,19 @@ export default function TraxApp() {
     { type:'service', label:'Service', desc:'Loser does a favor', ph:"e.g. Loser's chores" },
   ];
 
-  const inputCls = "w-full px-4 py-3 bg-white/[0.04] border border-white/[0.08] rounded-xl focus:outline-none focus:border-blue-500/50 text-white placeholder-gray-600 text-sm transition-all";
+  // ─── THEME CLASSES ───
+  const T = darkMode ? {
+    bg: 'bg-[#0a0a0f]', bgCard: 'bg-white/[0.03]', bgCardHover: 'hover:bg-white/[0.04]', bgInput: 'bg-white/[0.04]',
+    border: 'border-white/[0.06]', borderInput: 'border-white/[0.08]', text: 'text-white', textMuted: 'text-gray-500',
+    textDim: 'text-gray-600', textFaint: 'text-gray-700', headerBg: 'bg-[#0a0a0f]/80', modalBg: 'bg-[#12121a]',
+    selectBg: 'bg-[#12121a]', glowOrb: '/8', blurBg: 'backdrop-blur-xl'
+  } : {
+    bg: 'bg-gray-50', bgCard: 'bg-white', bgCardHover: 'hover:bg-gray-50', bgInput: 'bg-gray-100',
+    border: 'border-gray-200', borderInput: 'border-gray-300', text: 'text-gray-900', textMuted: 'text-gray-500',
+    textDim: 'text-gray-400', textFaint: 'text-gray-300', headerBg: 'bg-white/80', modalBg: 'bg-white',
+    selectBg: 'bg-white', glowOrb: '/5', blurBg: 'backdrop-blur-xl'
+  };
+  const inputCls = `w-full px-4 py-3 ${T.bgInput} border ${T.borderInput} rounded-xl focus:outline-none focus:border-blue-500/50 ${T.text} placeholder-gray-400 text-sm transition-all`;
   const btnPrimary = "w-full py-3.5 rounded-xl text-sm font-bold tracking-wide transition-all disabled:opacity-50 active:scale-[0.98]";
 
   // ─── LOADING ───
@@ -446,7 +563,7 @@ export default function TraxApp() {
 
   const myCr = currentUser&&currentRoom ? getTodayCrystals(currentUser.id) : {};
   const myPts = currentUser&&currentRoom ? getTodayPts(currentUser.id) : 0;
-  const isPerfect = myCr.Mind&&myCr.Body&&myCr.Spirit;
+  const isPerfect = allCatNames.length > 0 && allCatNames.every(c => myCr[c]);
   const dailyProg = currentUser&&currentRoom ? getDailyProgress() : 0;
   const soloMode = roomMembers.length < 2;
 
@@ -548,25 +665,29 @@ export default function TraxApp() {
   // MAIN DASHBOARD
   // ═══════════════════════════════════════
   return (
-    <div className="min-h-screen bg-[#0a0a0f] text-white">
+    <div className={`min-h-screen ${T.bg} ${T.text} transition-colors duration-300`}>
       <ConfettiCanvas trigger={confettiTrigger} />
+      {/* Maxout screen flash */}
+      {maxedHabit && <div className="fixed inset-0 z-[99] pointer-events-none animate-pulse" style={{background:'radial-gradient(circle at center, rgba(255,255,255,0.1) 0%, transparent 70%)'}}/>}
       {/* Header */}
-      <div className="bg-[#0a0a0f]/80 backdrop-blur-xl border-b border-white/[0.04] sticky top-0 z-40">
+      <div className={`${T.headerBg} ${T.blurBg} border-b ${T.border} sticky top-0 z-40`}>
         <div className="max-w-2xl mx-auto px-4 py-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <h1 className="text-lg font-black tracking-[0.2em]">TRAX</h1>
               <div className="flex gap-1"><div className="w-1.5 h-1.5 rounded-full bg-blue-500"/><div className="w-1.5 h-1.5 rounded-full bg-orange-500"/><div className="w-1.5 h-1.5 rounded-full bg-emerald-500"/></div>
-              <button onClick={()=>setShowSwitchRoom(true)} className="ml-2 flex items-center gap-1 px-2 py-1 bg-white/[0.04] border border-white/[0.06] rounded-lg text-[10px] text-gray-500 hover:text-white hover:border-white/[0.12] transition-all"><span className="font-mono tracking-wider">{currentRoom?.code}</span>{userRooms.length>1&&<ArrowLeftRight size={10}/>}</button>
+              <button onClick={()=>setShowSwitchRoom(true)} className={`ml-2 flex items-center gap-1 px-2 py-1 ${T.bgCard} border ${T.border} rounded-lg text-[10px] ${T.textMuted} hover:${T.text} transition-all`}><span className="font-mono tracking-wider">{currentRoom?.code}</span>{userRooms.length>1&&<ArrowLeftRight size={10}/>}</button>
             </div>
             <div className="flex items-center gap-1">
               <button onClick={()=>setShowLeaderboard(true)} className="flex items-center gap-1 px-2.5 py-1.5 bg-gradient-to-r from-amber-500/20 to-orange-500/20 border border-amber-500/20 text-amber-400 rounded-lg hover:border-amber-500/40 transition-all text-xs font-semibold"><Trophy size={12}/></button>
               <button onClick={()=>setShowStakes(true)} className={'p-1.5 transition-colors '+(roomStakes?'text-red-400 hover:text-red-300':'text-gray-700 hover:text-red-400')}><Zap size={14}/></button>
-              <button onClick={()=>{setHistoryDate(getYesterday());loadHistoryDate(getYesterday());setShowHistory(true);}} className="p-1.5 text-gray-600 hover:text-white transition-colors"><Calendar size={14}/></button>
-              <button onClick={()=>setShowProfile(true)} className="p-1.5 text-gray-600 hover:text-white transition-colors"><User size={14}/></button>
-              <button onClick={()=>setShowInviteModal(true)} className="p-1.5 text-gray-600 hover:text-white transition-colors"><UserPlus size={14}/></button>
-              <button onClick={()=>setShowHelp(true)} className="p-1.5 text-gray-600 hover:text-white transition-colors"><HelpCircle size={14}/></button>
-              <button onClick={()=>signOut(auth)} className="p-1.5 text-gray-600 hover:text-red-400 transition-colors"><LogOut size={14}/></button>
+              <button onClick={()=>{setHistoryDate(getYesterday());loadHistoryDate(getYesterday());setShowHistory(true);}} className={`p-1.5 ${T.textDim} hover:${T.text} transition-colors`}><Calendar size={14}/></button>
+              {lastWeekData&&<button onClick={()=>setShowWeeklyRecap(true)} className={`p-1.5 ${T.textDim} hover:text-purple-400 transition-colors`}><BarChart3 size={14}/></button>}
+              <button onClick={toggleTheme} className={`p-1.5 ${T.textDim} hover:text-amber-400 transition-colors`}>{darkMode?<Sun size={14}/>:<Moon size={14}/>}</button>
+              <button onClick={()=>setShowProfile(true)} className={`p-1.5 ${T.textDim} hover:${T.text} transition-colors`}><User size={14}/></button>
+              <button onClick={()=>setShowInviteModal(true)} className={`p-1.5 ${T.textDim} hover:${T.text} transition-colors`}><UserPlus size={14}/></button>
+              <button onClick={()=>setShowHelp(true)} className={`p-1.5 ${T.textDim} hover:${T.text} transition-colors`}><HelpCircle size={14}/></button>
+              <button onClick={()=>signOut(auth)} className={`p-1.5 ${T.textDim} hover:text-red-400 transition-colors`}><LogOut size={14}/></button>
             </div>
           </div>
         </div>
@@ -608,37 +729,50 @@ export default function TraxApp() {
         <div className="grid grid-cols-3 gap-3 mb-6">
           <div className="relative bg-white/[0.03] rounded-2xl border border-white/[0.06] p-4 overflow-hidden"><div className="absolute top-0 right-0 w-16 h-16 bg-blue-500/5 rounded-full blur-xl -translate-y-4 translate-x-4"/><div className="text-gray-500 text-[10px] tracking-wider uppercase mb-1 flex items-center gap-1"><Zap size={9}/>Points</div><div className="text-2xl font-black text-transparent bg-clip-text bg-gradient-to-b from-white to-gray-400">{myPts}</div></div>
           <div className="relative bg-white/[0.03] rounded-2xl border border-white/[0.06] p-4 overflow-hidden"><div className="absolute top-0 right-0 w-16 h-16 bg-orange-500/5 rounded-full blur-xl -translate-y-4 translate-x-4"/><div className="text-gray-500 text-[10px] tracking-wider uppercase mb-1 flex items-center gap-1"><Flame size={9}/>Streak</div><div className="text-2xl font-black text-transparent bg-clip-text bg-gradient-to-b from-orange-300 to-orange-600">{streakData.streak||0}<span className="text-sm font-medium text-gray-600 ml-1">d</span></div></div>
-          <div className="relative bg-white/[0.03] rounded-2xl border border-white/[0.06] p-4 overflow-hidden"><div className="absolute top-0 right-0 w-16 h-16 bg-purple-500/5 rounded-full blur-xl -translate-y-4 translate-x-4"/><div className="text-gray-500 text-[10px] tracking-wider uppercase mb-2">Crystals{isPerfect&&<span className="text-amber-400 ml-1">&#9830;</span>}</div><div className="flex items-center gap-2.5">{['Mind','Body','Spirit'].map(c=><div key={c} className={'w-5 h-5 rounded-full transition-all duration-500 '+(myCr[c]?CT[c].bg+' shadow-md '+CT[c].glow:'bg-white/[0.06] border border-white/[0.08]')}/>)}</div></div>
+          <div className="relative bg-white/[0.03] rounded-2xl border border-white/[0.06] p-4 overflow-hidden"><div className="absolute top-0 right-0 w-16 h-16 bg-purple-500/5 rounded-full blur-xl -translate-y-4 translate-x-4"/><div className="text-gray-500 text-[10px] tracking-wider uppercase mb-2">Crystals{isPerfect&&<span className="text-amber-400 ml-1">&#9830;</span>}</div><div className="flex items-center gap-2.5">{allCatNames.map(c=><div key={c} className={'w-5 h-5 rounded-full transition-all duration-500 '+(myCr[c]?CT[c].bg+' shadow-md '+CT[c].glow:'bg-white/[0.06] border border-white/[0.08]')}/>)}</div></div>
         </div>
+
+        {/* Edit mode toggle */}
+        {habits.length>0&&<div className="flex justify-end mb-3"><button onClick={()=>setEditMode(!editMode)} className={'text-[10px] font-medium tracking-wider uppercase px-3 py-1.5 rounded-lg transition-all '+(editMode?'bg-blue-500/20 text-blue-400 border border-blue-500/30':'text-gray-600 hover:text-gray-400')}>{editMode?'Done':'Reorder'}</button></div>}
 
         {/* Habits */}
         <div className="space-y-6">
-          {['Mind','Body','Spirit'].map(cat => {
-            const ch = habits.filter(h=>h.category===cat); if(!ch.length) return null;
+          {allCatNames.map(cat => {
+            const ch = getOrderedHabits(cat); if(!ch.length) return null;
             const t = CT[cat];
             return (
               <div key={cat}>
-                <div className="flex items-center gap-2.5 mb-3 px-1"><span className="text-sm">{t.icon}</span><h2 className={'text-[11px] font-bold tracking-[0.2em] uppercase '+t.txt}>{t.label}</h2><div className="flex-1 h-px bg-white/[0.04] ml-1"/><span className={'text-[10px] font-semibold '+t.txt}>{getCatPts(currentUser.id,cat)} pts</span></div>
-                <div className="space-y-2">{ch.map(h => {
+                <div className="flex items-center gap-2.5 mb-3 px-1"><span className="text-sm">{t.icon}</span><h2 className={'text-[11px] font-bold tracking-[0.2em] uppercase '+t.txt}>{t.label}</h2><div className={'flex-1 h-px ml-1 '+(darkMode?'bg-white/[0.04]':'bg-gray-200')}/><span className={'text-[10px] font-semibold '+t.txt}>{getCatPts(currentUser.id,cat)} pts</span></div>
+                <div className="space-y-2">{ch.map((h, idx) => {
                   const cnt = getCount(h.id), mx = h.isRepeatable?(h.maxCompletions||1):1, done=cnt>0, maxed=cnt>=mx, pct=mx>0?cnt/mx:0;
                   return (
-                    <div key={h.id} className={'relative rounded-xl p-3 flex items-center justify-between transition-all border '+(maxed?t.bdr+' '+t.bgS+' shadow-lg '+t.glow:done?t.bdr+' '+t.bgS:'border-white/[0.04] bg-white/[0.02] hover:bg-white/[0.03]')}>
-                      {mx>1&&<div className="absolute bottom-0 left-0 right-0 h-0.5 bg-white/[0.03] rounded-b-xl overflow-hidden"><div className="h-full rounded-full transition-all duration-500" style={{width:(pct*100)+'%',backgroundColor:t.neon}}/></div>}
+                    <div key={h.id}
+                      draggable={editMode}
+                      onDragStart={editMode?(e)=>{e.dataTransfer.setData('text/plain',cat+'|'+idx);e.dataTransfer.effectAllowed='move';}:undefined}
+                      onDragOver={editMode?(e)=>{e.preventDefault();}:undefined}
+                      onDrop={editMode?(e)=>{e.preventDefault();const data=e.dataTransfer.getData('text/plain');const [srcCat,srcIdx]=data.split('|');if(srcCat!==cat)return;const ni=parseInt(srcIdx);if(ni===idx)return;const arr=[...ch];const [moved]=arr.splice(ni,1);arr.splice(idx,0,moved);saveHabitOrder(cat,arr);}:undefined}
+                      className={'relative rounded-xl p-3 flex items-center justify-between transition-all border '+(editMode?'cursor-grab active:cursor-grabbing ':'')+
+                        (maxed?t.bdr+' '+(darkMode?t.bgS:'bg-white')+' shadow-lg '+t.glow:done?t.bdr+' '+(darkMode?t.bgS:'bg-white'):darkMode?'border-white/[0.04] bg-white/[0.02] hover:bg-white/[0.03]':'border-gray-200 bg-white hover:bg-gray-50')+
+                        (maxedHabit===h.id?' animate-pulse ring-2 ring-offset-2 ring-offset-transparent':'')}>
+                      {/* Maxout flash overlay */}
+                      {maxedHabit===h.id&&<div className="absolute inset-0 rounded-xl animate-ping opacity-20" style={{backgroundColor:t.neon}}/>}
+                      {mx>1&&<div className={'absolute bottom-0 left-0 right-0 h-0.5 rounded-b-xl overflow-hidden '+(darkMode?'bg-white/[0.03]':'bg-gray-100')}><div className="h-full rounded-full transition-all duration-500" style={{width:(pct*100)+'%',backgroundColor:t.neon}}/></div>}
                       <div className="flex items-center gap-3 flex-1 min-w-0">
+                        {editMode?<div className={darkMode?'text-gray-600':'text-gray-400'}><GripVertical size={16}/></div>:(
                         <div className="flex items-center gap-1 shrink-0">
-                          <button onClick={()=>handleDecrement(h.id)} disabled={cnt===0} className={'w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold transition-all active:scale-90 '+(cnt===0?'border border-white/[0.06] text-gray-700 cursor-not-allowed':'border-2 '+t.bdr+' '+t.txt)}>&minus;</button>
-                          <div className={'w-10 h-10 rounded-full border-2 flex items-center justify-center text-sm font-black transition-all duration-300 '+(maxed?t.bg+' border-transparent text-white shadow-lg '+t.glow:done?'border-current '+t.txt+' '+t.bgM:'border-white/[0.08] text-gray-600 bg-white/[0.02]')}>{cnt}</div>
-                          <button onClick={()=>handleIncrement(h.id)} disabled={maxed} className={'w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold transition-all active:scale-90 '+(maxed?'border border-white/[0.06] text-gray-700 cursor-not-allowed':'border-2 '+t.bdr+' '+t.txt)}>+</button>
-                        </div>
+                          <button onClick={()=>handleDecrement(h.id)} disabled={cnt===0} className={'w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold transition-all active:scale-90 '+(cnt===0?'border '+(darkMode?'border-white/[0.06] text-gray-700':'border-gray-200 text-gray-300')+' cursor-not-allowed':'border-2 '+t.bdr+' '+t.txt)}>&minus;</button>
+                          <div className={'w-10 h-10 rounded-full border-2 flex items-center justify-center text-sm font-black transition-all duration-300 '+(maxed?t.bg+' border-transparent text-white shadow-lg '+t.glow:done?'border-current '+t.txt+' '+t.bgM:'border-'+(darkMode?'white/[0.08]':'gray-200')+' '+(darkMode?'text-gray-600':'text-gray-400')+' '+(darkMode?'bg-white/[0.02]':'bg-gray-50'))}>{cnt}</div>
+                          <button onClick={()=>handleIncrement(h.id)} disabled={maxed} className={'w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold transition-all active:scale-90 '+(maxed?'border '+(darkMode?'border-white/[0.06] text-gray-700':'border-gray-200 text-gray-300')+' cursor-not-allowed':'border-2 '+t.bdr+' '+t.txt)}>+</button>
+                        </div>)}
                         <div className="min-w-0 flex-1">
-                          <div className={'text-sm font-medium truncate '+(done?'text-gray-200':'text-gray-500')}>{h.name}</div>
-                          <div className="text-[11px] text-gray-600 flex items-center gap-1.5 flex-wrap"><span>{h.points}pts</span><span className="text-gray-700">&middot;</span><span className={maxed?'font-bold '+t.txtB:''}>{cnt}/{mx}</span>{h.unit&&<span className="text-gray-700">{h.unit}</span>}{maxed&&<span className={t.pill+' text-[9px] font-bold px-1.5 py-0.5 rounded-full'}>MAXED</span>}</div>
+                          <div className={'text-sm font-medium truncate '+(done?(darkMode?'text-gray-200':'text-gray-800'):(darkMode?'text-gray-500':'text-gray-600'))}>{h.name}</div>
+                          <div className={(darkMode?'text-gray-600':'text-gray-400')+' text-[11px] flex items-center gap-1.5 flex-wrap'}><span>{h.points}pts</span><span>&middot;</span><span className={maxed?'font-bold '+t.txtB:''}>{cnt}/{mx}</span>{h.unit&&<span>{h.unit}</span>}{maxed&&<span className={t.pill+' text-[9px] font-bold px-1.5 py-0.5 rounded-full'+(maxedHabit===h.id?' animate-bounce':'')}>✓ MAXED</span>}</div>
                         </div>
                       </div>
-                      <div className="flex items-center gap-0.5 shrink-0 ml-1">
-                        <button onClick={()=>openEditHabit(h)} className="p-1.5 text-gray-800 hover:text-blue-400 transition-colors"><Edit3 size={11}/></button>
-                        <button onClick={()=>deleteHabit(h.id)} className="p-1.5 text-gray-800 hover:text-red-400 transition-colors"><X size={12}/></button>
-                      </div>
+                      {editMode&&<div className="flex items-center gap-0.5 shrink-0 ml-1">
+                        <button onClick={()=>openEditHabit(h)} className={'p-1.5 transition-colors '+(darkMode?'text-gray-700 hover:text-blue-400':'text-gray-400 hover:text-blue-500')}><Edit3 size={11}/></button>
+                        <button onClick={()=>deleteHabit(h.id)} className={'p-1.5 transition-colors '+(darkMode?'text-gray-700 hover:text-red-400':'text-gray-400 hover:text-red-500')}><X size={12}/></button>
+                      </div>}
                     </div>
                   );
                 })}</div>
@@ -648,7 +782,10 @@ export default function TraxApp() {
           {habits.length===0 ? (
             <div className="text-center py-16"><div className="text-5xl mb-4">&#x1F3AF;</div><p className="text-gray-500 text-sm mb-5">No habits yet</p><button onClick={()=>setShowAddHabit(true)} className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl shadow-lg shadow-blue-500/20 text-sm font-bold active:scale-[0.98]"><Plus size={18}/>Add Habits</button></div>
           ) : (
-            <button onClick={()=>setShowAddHabit(true)} className="w-full border border-dashed border-white/[0.08] rounded-xl p-4 text-gray-600 hover:text-blue-400 hover:border-blue-500/30 hover:bg-blue-500/5 flex items-center justify-center gap-2 transition-all"><Plus size={15}/><span className="text-xs font-medium tracking-wide">Add Habit</span></button>
+            <div className="flex gap-2">
+              <button onClick={()=>setShowAddHabit(true)} className={'flex-1 border border-dashed rounded-xl p-4 hover:text-blue-400 hover:border-blue-500/30 hover:bg-blue-500/5 flex items-center justify-center gap-2 transition-all '+(darkMode?'border-white/[0.08] text-gray-600':'border-gray-300 text-gray-400')}><Plus size={15}/><span className="text-xs font-medium tracking-wide">Add Habit</span></button>
+              <button onClick={()=>setShowAddCategory(true)} className={'border border-dashed rounded-xl p-4 hover:text-purple-400 hover:border-purple-500/30 hover:bg-purple-500/5 flex items-center justify-center gap-2 transition-all '+(darkMode?'border-white/[0.08] text-gray-600':'border-gray-300 text-gray-400')}><span className="text-xs font-medium tracking-wide">+ Category</span></button>
+            </div>
           )}
         </div>
       </div>
@@ -662,7 +799,7 @@ export default function TraxApp() {
         <div className="space-y-3">
           <input type="text" placeholder="Habit name" value={newHabit.name} onChange={e=>setNewHabit({...newHabit,name:e.target.value})} className={inputCls}/>
           <div className="grid grid-cols-2 gap-3">
-            <select value={newHabit.category} onChange={e=>setNewHabit({...newHabit,category:e.target.value})} className={inputCls}><option value="Mind" className="bg-[#12121a]">Mind</option><option value="Body" className="bg-[#12121a]">Body</option><option value="Spirit" className="bg-[#12121a]">Spirit</option></select>
+            <select value={newHabit.category} onChange={e=>setNewHabit({...newHabit,category:e.target.value})} className={inputCls}>{allCatNames.map(c=><option key={c} value={c} className={darkMode?'bg-[#12121a]':'bg-white'}>{c}</option>)}</select>
             <input type="number" placeholder="Points" value={newHabit.points} onChange={e=>setNewHabit({...newHabit,points:e.target.value})} className={inputCls}/>
           </div>
           <label className="flex items-center gap-3 py-1 cursor-pointer"><input type="checkbox" checked={newHabit.isRepeatable} onChange={e=>setNewHabit({...newHabit,isRepeatable:e.target.checked,maxCompletions:e.target.checked?5:1})} className="w-4 h-4 rounded accent-blue-500"/><span className="text-sm text-gray-400">Repeatable</span></label>
@@ -678,12 +815,36 @@ export default function TraxApp() {
         <div className="space-y-3">
           <input type="text" placeholder="Name" value={editHabitData.name||''} onChange={e=>setEditHabitData({...editHabitData,name:e.target.value})} className={inputCls}/>
           <div className="grid grid-cols-2 gap-3">
-            <select value={editHabitData.category||'Mind'} onChange={e=>setEditHabitData({...editHabitData,category:e.target.value})} className={inputCls}><option value="Mind" className="bg-[#12121a]">Mind</option><option value="Body" className="bg-[#12121a]">Body</option><option value="Spirit" className="bg-[#12121a]">Spirit</option></select>
+            <select value={editHabitData.category||allCatNames[0]} onChange={e=>setEditHabitData({...editHabitData,category:e.target.value})} className={inputCls}>{allCatNames.map(c=><option key={c} value={c} className={darkMode?'bg-[#12121a]':'bg-white'}>{c}</option>)}</select>
             <input type="number" placeholder="Points" value={editHabitData.points||''} onChange={e=>setEditHabitData({...editHabitData,points:e.target.value})} className={inputCls}/>
           </div>
           <label className="flex items-center gap-3 py-1 cursor-pointer"><input type="checkbox" checked={editHabitData.isRepeatable||false} onChange={e=>setEditHabitData({...editHabitData,isRepeatable:e.target.checked,maxCompletions:e.target.checked?5:1})} className="w-4 h-4 rounded accent-blue-500"/><span className="text-sm text-gray-400">Repeatable</span></label>
           {editHabitData.isRepeatable&&<input type="number" placeholder="Max per day" value={editHabitData.maxCompletions||''} onChange={e=>setEditHabitData({...editHabitData,maxCompletions:e.target.value})} className={inputCls}/>}
           <div className="flex gap-3 pt-2"><button onClick={()=>setShowEditHabit(null)} className="flex-1 px-4 py-3 border border-white/[0.08] rounded-xl text-sm text-gray-400 hover:bg-white/[0.04]">Cancel</button><button onClick={saveEditHabit} className="flex-1 px-4 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl text-sm font-bold shadow-lg shadow-blue-500/20 active:scale-[0.98]">Save</button></div>
+        </div>
+      </Modal>
+
+      {/* Add Category */}
+      <Modal show={showAddCategory} onClose={()=>setShowAddCategory(false)} dark={darkMode}>
+        <ModalHeader title="Manage Categories" onClose={()=>setShowAddCategory(false)}/>
+        <div className="space-y-2 mb-5">{activeCategories.map(cat => {
+          const ct = getCT(cat.name);
+          return (
+            <div key={cat.name} className={`flex items-center justify-between p-3 rounded-xl border ${ct.bdr} ${ct.bgS}`}>
+              <div className="flex items-center gap-2"><span>{cat.icon}</span><span className={`text-sm font-semibold ${ct.txt}`}>{cat.name}</span></div>
+              {!['Mind','Body','Spirit'].includes(cat.name) && <button onClick={()=>deleteCategory(cat.name)} className="text-[10px] text-gray-600 hover:text-red-400 uppercase tracking-wider">Remove</button>}
+            </div>
+          );
+        })}</div>
+        <div className={`border-t ${darkMode?'border-white/[0.06]':'border-gray-200'} pt-4`}>
+          <p className={`text-xs ${T.textMuted} mb-3`}>Add a new category</p>
+          <input type="text" placeholder="Category name" value={newCatName} onChange={e=>setNewCatName(e.target.value)} className={inputCls+' mb-3'} maxLength={20}/>
+          <p className={`text-[10px] ${T.textDim} mb-2`}>Icon</p>
+          <div className="flex flex-wrap gap-1.5 mb-4">{ICON_OPTIONS.map(ic=><button key={ic} onClick={()=>setNewCatIcon(ic)} className={`w-8 h-8 rounded-lg text-sm flex items-center justify-center transition-all ${newCatIcon===ic?'bg-blue-500/20 border border-blue-500/30 scale-110':darkMode?'bg-white/[0.04] hover:bg-white/[0.08]':'bg-gray-100 hover:bg-gray-200'}`}>{ic}</button>)}</div>
+          <p className={`text-[10px] ${T.textDim} mb-2`}>Color</p>
+          <div className="flex flex-wrap gap-2 mb-4">{COLOR_PALETTE.map((cp,i)=><button key={i} onClick={()=>setNewCatColor(i)} className={`w-7 h-7 rounded-full transition-all ${cp.bg} ${newCatColor===i?'ring-2 ring-offset-2 ring-white/30 scale-110':''}`}/>)}</div>
+          {error&&<p className="text-red-400 text-xs text-center mb-2">{error}</p>}
+          <button onClick={addCategory} disabled={!newCatName.trim()} className="w-full px-4 py-3 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-xl text-sm font-bold shadow-lg shadow-purple-500/20 active:scale-[0.98] disabled:opacity-40">Add Category</button>
         </div>
       </Modal>
 
@@ -767,7 +928,7 @@ export default function TraxApp() {
           return (
             <div key={item.member.id} className={'rounded-xl p-4 border transition-all '+(isMe?'bg-gradient-to-r from-blue-600/20 to-indigo-600/20 border-blue-500/30 shadow-lg shadow-blue-500/10':i===0?'bg-amber-500/5 border-amber-500/20':'bg-white/[0.02] border-white/[0.04] hover:bg-white/[0.04]')}>
               <div className="flex items-center justify-between"><div className="flex items-center gap-3"><div className="text-lg w-8 text-center">{i<3?medals[i]:<span className="text-sm text-gray-600">{i+1}</span>}</div><div><div className={'text-sm font-semibold '+(isMe?'text-blue-300':'text-gray-300')}>{item.member.username}{isMe&&<span className="text-[10px] ml-1.5 text-gray-600">(you)</span>}</div><div className="text-xs text-gray-600">{pts} pts{leaderboardTab==='week'?' \u00b7 '+item.weeklyCrystals+' crystals':''}</div></div></div>
-                <div className="flex items-center gap-3">{leaderboardTab==='today'&&<div className="flex items-center gap-1.5">{['Mind','Body','Spirit'].map(c=><div key={c} className={'w-2.5 h-2.5 rounded-full '+(item.crystals[c]?CT[c].bg.replace('bg-','bg-').replace('500','400')+' shadow-sm shadow-'+CT[c].neon.replace('#','')+'/50':isMe?'bg-white/10':'bg-white/[0.06]')}/>)}</div>}{!isMe&&<button onClick={()=>{setShowLeaderboard(false);setShowCompetitor(item.member);}} className="text-[10px] text-gray-600 hover:text-white uppercase tracking-wider font-medium">View</button>}</div>
+                <div className="flex items-center gap-3">{leaderboardTab==='today'&&<div className="flex items-center gap-1.5">{allCatNames.map(c=><div key={c} className={'w-2.5 h-2.5 rounded-full '+(item.crystals[c]?CT[c].bg.replace('bg-','bg-').replace('500','400')+' shadow-sm shadow-'+CT[c].neon.replace('#','')+'/50':isMe?'bg-white/10':'bg-white/[0.06]')}/>)}</div>}{!isMe&&<button onClick={()=>{setShowLeaderboard(false);setShowCompetitor(item.member);}} className="text-[10px] text-gray-600 hover:text-white uppercase tracking-wider font-medium">View</button>}</div>
               </div>
             </div>
           );
@@ -781,7 +942,7 @@ export default function TraxApp() {
         <div className="text-center mb-6"><div className="relative inline-block"><ProgressRing progress={dailyProg} size={80} stroke={4} color={dailyProg>=1?'#10b981':'#3b82f6'}/><div className="absolute inset-0 flex items-center justify-center"><span className="text-xl font-black">{Math.round(dailyProg*100)}%</span></div></div><h3 className="text-xl font-bold mt-3">{currentUser.username}</h3><p className="text-gray-600 text-xs">{currentUser.email}</p></div>
         <div className="grid grid-cols-3 gap-3 mb-4">{[{v:streakData.streak||0,l:'Streak',c:'text-orange-400',i:<Flame size={16} className="text-orange-400 mx-auto mb-1"/>},{v:myPts,l:'Today',c:'text-blue-400',i:<Star size={16} className="text-blue-400 mx-auto mb-1"/>},{v:getWeeklyPts(currentUser.id),l:'Week',c:'text-emerald-400',i:<TrendingUp size={16} className="text-emerald-400 mx-auto mb-1"/>}].map((s,i)=><div key={i} className="text-center p-3 bg-white/[0.03] rounded-xl border border-white/[0.04]">{s.i}<div className={'text-xl font-black '+s.c}>{s.v}</div><div className="text-[9px] text-gray-600 tracking-wider uppercase mt-0.5">{s.l}</div></div>)}</div>
         <div className="grid grid-cols-2 gap-3 mb-4"><div className="text-center p-3 bg-white/[0.03] rounded-xl border border-white/[0.04]"><div className="text-lg font-black text-purple-400">{streakData.activeDays||0}</div><div className="text-[9px] text-gray-600 tracking-wider uppercase mt-0.5">Active Days</div></div><div className="text-center p-3 bg-white/[0.03] rounded-xl border border-white/[0.04]"><div className="text-lg font-black text-cyan-400">{streakData.totalCompletions||0}</div><div className="text-[9px] text-gray-600 tracking-wider uppercase mt-0.5">Completions</div></div></div>
-        <div className="p-3 bg-white/[0.03] rounded-xl border border-white/[0.04]"><div className="text-[9px] text-gray-600 tracking-wider uppercase mb-2">Crystals</div><div className="flex justify-center gap-4">{['Mind','Body','Spirit'].map(c=><div key={c} className="text-center"><div className={'w-6 h-6 rounded-full mx-auto mb-1 transition-all '+(myCr[c]?CT[c].bg+' shadow-md '+CT[c].glow:'bg-white/[0.06]')}/><span className="text-[9px] text-gray-600">{c}</span></div>)}</div></div>
+        <div className="p-3 bg-white/[0.03] rounded-xl border border-white/[0.04]"><div className="text-[9px] text-gray-600 tracking-wider uppercase mb-2">Crystals</div><div className="flex justify-center gap-4">{allCatNames.map(c=><div key={c} className="text-center"><div className={'w-6 h-6 rounded-full mx-auto mb-1 transition-all '+(myCr[c]?CT[c].bg+' shadow-md '+CT[c].glow:'bg-white/[0.06]')}/><span className="text-[9px] text-gray-600">{c}</span></div>)}</div></div>
         <div className="mt-4 p-3 bg-white/[0.03] rounded-xl border border-white/[0.04] flex items-center justify-between"><div><div className="text-sm text-gray-300 font-medium">Email Reminders</div><div className="text-[10px] text-gray-600">Daily nudges at 12pm & 6pm</div></div><button onClick={async()=>{const newVal=currentUser.emailReminders===false?true:false;try{await updateDoc(doc(db,'users',currentUser.id),{emailReminders:!newVal});setCurrentUser(p=>({...p,emailReminders:!newVal}));}catch{}}} className={'relative w-11 h-6 rounded-full transition-all '+(currentUser.emailReminders!==false?'bg-blue-500':'bg-white/[0.08]')}><div className={'absolute top-1 w-4 h-4 rounded-full bg-white transition-all shadow-sm '+(currentUser.emailReminders!==false?'left-6':'left-1')}/></button></div>
       </Modal>
 
@@ -792,7 +953,7 @@ export default function TraxApp() {
           {[{i:'&#x1F3AF;',t:'Track & Earn',d:'Use + and \u2212 to track habits. Max them out for neon glow.'},{i:'&#x1F525;',t:'Streaks',d:'Complete at least one habit daily to keep your streak.'},{i:'&#x1F3C6;',t:'Compete',d:'Invite friends and dominate the leaderboard.'},{i:'&#x26A1;',t:'Stakes',d:'Set real consequences for the weekly loser.'},{i:'&#x1F465;',t:'Solo Mode',d:'No friends yet? Compete against your own yesterday.'}].map((s,i)=>(
             <div key={i} className="bg-white/[0.03] rounded-xl p-4 border border-white/[0.04]"><p className="font-bold text-white mb-1" dangerouslySetInnerHTML={{__html:s.i+' '+s.t}}/><p>{s.d}</p></div>
           ))}
-          <div className="bg-white/[0.03] rounded-xl p-4 border border-white/[0.04]"><p className="font-bold text-white mb-2">Categories</p><div className="space-y-1.5">{['Mind','Body','Spirit'].map(c=><div key={c} className="flex items-center gap-2"><div className={'w-3 h-3 rounded-full '+CT[c].bg+' shadow-sm '+CT[c].glow}/><span><strong className={CT[c].txt}>{c}</strong> &mdash; {c==='Mind'?'Learning, reading, studying':c==='Body'?'Exercise, nutrition, sleep':'Mindfulness, discipline, growth'}</span></div>)}</div></div>
+          <div className="bg-white/[0.03] rounded-xl p-4 border border-white/[0.04]"><p className="font-bold text-white mb-2">Categories</p><div className="space-y-1.5">{allCatNames.map(c=>{const ct=getCT(c);return(<div key={c} className="flex items-center gap-2"><div className={'w-3 h-3 rounded-full '+ct.bg+' shadow-sm '+ct.glow}/><span><strong className={ct.txt}>{c}</strong></span></div>);})}</div></div>
         </div>
       </Modal>
 
@@ -804,7 +965,44 @@ export default function TraxApp() {
       {/* Competitor */}
       <Modal show={!!showCompetitor} onClose={()=>setShowCompetitor(null)}>
         {showCompetitor&&<><ModalHeader title={showCompetitor.username} onClose={()=>setShowCompetitor(null)}/>
-        <div className="space-y-3"><div className="grid grid-cols-3 gap-3">{['Mind','Body','Spirit'].map(c=><div key={c} className={'text-center p-4 rounded-xl border '+CT[c].bgS+' '+CT[c].bdr}><div className={'text-2xl font-black '+CT[c].txt}>{getCatPts(showCompetitor.id,c)}</div><div className="text-[9px] text-gray-600 mt-1 tracking-wider uppercase">{c}</div></div>)}</div><div className="text-center p-5 bg-gradient-to-r from-blue-600/20 to-indigo-600/20 rounded-xl border border-blue-500/20"><div className="text-3xl font-black">{getTodayPts(showCompetitor.id)}</div><div className="text-[10px] text-gray-500 mt-1 tracking-wider uppercase">Total Today</div></div></div></>}
+        <div className="space-y-3"><div className="grid grid-cols-3 gap-3">{allCatNames.map(c=><div key={c} className={'text-center p-4 rounded-xl border '+CT[c].bgS+' '+CT[c].bdr}><div className={'text-2xl font-black '+CT[c].txt}>{getCatPts(showCompetitor.id,c)}</div><div className="text-[9px] text-gray-600 mt-1 tracking-wider uppercase">{c}</div></div>)}</div><div className="text-center p-5 bg-gradient-to-r from-blue-600/20 to-indigo-600/20 rounded-xl border border-blue-500/20"><div className="text-3xl font-black">{getTodayPts(showCompetitor.id)}</div><div className="text-[10px] text-gray-500 mt-1 tracking-wider uppercase">Total Today</div></div></div></>}
+      </Modal>
+
+      {/* Weekly Recap */}
+      <Modal show={showWeeklyRecap} onClose={()=>setShowWeeklyRecap(false)} wide dark={darkMode}>
+        <ModalHeader title="Weekly Recap" onClose={()=>setShowWeeklyRecap(false)} icon={<BarChart3 size={18} className="text-purple-400"/>}/>
+        {lastWeekData ? (
+          <div>
+            <p className={`text-xs ${T.textDim} mb-4`}>{lastWeekData.dateRange}</p>
+            {lastWeekData.scores.length > 0 && (
+              <div className="text-center p-5 bg-gradient-to-r from-amber-500/10 to-yellow-500/10 border border-amber-500/15 rounded-xl mb-4">
+                <span className="text-3xl">🏆</span>
+                <h3 className="text-xl font-black text-amber-300 mt-2">{lastWeekData.scores[0].member.username}</h3>
+                <p className={`text-sm ${T.textMuted} mt-1`}>{lastWeekData.scores[0].pts} points &middot; {lastWeekData.scores[0].activeDays} active days</p>
+              </div>
+            )}
+            <div className="space-y-2 mb-4">{lastWeekData.scores.map((s,i) => {
+              const medals = ['🥇','🥈','🥉']; const isMe = s.member.id === currentUser.id;
+              return (
+                <div key={s.member.id} className={'rounded-xl p-3 border transition-all '+(isMe?'bg-blue-600/10 border-blue-500/20':darkMode?'bg-white/[0.02] border-white/[0.04]':'bg-gray-50 border-gray-200')}>
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-2"><span className="text-sm">{i<3?medals[i]:(i+1)+'.'}</span><span className={'text-sm font-semibold '+(isMe?'text-blue-300':darkMode?'text-gray-300':'text-gray-700')}>{s.member.username}</span></div>
+                    <span className={`text-sm font-bold ${T.text}`}>{s.pts} pts</span>
+                  </div>
+                  <div className="grid grid-cols-3 gap-2">{allCatNames.map(c=>(
+                    <div key={c} className={'text-center p-1.5 rounded-lg '+CT[c].bgS}>
+                      <div className={'text-xs font-bold '+CT[c].txt}>{s.catPts[c]}</div>
+                      <div className="text-[8px] text-gray-500">{c}</div>
+                    </div>
+                  ))}</div>
+                  <div className={`flex gap-3 mt-2 text-[10px] ${T.textDim}`}><span>{s.activeDays} active days</span><span>{s.completions} completions</span></div>
+                </div>
+              );
+            })}</div>
+          </div>
+        ) : (
+          <p className={`${T.textDim} text-sm text-center py-8`}>No data from last week yet.</p>
+        )}
       </Modal>
     </div>
   );
