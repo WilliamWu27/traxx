@@ -132,7 +132,18 @@ export default function TraxApp() {
   const [newCatName, setNewCatName] = useState('');
   const [newCatColor, setNewCatColor] = useState(0);
   const [newCatIcon, setNewCatIcon] = useState('⭐');
-  const [maxedHabit, setMaxedHabit] = useState(null); // for maxout animation // triggers re-subscribe at midnight
+  const [maxedHabit, setMaxedHabit] = useState(null);
+  const [activityFeed, setActivityFeed] = useState([]);
+  const [showHeatMap, setShowHeatMap] = useState(false);
+  const [heatMapData, setHeatMapData] = useState({});
+  const [bonusMsg, setBonusMsg] = useState(null);
+  const [rivalStatus, setRivalStatus] = useState([]);
+  const [showInsights, setShowInsights] = useState(false);
+  const [insightsData, setInsightsData] = useState(null);
+  const [showCustomBoard, setShowCustomBoard] = useState(false);
+  const [customBoardHabits, setCustomBoardHabits] = useState([]);
+  const [pendingBoards, setPendingBoards] = useState([]);
+  const [boardRequests, setBoardRequests] = useState([]);
 
   // ─── HELPERS ───
   const genCode = () => { const c = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; let r = ''; for (let i=0;i<6;i++) r+=c[Math.floor(Math.random()*c.length)]; return r; };
@@ -144,7 +155,8 @@ export default function TraxApp() {
   const getLastWeekEnd = () => { const d = new Date(getWeekStart()+'T12:00:00'); d.setDate(d.getDate()-1); return formatDateStr(d); };
   const toggleTheme = () => { const next = !darkMode; setDarkMode(next); try { localStorage.setItem('trax-theme', next ? 'dark' : 'light'); } catch {} };
   const getOrderedHabits = (cat) => {
-    const ch = habits.filter(h=>h.category===cat);
+    const displayHabits = getDisplayHabits();
+    const ch = displayHabits.filter(h=>h.category===cat);
     if (!habitOrder.length) return ch;
     return [...ch].sort((a,b)=>{const ai=habitOrder.indexOf(a.id),bi=habitOrder.indexOf(b.id);if(ai===-1&&bi===-1)return 0;if(ai===-1)return 1;if(bi===-1)return-1;return ai-bi;});
   };
@@ -184,12 +196,14 @@ export default function TraxApp() {
       { name: 'No vaping / substances', category: 'Spirit', points: 15, isRepeatable: false, maxCompletions: 1 },
     ];
     try {
+      setLoading(true);
       for (const habit of defaultHabits) {
         const id = currentRoom.id + '_' + Date.now() + '_' + Math.random().toString(36).slice(2,8);
         await setDoc(doc(db, 'habits', id), { ...habit, roomId: currentRoom.id, createdBy: currentUser.id, createdAt: new Date().toISOString() });
       }
       setShowAddHabit(false);
-    } catch (err) { console.error(err); setError('Failed to load defaults'); }
+      setConfettiTrigger(v=>v+1);
+    } catch (err) { console.error(err); setError('Failed to load defaults'); } finally { setLoading(false); }
   };
 
   // ─── AUTH LISTENER ───
@@ -246,7 +260,18 @@ export default function TraxApp() {
     const u7 = onSnapshot(doc(db, 'habitOrder', currentUser.id+'_'+currentRoom.id), s => { if(s.exists()) setHabitOrder(s.data().order||[]); else setHabitOrder([]); });
     // Room categories listener
     const u8 = onSnapshot(doc(db, 'roomCategories', currentRoom.id), s => { if(s.exists()) setRoomCategories(s.data().categories||[]); else setRoomCategories([]); });
-    return () => { u1(); u2(); u4(); u5(); u6(); u7(); u8(); weekUnsubs.forEach(u=>u()); };
+    // Activity feed - today's completions from ALL room members (no composite index needed)
+    const u9 = onSnapshot(query(collection(db, 'activity'), where('roomId', '==', currentRoom.id), where('date', '==', today)), s => {
+      const items = s.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>(b.ts||'').localeCompare(a.ts||''));
+      setActivityFeed(items);
+    });
+    // Custom boards listener
+    const u10 = onSnapshot(query(collection(db, 'customBoards'), where('roomId', '==', currentRoom.id)), s => {
+      const boards = s.docs.map(d=>({id:d.id,...d.data()}));
+      setPendingBoards(boards);
+      setBoardRequests(boards.filter(b=>b.status==='pending'&&b.userId!==currentUser.id&&!(b.approvals||[]).includes(currentUser.id)&&!(b.rejections||[]).includes(currentUser.id)));
+    });
+    return () => { u1(); u2(); u4(); u5(); u6(); u7(); u8(); u9(); u10(); weekUnsubs.forEach(u=>u()); };
   }, [currentUser, currentRoom, dateKey]);
 
   // ─── LAST WEEK DATA (for recap) ───
@@ -322,6 +347,126 @@ export default function TraxApp() {
       setWeeklyWinner(isTied ? null : { ...scores[0], daysLeft: getDaysUntilSunday() });
     } else setWeeklyWinner(null);
   }, [roomMembers, allCompletions, habits, currentRoom]);
+
+  // ─── RIVAL STATUS (what your competition is doing today) ───
+  useEffect(() => {
+    if (!currentUser || !currentRoom || roomMembers.length < 2) { setRivalStatus([]); return; }
+    const today = getToday();
+    const rivals = roomMembers.filter(m=>m.id!==currentUser.id).map(m => {
+      const todayComps = completions.filter(c=>c.userId===m.id&&c.date===today);
+      const pts = todayComps.reduce((s,c)=>{const h=habits.find(x=>x.id===c.habitId);return s+((h?.points||c.habitPoints||0)*(c.count||1));},0);
+      const habitCount = todayComps.length;
+      const weekPts = allCompletions.filter(c=>c.userId===m.id).reduce((s,c)=>{const h=habits.find(x=>x.id===c.habitId);return s+((h?.points||c.habitPoints||0)*(c.count||1));},0);
+      return { member: m, pts, habitCount, weekPts };
+    }).sort((a,b)=>b.pts-a.pts);
+    setRivalStatus(rivals);
+  }, [currentUser, currentRoom, roomMembers, completions, allCompletions, habits]);
+
+  // ─── HEAT MAP (load on demand) ───
+  const loadHeatMap = async () => {
+    if (!currentUser) return;
+    try {
+      const ago = new Date(); ago.setDate(ago.getDate()-90);
+      const snap = await getDocs(query(collection(db,'completions'),where('userId','==',currentUser.id),where('date','>=',formatDateStr(ago))));
+      const map = {};
+      snap.docs.forEach(d => { const dt = d.data(); const pts = (dt.habitPoints||0)*(dt.count||1); map[dt.date] = (map[dt.date]||0) + pts; });
+      setHeatMapData(map);
+      setShowHeatMap(true);
+    } catch { setShowHeatMap(true); }
+  };
+
+  // ─── ROOM ROLES (computed from performance) ───
+  const getRoomRole = (uid) => {
+    if (!currentRoom) return null;
+    if (currentRoom.createdBy === uid) {
+      if (weeklyWinner?.member?.id === uid) return { role: 'Champion', icon: '👑', color: 'text-amber-400' };
+      return { role: 'Creator', icon: '⚡', color: 'text-blue-400' };
+    }
+    if (weeklyWinner?.member?.id === uid) return { role: 'Defender', icon: '🛡️', color: 'text-amber-400' };
+    if (lastWeekData?.scores) {
+      const lastIdx = lastWeekData.scores.findIndex(s=>s.member.id===uid);
+      if (lastIdx === lastWeekData.scores.length - 1 && lastWeekData.scores.length > 1) return { role: 'Underdog', icon: '🔥', color: 'text-red-400' };
+    }
+    const myWeekPts = allCompletions.filter(c=>c.userId===uid).reduce((s,c)=>{const h=habits.find(x=>x.id===c.habitId);return s+((h?.points||c.habitPoints||0)*(c.count||1));},0);
+    if (weeklyWinner && myWeekPts > 0 && myWeekPts >= (weeklyWinner.pts * 0.8)) return { role: 'Challenger', icon: '⚔️', color: 'text-purple-400' };
+    return null;
+  };
+
+  // ─── PERSONAL INSIGHTS (load on demand) ───
+  const loadInsights = async () => {
+    if (!currentUser || !currentRoom) return;
+    try {
+      const ago = new Date(); ago.setDate(ago.getDate()-60);
+      const snap = await getDocs(query(collection(db,'completions'),where('userId','==',currentUser.id),where('roomId','==',currentRoom.id),where('date','>=',formatDateStr(ago))));
+      const comps = snap.docs.map(d=>({id:d.id,...d.data()}));
+      if (!comps.length) { setInsightsData({ empty: true }); setShowInsights(true); return; }
+      const dayMap = {};
+      comps.forEach(c => { dayMap[c.date] = (dayMap[c.date]||0) + 1; });
+      const activeDays = Object.keys(dayMap).length;
+      const avgPerDay = activeDays > 0 ? (comps.length / activeDays).toFixed(1) : 0;
+      const weekdayCounts = [0,0,0,0,0,0,0];
+      const weekdayNames = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+      comps.forEach(c => { const d = new Date(c.date+'T12:00:00'); weekdayCounts[d.getDay()] += (c.count||1); });
+      const bestDayIdx = weekdayCounts.indexOf(Math.max(...weekdayCounts));
+      const worstDayIdx = weekdayCounts.indexOf(Math.min(...weekdayCounts));
+      const habitDays = {};
+      comps.forEach(c => { if (!habitDays[c.habitId]) habitDays[c.habitId] = new Set(); habitDays[c.habitId].add(c.date); });
+      let bestHabit = null, bestHabitDays = 0;
+      Object.entries(habitDays).forEach(([hid, days]) => { if (days.size > bestHabitDays) { bestHabitDays = days.size; bestHabit = hid; } });
+      const bestHabitName = habits.find(h=>h.id===bestHabit)?.name || comps.find(c=>c.habitId===bestHabit)?.habitName || 'Unknown';
+      const totalPts = comps.reduce((s,c) => s + ((c.habitPoints||0)*(c.count||1)), 0);
+      const avgPtsPerDay = activeDays > 0 ? Math.round(totalPts / activeDays) : 0;
+      const completionRate = Math.round((activeDays / 60) * 100);
+      const bestStreak = (() => {
+        const dates = Object.keys(dayMap).sort(); let max = 0, cur = 0;
+        for (let i = 0; i < dates.length; i++) {
+          if (i === 0) { cur = 1; } else {
+            const diff = (new Date(dates[i]+'T12:00:00') - new Date(dates[i-1]+'T12:00:00')) / 86400000;
+            cur = diff === 1 ? cur + 1 : 1;
+          }
+          if (cur > max) max = cur;
+        }
+        return max;
+      })();
+      setInsightsData({ avgPerDay, bestDay: weekdayNames[bestDayIdx], worstDay: weekdayNames[worstDayIdx], bestHabitName, bestHabitDays, completionRate, activeDays, totalPts, avgPtsPerDay, bestStreak, weekdayCounts, weekdayNames });
+      setShowInsights(true);
+    } catch(err) { console.error(err); setShowInsights(true); }
+  };
+
+  // ─── CUSTOM BOARDS ───
+  const proposeCustomBoard = async (selectedHabitIds) => {
+    if (!currentUser || !currentRoom || !selectedHabitIds.length) return;
+    try {
+      const boardId = currentUser.id + '_' + currentRoom.id;
+      await setDoc(doc(db, 'customBoards', boardId), {
+        userId: currentUser.id, username: currentUser.username, roomId: currentRoom.id,
+        habitIds: selectedHabitIds, status: 'pending',
+        createdAt: new Date().toISOString(), approvals: [], rejections: []
+      });
+      setShowCustomBoard(false); setSuccessMsg('Board submitted for approval!'); setTimeout(()=>setSuccessMsg(''),3000);
+    } catch { setError('Failed to submit board'); }
+  };
+  const voteOnBoard = async (boardDoc, approve) => {
+    try {
+      const ref = doc(db, 'customBoards', boardDoc.id);
+      const field = approve ? 'approvals' : 'rejections';
+      const other = approve ? 'rejections' : 'approvals';
+      const updList = [...(boardDoc[field]||[]).filter(id=>id!==currentUser.id), currentUser.id];
+      const otherList = (boardDoc[other]||[]).filter(id=>id!==currentUser.id);
+      const otherMembers = roomMembers.filter(m=>m.id!==boardDoc.userId).length;
+      const needed = Math.max(1, Math.ceil(otherMembers / 2));
+      let status = boardDoc.status;
+      if (approve && updList.length >= needed) status = 'approved';
+      if (!approve && updList.length >= needed) status = 'rejected';
+      await updateDoc(ref, { [field]: updList, [other]: otherList, status });
+    } catch {}
+  };
+  const getMyBoard = () => pendingBoards.find(b=>b.userId===currentUser?.id && b.status==='approved');
+  const getDisplayHabits = () => {
+    const board = getMyBoard();
+    if (board) return habits.filter(h => board.habitIds.includes(h.id));
+    return habits;
+  };
 
   // ─── TIMER + MIDNIGHT RESET ───
   useEffect(() => {
@@ -432,18 +577,69 @@ export default function TraxApp() {
 
   // ─── COMPLETIONS (with embedded habit data for orphan-proofing) ───
   const getExisting = (hid) => { const t = getToday(); return completions.find(c=>c.userId===currentUser.id&&c.habitId===hid&&c.date===t); };
+
+  // Mystery bonus: 10% chance 2x, 1% chance jackpot (5x)
+  const rollBonus = () => {
+    const roll = Math.random();
+    if (roll < 0.01) return { multi: 5, label: '🎰 JACKPOT! 5×', type: 'jackpot' };
+    if (roll < 0.10) return { multi: 2, label: '✨ 2× BONUS!', type: 'bonus' };
+    return null;
+  };
+
+  const postActivity = async (text, bonus) => {
+    try {
+      const aid = Date.now()+'_'+Math.random().toString(36).slice(2,6);
+      await setDoc(doc(db,'activity',aid),{
+        userId: currentUser.id, username: currentUser.username, roomId: currentRoom.id,
+        text, bonus: bonus?.type||null, ts: new Date().toISOString(), date: getToday()
+      });
+    } catch {}
+  };
+
   const handleIncrement = async (hid) => {
     const t = getToday(), h = habits.find(x=>x.id===hid); if(!h) return;
     const max = h.isRepeatable ? (h.maxCompletions||1) : 1;
     const ex = getExisting(hid);
     const triggerMaxed = () => { setConfettiTrigger(v=>v+1); setMaxedHabit(hid); setTimeout(()=>setMaxedHabit(null),1500); };
+
+    // Roll for mystery bonus
+    const bonus = rollBonus();
+    const bonusPts = bonus ? h.points * bonus.multi : h.points;
+
     try {
       if (ex) {
-        if (ex.count < max) { await updateDoc(doc(db, 'completions', ex.id), { count: ex.count+1 }); if(ex.count+1>=max) triggerMaxed(); }
+        if (ex.count < max) {
+          await updateDoc(doc(db, 'completions', ex.id), {
+            count: ex.count+1,
+            ...(bonus ? { bonusPoints: (ex.bonusPoints||0) + (bonusPts - h.points) } : {})
+          });
+          if(ex.count+1>=max) triggerMaxed();
+        }
       } else {
         const cid = currentUser.id+'_'+hid+'_'+t;
-        await setDoc(doc(db, 'completions', cid), { userId: currentUser.id, habitId: hid, roomId: currentRoom.id, date: t, count: 1, habitName: h.name, habitPoints: h.points, habitCategory: h.category });
+        await setDoc(doc(db, 'completions', cid), {
+          userId: currentUser.id, habitId: hid, roomId: currentRoom.id, date: t, count: 1,
+          habitName: h.name, habitPoints: h.points, habitCategory: h.category,
+          ...(bonus ? { bonusPoints: bonusPts - h.points } : {})
+        });
         if (max===1) triggerMaxed();
+      }
+      // Show bonus notification
+      if (bonus) {
+        setBonusMsg(bonus);
+        setConfettiTrigger(v=>v+1);
+        setTimeout(() => setBonusMsg(null), 2500);
+      }
+      // Post to activity feed
+      const newCount = ex ? ex.count + 1 : 1;
+      const feedText = bonus
+        ? `${h.name} (+${bonusPts}) ${bonus.label}`
+        : `${h.name} (+${h.points})`;
+      if (newCount >= max) {
+        postActivity(`Maxed out ${h.name}! 💎`, bonus);
+      } else if (newCount === 1 || Math.random() < 0.3) {
+        // Post first completion always, others 30% of the time to avoid spam
+        postActivity(feedText, bonus);
       }
     } catch (err) { console.error(err); }
   };
@@ -497,7 +693,7 @@ export default function TraxApp() {
     return t;
   };
   const getCount = (hid) => { const e=getExisting(hid); return e?.count||0; };
-  const getDailyProgress = () => { if(!habits.length)return 0; let tm=0,td=0; habits.forEach(h=>{const mx=h.isRepeatable?(h.maxCompletions||1):1;tm+=mx;td+=Math.min(getCount(h.id),mx);}); return tm>0?td/tm:0; };
+  const getDailyProgress = () => { const dh=getDisplayHabits(); if(!dh.length)return 0; let tm=0,td=0; dh.forEach(h=>{const mx=h.isRepeatable?(h.maxCompletions||1):1;tm+=mx;td+=Math.min(getCount(h.id),mx);}); return tm>0?td/tm:0; };
   const getLeaderboard = () => roomMembers.map(m=>({member:m,todayPts:getTodayPts(m.id),weeklyPts:getWeeklyPts(m.id),crystals:getTodayCrystals(m.id),weeklyCrystals:getWeeklyCrystals(m.id)})).sort((a,b)=>leaderboardTab==='today'?b.todayPts-a.todayPts:b.weeklyPts-a.weeklyPts);
 
   // ─── CATEGORY SYSTEM ───
@@ -578,6 +774,15 @@ export default function TraxApp() {
   const myPts = currentUser&&currentRoom ? getTodayPts(currentUser.id) : 0;
   const isPerfect = allCatNames.length > 0 && allCatNames.every(c => myCr[c]);
   const dailyProg = currentUser&&currentRoom ? getDailyProgress() : 0;
+  const prevProgRef = useRef(0);
+  useEffect(() => {
+    if (dailyProg >= 1 && prevProgRef.current < 1 && prevProgRef.current > 0) {
+      // Just hit 100%! Double confetti burst
+      setConfettiTrigger(v=>v+1);
+      setTimeout(() => setConfettiTrigger(v=>v+1), 400);
+    }
+    prevProgRef.current = dailyProg;
+  }, [dailyProg]);
   const soloMode = roomMembers.length < 2;
 
   // ═══════════════════════════════════════
@@ -682,6 +887,14 @@ export default function TraxApp() {
       <ConfettiCanvas trigger={confettiTrigger} />
       {/* Maxout screen flash */}
       {maxedHabit && <div className="fixed inset-0 z-[99] pointer-events-none animate-pulse" style={{background:'radial-gradient(circle at center, rgba(255,255,255,0.1) 0%, transparent 70%)'}}/>}
+      {/* Mystery Bonus popup */}
+      {bonusMsg && (
+        <div className="fixed top-20 left-1/2 -translate-x-1/2 z-[101] animate-bounce">
+          <div className={`px-6 py-3 rounded-2xl shadow-2xl text-center ${bonusMsg.type==='jackpot'?'bg-gradient-to-r from-amber-500 to-yellow-500 text-black':'bg-gradient-to-r from-purple-600 to-blue-600 text-white'}`}>
+            <div className="text-lg font-black">{bonusMsg.label}</div>
+          </div>
+        </div>
+      )}
       {/* Header */}
       <div className={`${T.headerBg} ${T.blurBg} border-b ${T.border} sticky top-0 z-40`}>
         <div className="max-w-2xl mx-auto px-4 py-3">
@@ -691,16 +904,12 @@ export default function TraxApp() {
               <div className="flex gap-1"><div className="w-1.5 h-1.5 rounded-full bg-blue-500"/><div className="w-1.5 h-1.5 rounded-full bg-orange-500"/><div className="w-1.5 h-1.5 rounded-full bg-emerald-500"/></div>
               <button onClick={()=>setShowSwitchRoom(true)} className={`ml-2 flex items-center gap-1 px-2 py-1 ${T.bgCard} border ${T.border} rounded-lg text-[10px] ${T.textMuted} hover:${T.text} transition-all`}><span className="font-mono tracking-wider">{currentRoom?.code}</span>{userRooms.length>1&&<ArrowLeftRight size={10}/>}</button>
             </div>
-            <div className="flex items-center gap-1">
+            <div className="flex items-center gap-1.5">
               <button onClick={()=>setShowLeaderboard(true)} className="flex items-center gap-1 px-2.5 py-1.5 bg-gradient-to-r from-amber-500/20 to-orange-500/20 border border-amber-500/20 text-amber-400 rounded-lg hover:border-amber-500/40 transition-all text-xs font-semibold"><Trophy size={12}/></button>
-              <button onClick={()=>setShowStakes(true)} className={'p-1.5 transition-colors '+(roomStakes?'text-red-400 hover:text-red-300':'text-gray-700 hover:text-red-400')}><Zap size={14}/></button>
+              {roomStakes&&<button onClick={()=>setShowStakes(true)} className="p-1.5 text-red-400"><Zap size={14}/></button>}
               <button onClick={()=>{setHistoryDate(getYesterday());loadHistoryDate(getYesterday());setShowHistory(true);}} className={`p-1.5 ${T.textDim} hover:${T.text} transition-colors`}><Calendar size={14}/></button>
-              {lastWeekData&&<button onClick={()=>setShowWeeklyRecap(true)} className={`p-1.5 ${T.textDim} hover:text-purple-400 transition-colors`}><BarChart3 size={14}/></button>}
               <button onClick={toggleTheme} className={`p-1.5 ${T.textDim} hover:text-amber-400 transition-colors`}>{darkMode?<Sun size={14}/>:<Moon size={14}/>}</button>
-              <button onClick={()=>setShowProfile(true)} className={`p-1.5 ${T.textDim} hover:${T.text} transition-colors`}><User size={14}/></button>
-              <button onClick={()=>setShowInviteModal(true)} className={`p-1.5 ${T.textDim} hover:${T.text} transition-colors`}><UserPlus size={14}/></button>
-              <button onClick={()=>setShowHelp(true)} className={`p-1.5 ${T.textDim} hover:${T.text} transition-colors`}><HelpCircle size={14}/></button>
-              <button onClick={()=>signOut(auth)} className={`p-1.5 ${T.textDim} hover:text-red-400 transition-colors`}><LogOut size={14}/></button>
+              <button onClick={()=>setShowProfile(true)} className={`p-2 ${T.textDim} hover:${T.text} transition-colors`}><User size={16}/></button>
             </div>
           </div>
         </div>
@@ -717,8 +926,8 @@ export default function TraxApp() {
           {/* Weekly winner / countdown banner */}
           {weeklyWinner && (
             <div className="mb-3 p-3 bg-gradient-to-r from-amber-500/10 to-yellow-500/10 border border-amber-500/15 rounded-xl flex items-center justify-between">
-              <div className="flex items-center gap-2"><Crown size={14} className="text-amber-400"/><span className="text-sm text-amber-300 font-medium">{weeklyWinner.member.username} leads this week</span></div>
-              <span className="text-[10px] text-gray-500">{weeklyWinner.daysLeft}d left</span>
+              <div className="flex items-center gap-2"><Crown size={14} className="text-amber-400"/><span className="text-sm text-amber-300 font-medium">{weeklyWinner.member.username}</span>{getRoomRole(weeklyWinner.member.id)&&<span className={`text-[9px] font-bold ${getRoomRole(weeklyWinner.member.id).color}`}>{getRoomRole(weeklyWinner.member.id).icon} {getRoomRole(weeklyWinner.member.id).role}</span>}<span className={`text-xs ${T.textDim}`}>leads this week</span></div>
+              <span className={`text-[10px] ${T.textDim}`}>{weeklyWinner.daysLeft}d left</span>
             </div>
           )}
 
@@ -735,18 +944,123 @@ export default function TraxApp() {
 
           {/* Progress bar */}
           <div className="relative h-2 bg-white/[0.04] rounded-full overflow-hidden"><div className="absolute inset-y-0 left-0 rounded-full transition-all duration-700 ease-out" style={{width:(dailyProg*100)+'%',background:dailyProg>=1?'linear-gradient(90deg,#10b981,#34d399)':'linear-gradient(90deg,#3b82f6,#8b5cf6,#10b981)'}}/></div>
-          <div className="flex justify-between mt-1.5"><span className="text-[10px] text-gray-600">{Math.round(dailyProg*100)}% complete</span><span className="text-[10px] text-gray-600">{timeDisplay} left</span></div>
+          <div className="flex justify-between mt-1.5"><span className={`text-[10px] ${T.textDim}`}>{dailyProg>=1?'🎉 All habits complete!':Math.round(dailyProg*100)+'% daily progress'}</span><span className={`text-[10px] ${T.textDim}`}>{timeDisplay} left</span></div>
         </div>
 
         {/* Stats */}
         <div className="grid grid-cols-3 gap-3 mb-6">
-          <div className="relative bg-white/[0.03] rounded-2xl border border-white/[0.06] p-4 overflow-hidden"><div className="absolute top-0 right-0 w-16 h-16 bg-blue-500/5 rounded-full blur-xl -translate-y-4 translate-x-4"/><div className="text-gray-500 text-[10px] tracking-wider uppercase mb-1 flex items-center gap-1"><Zap size={9}/>Points</div><div className="text-2xl font-black text-transparent bg-clip-text bg-gradient-to-b from-white to-gray-400">{myPts}</div></div>
-          <div className="relative bg-white/[0.03] rounded-2xl border border-white/[0.06] p-4 overflow-hidden"><div className="absolute top-0 right-0 w-16 h-16 bg-orange-500/5 rounded-full blur-xl -translate-y-4 translate-x-4"/><div className="text-gray-500 text-[10px] tracking-wider uppercase mb-1 flex items-center gap-1"><Flame size={9}/>Streak</div><div className="text-2xl font-black text-transparent bg-clip-text bg-gradient-to-b from-orange-300 to-orange-600">{streakData.streak||0}<span className="text-sm font-medium text-gray-600 ml-1">d</span></div></div>
-          <div className="relative bg-white/[0.03] rounded-2xl border border-white/[0.06] p-4 overflow-hidden"><div className="absolute top-0 right-0 w-16 h-16 bg-purple-500/5 rounded-full blur-xl -translate-y-4 translate-x-4"/><div className="text-gray-500 text-[10px] tracking-wider uppercase mb-2">Crystals{isPerfect&&<span className="text-amber-400 ml-1">&#9830;</span>}</div><div className="flex items-center gap-2.5">{allCatNames.map(c=><div key={c} className={'w-5 h-5 rounded-full transition-all duration-500 '+(myCr[c]?getCT(c).bg+' shadow-md '+getCT(c).glow:'bg-white/[0.06] border border-white/[0.08]')}/>)}</div></div>
+          <div className={`relative ${T.bgCard} rounded-2xl border ${T.border} p-4 overflow-hidden`}><div className="absolute top-0 right-0 w-16 h-16 bg-blue-500/5 rounded-full blur-xl -translate-y-4 translate-x-4"/><div className={`${T.textMuted} text-[10px] tracking-wider uppercase mb-1 flex items-center gap-1`}><Zap size={9}/>Points</div><div className={`text-2xl font-black ${darkMode?'text-transparent bg-clip-text bg-gradient-to-b from-white to-gray-400':''}`}>{myPts}</div></div>
+          <div className={`relative ${T.bgCard} rounded-2xl border ${T.border} p-4 overflow-hidden`}><div className="absolute top-0 right-0 w-16 h-16 bg-orange-500/5 rounded-full blur-xl -translate-y-4 translate-x-4"/><div className={`${T.textMuted} text-[10px] tracking-wider uppercase mb-1 flex items-center gap-1`}><Flame size={9}/>Streak</div><div className="text-2xl font-black text-transparent bg-clip-text bg-gradient-to-b from-orange-300 to-orange-600">{streakData.streak||0}<span className={`text-sm font-medium ${T.textDim} ml-1`}>d</span></div></div>
+          <div className={`relative ${T.bgCard} rounded-2xl border ${T.border} p-4 overflow-hidden`}><div className="absolute top-0 right-0 w-16 h-16 bg-purple-500/5 rounded-full blur-xl -translate-y-4 translate-x-4"/><div className={`${T.textMuted} text-[10px] tracking-wider uppercase mb-2`}>Crystals{isPerfect&&<span className="text-amber-400 ml-1">&#9830;</span>}</div><div className="flex items-center gap-2.5">{allCatNames.map(c=><div key={c} className={'w-5 h-5 rounded-full transition-all duration-500 '+(myCr[c]?getCT(c).bg+' shadow-md '+getCT(c).glow:darkMode?'bg-white/[0.06] border border-white/[0.08]':'bg-gray-200 border border-gray-300')}/>)}</div></div>
         </div>
 
-        {/* Edit mode toggle */}
-        {habits.length>0&&<div className="flex justify-end mb-3"><button onClick={()=>setEditMode(!editMode)} className={'text-[10px] font-medium tracking-wider uppercase px-3 py-1.5 rounded-lg transition-all '+(editMode?'bg-blue-500/20 text-blue-400 border border-blue-500/30':'text-gray-600 hover:text-gray-400')}>{editMode?'Done':'Reorder'}</button></div>}
+        {/* ─── RIVAL STATUS (always visible) ─── */}
+        {rivalStatus.length > 0 && (
+          <div className={`mb-4 rounded-2xl border ${T.border} ${T.bgCard} overflow-hidden`}>
+            <div className="px-4 py-2.5 border-b border-white/[0.04] flex items-center justify-between">
+              <span className={`text-[10px] font-bold tracking-wider uppercase ${T.textMuted}`}>Rival Status</span>
+              <span className={`text-[10px] ${T.textDim}`}>Live</span>
+            </div>
+            <div className="divide-y divide-white/[0.04]">{rivalStatus.slice(0,3).map(r => {
+              const role = getRoomRole(r.member.id);
+              const ahead = r.pts > myPts;
+              const diff = Math.abs(r.pts - myPts);
+              return (
+                <div key={r.member.id} className="px-4 py-2.5 flex items-center justify-between">
+                  <div className="flex items-center gap-2.5">
+                    <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-black ${ahead?'bg-red-500/20 text-red-400':'bg-emerald-500/20 text-emerald-400'}`}>{r.member.username?.charAt(0)?.toUpperCase()}</div>
+                    <div>
+                      <div className="flex items-center gap-1.5"><span className={`text-sm font-medium ${darkMode?'text-gray-300':'text-gray-700'}`}>{r.member.username}</span>{role&&<span className={`text-[9px] ${role.color} font-semibold`}>{role.icon} {role.role}</span>}</div>
+                      <div className={`text-[10px] ${T.textDim}`}>{r.habitCount===0?'No habits logged yet':r.habitCount+' habit'+(r.habitCount>1?'s':'')+' today'}</div>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <div className={`text-sm font-bold ${ahead?'text-red-400':'text-emerald-400'}`}>{r.pts} pts</div>
+                    {diff>0&&<div className={`text-[9px] font-medium ${ahead?'text-red-400/70':'text-emerald-400/70'}`}>{ahead?'+'+diff+' ahead':''+diff+' behind'}</div>}
+                  </div>
+                </div>
+              );
+            })}</div>
+            {/* Loss aversion nudge */}
+            {myPts === 0 && rivalStatus.some(r=>r.pts>0) && (
+              <div className="px-4 py-2 bg-red-500/5 border-t border-red-500/10">
+                <p className="text-[10px] text-red-400">⚠️ Your rivals are logging. You haven't started today.</p>
+              </div>
+            )}
+            {myPts > 0 && rivalStatus[0]?.pts > myPts && (
+              <div className="px-4 py-2 bg-amber-500/5 border-t border-amber-500/10">
+                <p className="text-[10px] text-amber-400">📉 You're {rivalStatus[0].pts - myPts} pts behind {rivalStatus[0].member.username}. Keep pushing.</p>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ─── ACTIVITY FEED ─── */}
+        {activityFeed.length > 0 && (
+          <div className={`mb-4 rounded-2xl border ${T.border} ${T.bgCard} overflow-hidden`}>
+            <div className="px-4 py-2.5 border-b border-white/[0.04]">
+              <span className={`text-[10px] font-bold tracking-wider uppercase ${T.textMuted}`}>Activity</span>
+            </div>
+            <div className="max-h-32 overflow-y-auto divide-y divide-white/[0.04]">{activityFeed.slice(0,8).map(a => {
+              const isMe = a.userId === currentUser.id;
+              const ts = a.ts ? new Date(a.ts) : null;
+              const timeAgo = ts ? (Math.floor((Date.now()-ts.getTime())/60000)<60 ? Math.floor((Date.now()-ts.getTime())/60000)+'m ago' : Math.floor((Date.now()-ts.getTime())/3600000)+'h ago') : '';
+              return (
+                <div key={a.id} className="px-4 py-2 flex items-center justify-between">
+                  <div className="flex-1 min-w-0">
+                    <span className={`text-xs ${isMe?'text-blue-400':'text-gray-400'} font-medium`}>{isMe?'You':a.username}</span>
+                    <span className={`text-xs ${T.textDim} ml-1.5`}>{a.text}</span>
+                    {a.bonus==='jackpot'&&<span className="ml-1 text-[10px] bg-amber-500/20 text-amber-300 px-1.5 py-0.5 rounded-full font-bold">JACKPOT</span>}
+                    {a.bonus==='bonus'&&<span className="ml-1 text-[10px] bg-purple-500/20 text-purple-300 px-1.5 py-0.5 rounded-full font-bold">2×</span>}
+                  </div>
+                  <span className={`text-[9px] ${T.textFaint} shrink-0 ml-2`}>{timeAgo}</span>
+                </div>
+              );
+            })}</div>
+          </div>
+        )}
+
+        {/* ─── WEEKLY DRAMA COUNTDOWN (Sunday) ─── */}
+        {weeklyWinner && weeklyWinner.daysLeft <= 1 && roomMembers.length > 1 && (
+          <div className="mb-4 p-4 bg-gradient-to-r from-amber-500/10 via-red-500/10 to-purple-500/10 border border-amber-500/20 rounded-2xl text-center">
+            <div className="text-2xl mb-1">{weeklyWinner.daysLeft === 0 ? '🏆' : '⏰'}</div>
+            <div className="text-sm font-bold text-amber-300">{weeklyWinner.daysLeft === 0 ? 'Winner Takes the Week' : 'Final Day — Tomorrow Decides'}</div>
+            <div className={`text-xs ${T.textDim} mt-1`}>{weeklyWinner.member.username} leads with {weeklyWinner.pts} pts</div>
+            <div className={`text-[10px] ${T.textDim} mt-0.5`}>{timeDisplay} until reset</div>
+          </div>
+        )}
+
+        {/* Board approval requests */}
+        {boardRequests.length > 0 && boardRequests.map(br => (
+          <div key={br.id} className={`mb-3 p-3 rounded-xl border ${darkMode?'bg-purple-500/5 border-purple-500/15':'bg-purple-50 border-purple-200'}`}>
+            <div className="flex items-center justify-between">
+              <div><span className="text-sm font-medium text-purple-400">{br.username}</span><span className={`text-xs ${T.textDim} ml-1`}>wants a custom board</span></div>
+              <div className="flex gap-2">
+                <button onClick={()=>voteOnBoard(br,true)} className="px-3 py-1 bg-emerald-500/20 text-emerald-400 text-[10px] font-bold rounded-lg hover:bg-emerald-500/30">Approve</button>
+                <button onClick={()=>voteOnBoard(br,false)} className="px-3 py-1 bg-red-500/20 text-red-400 text-[10px] font-bold rounded-lg hover:bg-red-500/30">Deny</button>
+              </div>
+            </div>
+            <div className={`text-[10px] ${T.textDim} mt-1`}>{br.habitIds.length} habits selected · {(br.approvals||[]).length} approval(s) so far</div>
+          </div>
+        ))}
+
+        {/* Custom board indicator */}
+        {getMyBoard() && (
+          <div className={`mb-3 p-2.5 rounded-xl border flex items-center justify-between ${darkMode?'bg-indigo-500/5 border-indigo-500/15':'bg-indigo-50 border-indigo-200'}`}>
+            <span className="text-[10px] text-indigo-400 font-medium">🎯 Custom Board Active — {getMyBoard().habitIds.length} habits</span>
+            <button onClick={async()=>{try{await deleteDoc(doc(db,'customBoards',getMyBoard().id));}catch{}}} className="text-[10px] text-gray-500 hover:text-red-400">Reset</button>
+          </div>
+        )}
+
+        {/* Toolbar: Heat Map, Insights, Custom Board, Reorder */}
+        <div className="flex items-center justify-between mb-3 flex-wrap gap-1">
+          <div className="flex gap-1">
+            <button onClick={loadHeatMap} className={`text-[10px] font-medium tracking-wider uppercase px-3 py-1.5 rounded-lg transition-all ${T.textDim} hover:text-purple-400`}>📊 Map</button>
+            <button onClick={loadInsights} className={`text-[10px] font-medium tracking-wider uppercase px-3 py-1.5 rounded-lg transition-all ${T.textDim} hover:text-blue-400`}>📈 Insights</button>
+            {roomMembers.length>1&&<button onClick={()=>{setCustomBoardHabits(getMyBoard()?.habitIds||habits.map(h=>h.id));setShowCustomBoard(true);}} className={`text-[10px] font-medium tracking-wider uppercase px-3 py-1.5 rounded-lg transition-all ${T.textDim} hover:text-indigo-400`}>🎯 Board</button>}
+          </div>
+          {habits.length>0&&<button onClick={()=>setEditMode(!editMode)} className={'text-[10px] font-medium tracking-wider uppercase px-3 py-1.5 rounded-lg transition-all '+(editMode?'bg-blue-500/20 text-blue-400 border border-blue-500/30':T.textDim+' hover:text-gray-400')}>{editMode?'Done':'Reorder'}</button>}
+        </div>
 
         {/* Habits */}
         <div className="space-y-6">
@@ -774,7 +1088,7 @@ export default function TraxApp() {
                         {editMode?<div className={darkMode?'text-gray-600':'text-gray-400'}><GripVertical size={16}/></div>:(
                         <div className="flex items-center gap-1 shrink-0">
                           <button onClick={()=>handleDecrement(h.id)} disabled={cnt===0} className={'w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold transition-all active:scale-90 '+(cnt===0?'border '+(darkMode?'border-white/[0.06] text-gray-700':'border-gray-200 text-gray-300')+' cursor-not-allowed':'border-2 '+t.bdr+' '+t.txt)}>&minus;</button>
-                          <div className={'w-10 h-10 rounded-full border-2 flex items-center justify-center text-sm font-black transition-all duration-300 '+(maxed?t.bg+' border-transparent text-white shadow-lg '+t.glow:done?'border-current '+t.txt+' '+t.bgM:'border-'+(darkMode?'white/[0.08]':'gray-200')+' '+(darkMode?'text-gray-600':'text-gray-400')+' '+(darkMode?'bg-white/[0.02]':'bg-gray-50'))}>{cnt}</div>
+                          <div className={'w-10 h-10 rounded-full border-2 flex items-center justify-center text-sm font-black transition-all duration-300 '+(maxed?t.bg+' border-transparent text-white shadow-lg '+t.glow+' scale-110':done?'border-current '+t.txt+' '+t.bgM:'border-'+(darkMode?'white/[0.08]':'gray-200')+' '+(darkMode?'text-gray-600':'text-gray-400')+' '+(darkMode?'bg-white/[0.02]':'bg-gray-50'))}>{maxed?'✓':cnt}</div>
                           <button onClick={()=>handleIncrement(h.id)} disabled={maxed} className={'w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold transition-all active:scale-90 '+(maxed?'border '+(darkMode?'border-white/[0.06] text-gray-700':'border-gray-200 text-gray-300')+' cursor-not-allowed':'border-2 '+t.bdr+' '+t.txt)}>+</button>
                         </div>)}
                         <div className="min-w-0 flex-1">
@@ -808,7 +1122,7 @@ export default function TraxApp() {
       {/* Add Habit */}
       <Modal show={showAddHabit} onClose={()=>setShowAddHabit(false)}>
         <ModalHeader title="Add Habit" onClose={()=>setShowAddHabit(false)}/>
-        <button onClick={loadDefaultHabits} className="w-full mb-5 px-4 py-3 bg-gradient-to-r from-violet-600 to-purple-600 text-white rounded-xl shadow-lg shadow-violet-500/20 text-sm font-bold active:scale-[0.98]">&#x26A1; Load Defaults (16 habits)</button>
+        <button onClick={loadDefaultHabits} disabled={loading} className="w-full mb-5 px-4 py-3 bg-gradient-to-r from-violet-600 to-purple-600 text-white rounded-xl shadow-lg shadow-violet-500/20 text-sm font-bold active:scale-[0.98] disabled:opacity-50">{loading?'Loading...':'⚡ Load Defaults (16 habits)'}</button>
         <div className="space-y-3">
           <input type="text" placeholder="Habit name" value={newHabit.name} onChange={e=>setNewHabit({...newHabit,name:e.target.value})} className={inputCls}/>
           <div className="grid grid-cols-2 gap-3">
@@ -940,7 +1254,7 @@ export default function TraxApp() {
           const medals=['\u{1F947}','\u{1F948}','\u{1F949}'];
           return (
             <div key={item.member.id} className={'rounded-xl p-4 border transition-all '+(isMe?'bg-gradient-to-r from-blue-600/20 to-indigo-600/20 border-blue-500/30 shadow-lg shadow-blue-500/10':i===0?'bg-amber-500/5 border-amber-500/20':'bg-white/[0.02] border-white/[0.04] hover:bg-white/[0.04]')}>
-              <div className="flex items-center justify-between"><div className="flex items-center gap-3"><div className="text-lg w-8 text-center">{i<3?medals[i]:<span className="text-sm text-gray-600">{i+1}</span>}</div><div><div className={'text-sm font-semibold '+(isMe?'text-blue-300':'text-gray-300')}>{item.member.username}{isMe&&<span className="text-[10px] ml-1.5 text-gray-600">(you)</span>}</div><div className="text-xs text-gray-600">{pts} pts{leaderboardTab==='week'?' \u00b7 '+item.weeklyCrystals+' crystals':''}</div></div></div>
+              <div className="flex items-center justify-between"><div className="flex items-center gap-3"><div className="text-lg w-8 text-center">{i<3?medals[i]:<span className="text-sm text-gray-600">{i+1}</span>}</div><div><div className={'text-sm font-semibold flex items-center gap-1.5 '+(isMe?'text-blue-300':'text-gray-300')}>{item.member.username}{isMe&&<span className="text-[10px] text-gray-600">(you)</span>}{getRoomRole(item.member.id)&&<span className={`text-[9px] font-bold ${getRoomRole(item.member.id).color}`}>{getRoomRole(item.member.id).icon}</span>}</div><div className="text-xs text-gray-600">{pts} pts{leaderboardTab==='week'?' \u00b7 '+item.weeklyCrystals+' crystals':''}</div></div></div>
                 <div className="flex items-center gap-3">{leaderboardTab==='today'&&<div className="flex items-center gap-1.5">{allCatNames.map(c=><div key={c} className={'w-2.5 h-2.5 rounded-full '+(item.crystals[c]?getCT(c).bg.replace('bg-','bg-').replace('500','400')+' shadow-sm shadow-'+getCT(c).neon.replace('#','')+'/50':isMe?'bg-white/10':'bg-white/[0.06]')}/>)}</div>}{!isMe&&<button onClick={()=>{setShowLeaderboard(false);setShowCompetitor(item.member);}} className="text-[10px] text-gray-600 hover:text-white uppercase tracking-wider font-medium">View</button>}</div>
               </div>
             </div>
@@ -963,15 +1277,6 @@ export default function TraxApp() {
           try{
             const snap=await getDocs(query(collection(db,'completions'),where('userId','==',currentUser.id)));
             let fixed=0;
-            for(const d of snap.docs){
-              const data=d.data();
-              // Check if the date looks like it might have been UTC-offset
-              // We can't perfectly know, but we can check for obvious issues:
-              // If a completion was made with toISOString(), the stored date could be +1 day ahead
-              // We'll look for completions where the Firestore doc creation timestamp (if available)
-              // doesn't match the stored date. Since we don't have that, just offer to delete orphans.
-            }
-            // Simpler approach: just delete completions with dates in the future
             const today=getToday();
             for(const d of snap.docs){
               const data=d.data();
@@ -982,7 +1287,15 @@ export default function TraxApp() {
             }
             alert(fixed>0?'Fixed '+fixed+' completion(s) with future dates.':'All completions look correct!');
           }catch(err){alert('Error: '+err.message);}finally{setLoading(false);}
-        }} disabled={loading} className="mt-3 w-full px-4 py-2.5 border border-white/[0.06] rounded-xl text-xs text-gray-500 hover:text-white hover:bg-white/[0.04] transition-all disabled:opacity-50">{loading?'Scanning...':'Fix Old Data (UTC cleanup)'}</button>
+        }} disabled={loading} className={`mt-3 w-full px-4 py-2.5 border rounded-xl text-xs transition-all disabled:opacity-50 ${darkMode?'border-white/[0.06] text-gray-500 hover:text-white hover:bg-white/[0.04]':'border-gray-200 text-gray-400 hover:text-gray-700 hover:bg-gray-50'}`}>{loading?'Scanning...':'Fix Old Data (UTC cleanup)'}</button>
+        {/* Quick actions */}
+        <div className="mt-5 space-y-2">
+          <button onClick={()=>{setShowProfile(false);setShowInviteModal(true);}} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border transition-all ${darkMode?'border-white/[0.06] bg-white/[0.02] hover:bg-white/[0.04] text-gray-300':'border-gray-200 bg-gray-50 hover:bg-gray-100 text-gray-700'}`}><UserPlus size={16} className="text-blue-400"/><span className="text-sm">Invite to Room</span></button>
+          <button onClick={()=>{setShowProfile(false);setShowStakes(true);}} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border transition-all ${darkMode?'border-white/[0.06] bg-white/[0.02] hover:bg-white/[0.04] text-gray-300':'border-gray-200 bg-gray-50 hover:bg-gray-100 text-gray-700'}`}><Zap size={16} className="text-red-400"/><span className="text-sm">Stakes</span></button>
+          {lastWeekData&&<button onClick={()=>{setShowProfile(false);setShowWeeklyRecap(true);}} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border transition-all ${darkMode?'border-white/[0.06] bg-white/[0.02] hover:bg-white/[0.04] text-gray-300':'border-gray-200 bg-gray-50 hover:bg-gray-100 text-gray-700'}`}><BarChart3 size={16} className="text-purple-400"/><span className="text-sm">Weekly Recap</span></button>}
+          <button onClick={()=>{setShowProfile(false);setShowHelp(true);}} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border transition-all ${darkMode?'border-white/[0.06] bg-white/[0.02] hover:bg-white/[0.04] text-gray-300':'border-gray-200 bg-gray-50 hover:bg-gray-100 text-gray-700'}`}><HelpCircle size={16} className="text-gray-400"/><span className="text-sm">How TRAX Works</span></button>
+          <button onClick={()=>signOut(auth)} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border transition-all ${darkMode?'border-white/[0.06] bg-white/[0.02] hover:bg-red-500/5 text-red-400':'border-gray-200 bg-gray-50 hover:bg-red-50 text-red-500'}`}><LogOut size={16}/><span className="text-sm">Sign Out</span></button>
+        </div>
       </Modal>
 
       {/* Help */}
@@ -1028,8 +1341,8 @@ export default function TraxApp() {
                     <div className="flex items-center gap-2"><span className="text-sm">{i<3?medals[i]:(i+1)+'.'}</span><span className={'text-sm font-semibold '+(isMe?'text-blue-300':darkMode?'text-gray-300':'text-gray-700')}>{s.member.username}</span></div>
                     <span className={`text-sm font-bold ${T.text}`}>{s.pts} pts</span>
                   </div>
-                  <div className="grid grid-cols-3 gap-2">{allCatNames.map(c=>(
-                    <div key={c} className={'text-center p-1.5 rounded-lg '+getCT(c).bgS}>
+                  <div className="flex flex-wrap gap-2">{allCatNames.map(c=>(
+                    <div key={c} className={'flex-1 min-w-[60px] text-center p-1.5 rounded-lg '+getCT(c).bgS}>
                       <div className={'text-xs font-bold '+getCT(c).txt}>{s.catPts[c]}</div>
                       <div className="text-[8px] text-gray-500">{c}</div>
                     </div>
@@ -1042,6 +1355,163 @@ export default function TraxApp() {
         ) : (
           <p className={`${T.textDim} text-sm text-center py-8`}>No data from last week yet.</p>
         )}
+      </Modal>
+
+      {/* Heat Map Calendar */}
+      <Modal show={showHeatMap} onClose={()=>setShowHeatMap(false)} wide dark={darkMode}>
+        <ModalHeader title="90-Day Heat Map" onClose={()=>setShowHeatMap(false)} icon={<Calendar size={18} className="text-emerald-400"/>}/>
+        <div className="mb-3"><p className={`text-xs ${T.textDim}`}>Points per day · darker = more active</p></div>
+        <div className="flex flex-wrap gap-[3px]">{(() => {
+          const cells = [];
+          const today = new Date();
+          const maxPts = Math.max(1, ...Object.values(heatMapData));
+          for (let i = 89; i >= 0; i--) {
+            const d = new Date(today); d.setDate(d.getDate()-i);
+            const ds = formatDateStr(d);
+            const pts = heatMapData[ds] || 0;
+            const intensity = pts / maxPts;
+            const isToday = ds === getToday();
+            const bg = pts === 0
+              ? (darkMode ? 'bg-white/[0.04]' : 'bg-gray-100')
+              : '';
+            const style = pts > 0 ? {backgroundColor:`rgba(16,185,129,${0.2+intensity*0.8})`} : {};
+            cells.push(
+              <div key={ds} className={`w-[10px] h-[10px] rounded-[2px] ${bg} ${isToday?'ring-1 ring-white/30':''}`} style={style} title={`${formatDate(ds)}: ${pts} pts`}/>
+            );
+          }
+          return cells;
+        })()}</div>
+        <div className="flex items-center justify-between mt-3">
+          <span className={`text-[10px] ${T.textDim}`}>90 days ago</span>
+          <div className="flex items-center gap-1">
+            <span className={`text-[10px] ${T.textDim} mr-1`}>Less</span>
+            {[0,0.25,0.5,0.75,1].map((v,i)=><div key={i} className="w-[10px] h-[10px] rounded-[2px]" style={{backgroundColor:v===0?(darkMode?'rgba(255,255,255,0.04)':'#f3f4f6'):`rgba(16,185,129,${0.2+v*0.8})`}}/>)}
+            <span className={`text-[10px] ${T.textDim} ml-1`}>More</span>
+          </div>
+          <span className={`text-[10px] ${T.textDim}`}>Today</span>
+        </div>
+        {/* Stats summary */}
+        <div className="grid grid-cols-3 gap-3 mt-4">{[
+          {v: Object.keys(heatMapData).length, l: 'Active Days'},
+          {v: Object.values(heatMapData).reduce((a,b)=>a+b,0), l: 'Total Points'},
+          {v: streakData.streak||0, l: 'Current Streak'}
+        ].map((s,i)=>(
+          <div key={i} className={`text-center p-3 rounded-xl ${darkMode?'bg-white/[0.03] border border-white/[0.04]':'bg-gray-50 border border-gray-200'}`}>
+            <div className="text-lg font-black text-emerald-400">{s.v}</div>
+            <div className={`text-[9px] ${T.textDim} tracking-wider uppercase`}>{s.l}</div>
+          </div>
+        ))}</div>
+      </Modal>
+
+      {/* Personal Insights */}
+      <Modal show={showInsights} onClose={()=>setShowInsights(false)} wide dark={darkMode}>
+        <ModalHeader title="Your Insights" onClose={()=>setShowInsights(false)} icon={<TrendingUp size={18} className="text-blue-400"/>}/>
+        {insightsData?.empty ? (
+          <p className={`text-sm ${T.textDim} text-center py-8`}>Not enough data yet. Keep tracking!</p>
+        ) : insightsData ? (
+          <div>
+            {/* Key metrics */}
+            <div className="grid grid-cols-2 gap-3 mb-4">
+              {[
+                { v: insightsData.avgPerDay, l: 'Avg habits/day', c: 'text-blue-400', icon: '📊' },
+                { v: insightsData.bestDay, l: 'Best day', c: 'text-emerald-400', icon: '🔥' },
+                { v: insightsData.avgPtsPerDay, l: 'Avg pts/day', c: 'text-purple-400', icon: '⚡' },
+                { v: insightsData.bestStreak+'d', l: 'Best streak', c: 'text-amber-400', icon: '🏆' },
+              ].map((s,i) => (
+                <div key={i} className={`p-3 rounded-xl ${darkMode?'bg-white/[0.03] border border-white/[0.04]':'bg-gray-50 border border-gray-200'}`}>
+                  <div className="text-sm mb-0.5">{s.icon}</div>
+                  <div className={`text-lg font-black ${s.c}`}>{s.v}</div>
+                  <div className={`text-[9px] ${T.textDim} tracking-wider uppercase`}>{s.l}</div>
+                </div>
+              ))}
+            </div>
+
+            {/* Most consistent habit */}
+            <div className={`p-4 rounded-xl mb-4 ${darkMode?'bg-white/[0.03] border border-white/[0.04]':'bg-gray-50 border border-gray-200'}`}>
+              <div className={`text-[10px] ${T.textDim} tracking-wider uppercase mb-1`}>Most Consistent Habit</div>
+              <div className={`text-sm font-bold ${darkMode?'text-white':'text-gray-900'}`}>{insightsData.bestHabitName}</div>
+              <div className={`text-xs ${T.textDim}`}>{insightsData.bestHabitDays} out of {insightsData.activeDays} active days</div>
+            </div>
+
+            {/* Weekly pattern bar chart */}
+            <div className={`p-4 rounded-xl mb-4 ${darkMode?'bg-white/[0.03] border border-white/[0.04]':'bg-gray-50 border border-gray-200'}`}>
+              <div className={`text-[10px] ${T.textDim} tracking-wider uppercase mb-3`}>Weekly Pattern</div>
+              <div className="flex items-end justify-between gap-1 h-20">
+                {insightsData.weekdayNames.map((day,i) => {
+                  const max = Math.max(1,...insightsData.weekdayCounts);
+                  const h = (insightsData.weekdayCounts[i] / max) * 100;
+                  const isBest = i === insightsData.weekdayNames.indexOf(insightsData.bestDay);
+                  return (
+                    <div key={day} className="flex-1 flex flex-col items-center gap-1">
+                      <div className="w-full rounded-t-md transition-all" style={{height: Math.max(4, h)+'%', backgroundColor: isBest ? '#10b981' : (darkMode ? 'rgba(255,255,255,0.1)' : '#e5e7eb')}}/>
+                      <span className={`text-[8px] ${isBest?'text-emerald-400 font-bold':T.textDim}`}>{day}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Summary stats */}
+            <div className="grid grid-cols-3 gap-2">
+              {[
+                { v: insightsData.activeDays, l: 'Active Days' },
+                { v: insightsData.completionRate+'%', l: 'Active Rate' },
+                { v: insightsData.totalPts, l: 'Total Pts' },
+              ].map((s,i) => (
+                <div key={i} className={`text-center p-2 rounded-lg ${darkMode?'bg-white/[0.02]':'bg-gray-50'}`}>
+                  <div className={`text-sm font-bold ${darkMode?'text-white':'text-gray-800'}`}>{s.v}</div>
+                  <div className={`text-[8px] ${T.textDim} tracking-wider uppercase`}>{s.l}</div>
+                </div>
+              ))}
+            </div>
+
+            <p className={`text-[10px] ${T.textDim} text-center mt-4 italic`}>Based on last 60 days · only you can see this</p>
+          </div>
+        ) : <p className={`text-sm ${T.textDim} text-center py-8`}>Loading...</p>}
+      </Modal>
+
+      {/* Custom Board */}
+      <Modal show={showCustomBoard} onClose={()=>setShowCustomBoard(false)} wide dark={darkMode}>
+        <ModalHeader title="Custom Board" onClose={()=>setShowCustomBoard(false)}/>
+        <p className={`text-xs ${T.textDim} mb-4`}>Choose which habits you want on your personal board. Other members must approve your selection.</p>
+        {getMyBoard() && (
+          <div className="mb-4 p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-xl">
+            <span className="text-xs text-emerald-400 font-medium">✓ You have an active custom board</span>
+          </div>
+        )}
+        {pendingBoards.find(b=>b.userId===currentUser?.id&&b.status==='pending') && (
+          <div className="mb-4 p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl">
+            <span className="text-xs text-amber-400 font-medium">⏳ Your board is pending approval</span>
+          </div>
+        )}
+        <div className="space-y-2 mb-4 max-h-64 overflow-y-auto">
+          {habits.map(h => {
+            const selected = customBoardHabits.includes(h.id);
+            const ct = getCT(h.category);
+            return (
+              <button key={h.id} onClick={()=>{
+                setCustomBoardHabits(prev=>selected?prev.filter(id=>id!==h.id):[...prev,h.id]);
+              }} className={`w-full text-left p-3 rounded-xl border transition-all flex items-center gap-3 ${
+                selected
+                  ? ct.bdr+' '+ct.bgS
+                  : darkMode?'border-white/[0.04] bg-white/[0.02] hover:bg-white/[0.03]':'border-gray-200 bg-white hover:bg-gray-50'
+              }`}>
+                <div className={`w-5 h-5 rounded-md border-2 flex items-center justify-center text-xs ${
+                  selected?ct.bg+' border-transparent text-white':'border-gray-600'
+                }`}>{selected&&'✓'}</div>
+                <div className="flex-1 min-w-0">
+                  <div className={`text-sm font-medium truncate ${selected?(darkMode?'text-white':'text-gray-900'):T.textDim}`}>{h.name}</div>
+                  <div className={`text-[10px] ${T.textDim}`}>{h.category} · {h.points} pts</div>
+                </div>
+              </button>
+            );
+          })}
+        </div>
+        <div className={`text-xs ${T.textDim} mb-3`}>{customBoardHabits.length} of {habits.length} habits selected</div>
+        {error&&<p className="text-red-400 text-xs text-center mb-2">{error}</p>}
+        {successMsg&&<p className="text-emerald-400 text-xs text-center mb-2">{successMsg}</p>}
+        <button onClick={()=>proposeCustomBoard(customBoardHabits)} disabled={customBoardHabits.length===0||customBoardHabits.length===habits.length} className="w-full px-4 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-xl text-sm font-bold shadow-lg shadow-indigo-500/20 active:scale-[0.98] disabled:opacity-40">Submit for Approval</button>
+        <p className={`text-[10px] ${T.textDim} text-center mt-2`}>Needs majority approval from room members</p>
       </Modal>
     </div>
   );
