@@ -483,12 +483,23 @@ export default function TraxApp() {
     if (!currentUser || !currentRoom || !selectedHabitIds.length) return;
     try {
       const boardId = currentUser.id + '_' + currentRoom.id;
-      await setDoc(doc(db, 'customBoards', boardId), {
-        userId: currentUser.id, username: currentUser.username, roomId: currentRoom.id,
-        habitIds: selectedHabitIds, status: 'pending',
-        createdAt: new Date().toISOString(), approvals: [], rejections: []
-      });
-      setShowCustomBoard(false); setSuccessMsg('Board submitted for approval!'); setTimeout(()=>setSuccessMsg(''),3000);
+      const otherMembers = roomMembers.filter(m=>m.id!==currentUser.id).length;
+      if (otherMembers === 0) {
+        // Solo mode: apply directly, no approval needed
+        await setDoc(doc(db, 'myBoard', boardId), { habitIds: selectedHabitIds, userId: currentUser.id, roomId: currentRoom.id });
+        await setDoc(doc(db, 'customBoards', boardId), {
+          userId: currentUser.id, username: currentUser.username, roomId: currentRoom.id,
+          habitIds: selectedHabitIds, status: 'approved', createdAt: new Date().toISOString(), approvals: [], rejections: []
+        });
+        setShowCustomBoard(false); setSuccessMsg('Board applied!'); setTimeout(()=>setSuccessMsg(''),2000);
+      } else {
+        await setDoc(doc(db, 'customBoards', boardId), {
+          userId: currentUser.id, username: currentUser.username, roomId: currentRoom.id,
+          habitIds: selectedHabitIds, status: 'pending',
+          createdAt: new Date().toISOString(), approvals: [], rejections: []
+        });
+        setShowCustomBoard(false); setSuccessMsg('Board submitted for approval!'); setTimeout(()=>setSuccessMsg(''),3000);
+      }
     } catch { setError('Failed to submit board'); }
   };
   const voteOnBoard = async (boardDoc, approve) => {
@@ -953,6 +964,8 @@ export default function TraxApp() {
               <button onClick={()=>setShowLeaderboard(true)} className="flex items-center gap-1 px-2.5 py-1.5 bg-gradient-to-r from-amber-500/20 to-orange-500/20 border border-amber-500/20 text-amber-400 rounded-lg hover:border-amber-500/40 transition-all text-xs font-semibold"><Trophy size={12}/></button>
               {roomStakes&&<button onClick={()=>setShowStakes(true)} className="p-1.5 text-red-400"><Zap size={14}/></button>}
               <button onClick={()=>{setHistoryDate(getYesterday());loadHistoryDate(getYesterday());setShowHistory(true);}} className={`p-1.5 ${T.textDim} hover:${T.text} transition-colors`}><Calendar size={14}/></button>
+              {lastWeekData&&<button onClick={()=>setShowWeeklyRecap(true)} className={`p-1.5 ${T.textDim} hover:text-purple-400 transition-colors`}><BarChart3 size={14}/></button>}
+              <button onClick={()=>setShowInviteModal(true)} className={`p-1.5 ${T.textDim} hover:${T.text} transition-colors`}><UserPlus size={14}/></button>
               <button onClick={toggleTheme} className={`p-1.5 ${T.textDim} hover:text-amber-400 transition-colors`}>{darkMode?<Sun size={14}/>:<Moon size={14}/>}</button>
               <button onClick={()=>setShowProfile(true)} className={`p-2 ${T.textDim} hover:${T.text} transition-colors`}><User size={16}/></button>
             </div>
@@ -1102,7 +1115,7 @@ export default function TraxApp() {
           <div className="flex gap-1">
             <button onClick={loadHeatMap} className={`text-[10px] font-medium tracking-wider uppercase px-3 py-1.5 rounded-lg transition-all ${T.textDim} hover:text-purple-400`}>📊 Map</button>
             <button onClick={loadInsights} className={`text-[10px] font-medium tracking-wider uppercase px-3 py-1.5 rounded-lg transition-all ${T.textDim} hover:text-blue-400`}>📈 Insights</button>
-            {roomMembers.length>1&&<button onClick={()=>{setCustomBoardHabits(myBoardIds||habits.map(h=>h.id));setShowCustomBoard(true);}} className={`text-[10px] font-medium tracking-wider uppercase px-3 py-1.5 rounded-lg transition-all ${T.textDim} hover:text-indigo-400`}>🎯 Board</button>}
+            <button onClick={()=>{setCustomBoardHabits(myBoardIds||habits.map(h=>h.id));setShowCustomBoard(true);}} className={`text-[10px] font-medium tracking-wider uppercase px-3 py-1.5 rounded-lg transition-all ${T.textDim} hover:text-indigo-400`}>🎯 Board</button>
           </div>
           <div className="flex gap-1">
             {habits.length>0&&<button onClick={()=>setEditMode(!editMode)} className={'text-[10px] font-medium tracking-wider uppercase px-3 py-1.5 rounded-lg transition-all flex items-center gap-1 '+(editMode?'bg-blue-500/20 text-blue-400 border border-blue-500/30':T.textDim+' hover:text-gray-400')}>{editMode?'Done':'✏️ Edit Board'}</button>}
@@ -1599,8 +1612,8 @@ export default function TraxApp() {
         <div className={`text-xs ${T.textDim} mb-3`}>{customBoardHabits.length} habit{customBoardHabits.length!==1?'s':''} selected</div>
         {error&&<p className="text-red-400 text-xs text-center mb-2">{error}</p>}
         {successMsg&&<p className="text-emerald-400 text-xs text-center mb-2">{successMsg}</p>}
-        <button onClick={()=>proposeCustomBoard(customBoardHabits)} disabled={customBoardHabits.length===0} className="w-full px-4 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-xl text-sm font-bold shadow-lg shadow-indigo-500/20 active:scale-[0.98] disabled:opacity-40">Submit for Approval</button>
-        <p className={`text-[10px] ${T.textDim} text-center mt-2`}>Needs majority approval from room members</p>
+        <button onClick={()=>proposeCustomBoard(customBoardHabits)} disabled={customBoardHabits.length===0} className="w-full px-4 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-xl text-sm font-bold shadow-lg shadow-indigo-500/20 active:scale-[0.98] disabled:opacity-40">{roomMembers.filter(m=>m.id!==currentUser?.id).length>0?'Submit for Approval':'Apply Board'}</button>
+        {roomMembers.filter(m=>m.id!==currentUser?.id).length>0&&<p className={`text-[10px] ${T.textDim} text-center mt-2`}>Needs majority approval from room members</p>}
       </Modal>
 
     </div>
