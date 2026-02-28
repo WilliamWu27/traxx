@@ -141,6 +141,10 @@ export default function TraxApp() {
   const [showInsights, setShowInsights] = useState(false);
   const [insightsData, setInsightsData] = useState(null);
   const [myBoardIds, setMyBoardIds] = useState(null); // null = show all, array = custom selection
+  const [showCustomBoard, setShowCustomBoard] = useState(false);
+  const [customBoardHabits, setCustomBoardHabits] = useState([]);
+  const [pendingBoards, setPendingBoards] = useState([]);
+  const [boardRequests, setBoardRequests] = useState([]);
 
   const prevProgRef = useRef(0);
   const [celebrateComplete, setCelebrateComplete] = useState(false);
@@ -276,13 +280,22 @@ export default function TraxApp() {
       }, err => console.warn('Activity feed:', err));
     } catch(e) { console.warn('Activity listener failed:', e); }
     // Personal board listener
+    let u10 = ()=>{}, u11 = ()=>{};
     try {
       u10 = onSnapshot(doc(db, 'myBoard', currentUser.id+'_'+currentRoom.id), s => {
         if (s.exists() && s.data().habitIds) setMyBoardIds(s.data().habitIds);
         else setMyBoardIds(null);
       }, err => console.warn('Board:', err));
     } catch(e) { console.warn('Board listener failed:', e); }
-    return () => { u1(); u2(); u4(); u5(); u6(); u7(); u8(); u9(); u10(); weekUnsubs.forEach(u=>u()); };
+    // Custom board proposals listener
+    try {
+      u11 = onSnapshot(query(collection(db, 'customBoards'), where('roomId', '==', currentRoom.id)), s => {
+        const boards = s.docs.map(d=>({id:d.id,...d.data()}));
+        setPendingBoards(boards);
+        setBoardRequests(boards.filter(b=>b.status==='pending'&&b.userId!==currentUser.id&&!(b.approvals||[]).includes(currentUser.id)&&!(b.rejections||[]).includes(currentUser.id)));
+      }, err => console.warn('Custom boards:', err));
+    } catch(e) { console.warn('Board proposals listener failed:', e); }
+    return () => { u1(); u2(); u4(); u5(); u6(); u7(); u8(); u9(); u10(); u11(); weekUnsubs.forEach(u=>u()); };
   }, [currentUser, currentRoom, dateKey]);
 
   // ─── LAST WEEK DATA (for recap) ───
@@ -464,6 +477,39 @@ export default function TraxApp() {
   };
   const isOnBoard = (habitId) => !myBoardIds || myBoardIds.includes(habitId);
   const boardActive = myBoardIds !== null;
+
+  // Custom board proposals (for approval flow)
+  const proposeCustomBoard = async (selectedHabitIds) => {
+    if (!currentUser || !currentRoom || !selectedHabitIds.length) return;
+    try {
+      const boardId = currentUser.id + '_' + currentRoom.id;
+      await setDoc(doc(db, 'customBoards', boardId), {
+        userId: currentUser.id, username: currentUser.username, roomId: currentRoom.id,
+        habitIds: selectedHabitIds, status: 'pending',
+        createdAt: new Date().toISOString(), approvals: [], rejections: []
+      });
+      setShowCustomBoard(false); setSuccessMsg('Board submitted for approval!'); setTimeout(()=>setSuccessMsg(''),3000);
+    } catch { setError('Failed to submit board'); }
+  };
+  const voteOnBoard = async (boardDoc, approve) => {
+    try {
+      const ref = doc(db, 'customBoards', boardDoc.id);
+      const field = approve ? 'approvals' : 'rejections';
+      const other = approve ? 'rejections' : 'approvals';
+      const updList = [...(boardDoc[field]||[]).filter(id=>id!==currentUser.id), currentUser.id];
+      const otherList = (boardDoc[other]||[]).filter(id=>id!==currentUser.id);
+      const otherMembers = roomMembers.filter(m=>m.id!==boardDoc.userId).length;
+      const needed = Math.max(1, Math.ceil(otherMembers / 2));
+      let status = boardDoc.status;
+      if (approve && updList.length >= needed) status = 'approved';
+      if (!approve && updList.length >= needed) status = 'rejected';
+      await updateDoc(ref, { [field]: updList, [other]: otherList, status });
+      // If approved, apply to the user's personal board
+      if (status === 'approved') {
+        await setDoc(doc(db, 'myBoard', boardDoc.userId+'_'+currentRoom.id), { habitIds: boardDoc.habitIds, userId: boardDoc.userId, roomId: currentRoom.id });
+      }
+    } catch {}
+  };
 
   // ─── TIMER + MIDNIGHT RESET ───
   useEffect(() => {
@@ -1029,6 +1075,20 @@ export default function TraxApp() {
           </div>
         )}
 
+        {/* Board approval requests from other members */}
+        {boardRequests.length > 0 && boardRequests.map(br => (
+          <div key={br.id} className={`mb-3 p-3 rounded-xl border ${darkMode?'bg-purple-500/5 border-purple-500/15':'bg-purple-50 border-purple-200'}`}>
+            <div className="flex items-center justify-between">
+              <div><span className="text-sm font-medium text-purple-400">{br.username}</span><span className={`text-xs ${T.textDim} ml-1`}>wants a custom board</span></div>
+              <div className="flex gap-2">
+                <button onClick={()=>voteOnBoard(br,true)} className="px-3 py-1 bg-emerald-500/20 text-emerald-400 text-[10px] font-bold rounded-lg hover:bg-emerald-500/30">Approve</button>
+                <button onClick={()=>voteOnBoard(br,false)} className="px-3 py-1 bg-red-500/20 text-red-400 text-[10px] font-bold rounded-lg hover:bg-red-500/30">Deny</button>
+              </div>
+            </div>
+            <div className={`text-[10px] ${T.textDim} mt-1`}>{br.habitIds?.length||0} habits selected · {(br.approvals||[]).length} approval(s) so far</div>
+          </div>
+        ))}
+
         {/* Board indicator */}
         {boardActive && (
           <div className={`mb-3 p-2.5 rounded-xl border flex items-center justify-between ${darkMode?'bg-indigo-500/5 border-indigo-500/15':'bg-indigo-50 border-indigo-200'}`}>
@@ -1042,11 +1102,19 @@ export default function TraxApp() {
           <div className="flex gap-1">
             <button onClick={loadHeatMap} className={`text-[10px] font-medium tracking-wider uppercase px-3 py-1.5 rounded-lg transition-all ${T.textDim} hover:text-purple-400`}>📊 Map</button>
             <button onClick={loadInsights} className={`text-[10px] font-medium tracking-wider uppercase px-3 py-1.5 rounded-lg transition-all ${T.textDim} hover:text-blue-400`}>📈 Insights</button>
+            {roomMembers.length>1&&<button onClick={()=>{setCustomBoardHabits(myBoardIds||habits.map(h=>h.id));setShowCustomBoard(true);}} className={`text-[10px] font-medium tracking-wider uppercase px-3 py-1.5 rounded-lg transition-all ${T.textDim} hover:text-indigo-400`}>🎯 Board</button>}
           </div>
           <div className="flex gap-1">
-            {habits.length>0&&<button onClick={()=>setEditMode(!editMode)} className={'text-[10px] font-medium tracking-wider uppercase px-3 py-1.5 rounded-lg transition-all '+(editMode?'bg-blue-500/20 text-blue-400 border border-blue-500/30':T.textDim+' hover:text-gray-400')}>{editMode?'Done':'Edit'}</button>}
+            {habits.length>0&&<button onClick={()=>setEditMode(!editMode)} className={'text-[10px] font-medium tracking-wider uppercase px-3 py-1.5 rounded-lg transition-all flex items-center gap-1 '+(editMode?'bg-blue-500/20 text-blue-400 border border-blue-500/30':T.textDim+' hover:text-gray-400')}>{editMode?'Done':'✏️ Edit Board'}</button>}
           </div>
         </div>
+        {editMode && (
+          <div className={`mb-3 p-3 rounded-xl border ${darkMode?'bg-blue-500/5 border-blue-500/15':'bg-blue-50 border-blue-200'}`}>
+            <p className={`text-[10px] ${darkMode?'text-blue-300':'text-blue-600'}`}>
+              <strong>Editing:</strong> Drag to reorder · <span className="text-indigo-400">✓</span> to show/hide habits on your board · ✏️ to edit · ✕ to delete
+            </p>
+          </div>
+        )}
 
         {/* Habits */}
         <div className="space-y-6">
@@ -1456,6 +1524,83 @@ export default function TraxApp() {
             <p className={`text-[10px] ${T.textDim} text-center mt-4 italic`}>Based on last 60 days · only you can see this</p>
           </div>
         ) : <p className={`text-sm ${T.textDim} text-center py-8`}>Loading...</p>}
+      </Modal>
+
+      {/* Custom Board Proposal */}
+      <Modal show={showCustomBoard} onClose={()=>setShowCustomBoard(false)} wide dark={darkMode}>
+        <ModalHeader title="Custom Board" onClose={()=>setShowCustomBoard(false)}/>
+        <p className={`text-xs ${T.textDim} mb-4`}>Pick which habits go on your personal board, or add new ones. Needs approval from your room.</p>
+        {pendingBoards.find(b=>b.userId===currentUser?.id&&b.status==='approved') && (
+          <div className="mb-3 p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-xl">
+            <span className="text-xs text-emerald-400 font-medium">✓ You have an active custom board</span>
+          </div>
+        )}
+        {pendingBoards.find(b=>b.userId===currentUser?.id&&b.status==='pending') && (
+          <div className="mb-3 p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl">
+            <span className="text-xs text-amber-400 font-medium">⏳ Your board is pending approval</span>
+          </div>
+        )}
+        <div className="space-y-2 mb-3 max-h-52 overflow-y-auto">
+          {habits.map(h => {
+            const selected = customBoardHabits.includes(h.id);
+            const ct = getCT(h.category);
+            return (
+              <button key={h.id} onClick={()=>{
+                setCustomBoardHabits(prev=>selected?prev.filter(id=>id!==h.id):[...prev,h.id]);
+              }} className={`w-full text-left p-3 rounded-xl border transition-all flex items-center gap-3 ${
+                selected ? ct.bdr+' '+ct.bgS : darkMode?'border-white/[0.04] bg-white/[0.02] hover:bg-white/[0.03]':'border-gray-200 bg-white hover:bg-gray-50'
+              }`}>
+                <div className={`w-5 h-5 rounded-md border-2 flex items-center justify-center text-xs ${
+                  selected?ct.bg+' border-transparent text-white':'border-gray-600'
+                }`}>{selected&&'✓'}</div>
+                <div className="flex-1 min-w-0">
+                  <div className={`text-sm font-medium truncate ${selected?(darkMode?'text-white':'text-gray-900'):T.textDim}`}>{h.name}</div>
+                  <div className={`text-[10px] ${T.textDim}`}>{h.category} · {h.points} pts</div>
+                </div>
+              </button>
+            );
+          })}
+        </div>
+        {/* Inline add habit */}
+        <details className={`mb-4 rounded-xl border overflow-hidden ${darkMode?'border-white/[0.06] bg-white/[0.02]':'border-gray-200 bg-gray-50'}`}>
+          <summary className={`px-4 py-2.5 cursor-pointer text-xs font-medium ${T.textDim} hover:${T.text} transition-colors`}><Plus size={12} className="inline mr-1"/>Add a new habit</summary>
+          <div className="px-4 pb-4 pt-2 space-y-3">
+            <input value={newHabit.name} onChange={e=>setNewHabit(p=>({...p,name:e.target.value}))} placeholder="Habit name" className={inputCls} maxLength={40}/>
+            <div className="grid grid-cols-2 gap-3">
+              <select value={newHabit.category} onChange={e=>setNewHabit(p=>({...p,category:e.target.value}))} className={inputCls}>
+                {allCatNames.map(c=><option key={c} value={c}>{c}</option>)}
+              </select>
+              <input type="number" value={newHabit.points} onChange={e=>setNewHabit(p=>({...p,points:parseInt(e.target.value)||0}))} placeholder="Points" className={inputCls} min="1" max="100"/>
+            </div>
+            <div className="flex items-center gap-3">
+              <label className={`flex items-center gap-2 text-xs ${T.textDim}`}>
+                <input type="checkbox" checked={newHabit.isRepeatable} onChange={e=>setNewHabit(p=>({...p,isRepeatable:e.target.checked}))} className="rounded"/>
+                Repeatable
+              </label>
+              {newHabit.isRepeatable && (
+                <input type="number" value={newHabit.maxCompletions} onChange={e=>setNewHabit(p=>({...p,maxCompletions:parseInt(e.target.value)||1}))} className={inputCls+' !w-20 !py-2'} min="1" max="50" placeholder="Max"/>
+              )}
+            </div>
+            <button onClick={async()=>{
+              if(!newHabit.name.trim())return;
+              try{
+                const hid=currentRoom.id+'_'+Date.now()+'_'+Math.random().toString(36).slice(2,8);
+                await setDoc(doc(db,'habits',hid),{
+                  name:newHabit.name.trim(),category:newHabit.category,points:parseInt(newHabit.points)||10,
+                  isRepeatable:newHabit.isRepeatable,maxCompletions:parseInt(newHabit.maxCompletions)||1,
+                  roomId:currentRoom.id,createdBy:currentUser.id,createdAt:new Date().toISOString()
+                });
+                setCustomBoardHabits(prev=>[...prev,hid]);
+                setNewHabit({name:'',category:newHabit.category,points:10,isRepeatable:false,maxCompletions:1});
+              }catch{setError('Failed to add');}
+            }} disabled={!newHabit.name.trim()} className="w-full py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl text-xs font-bold active:scale-[0.98] disabled:opacity-40">Add & Select</button>
+          </div>
+        </details>
+        <div className={`text-xs ${T.textDim} mb-3`}>{customBoardHabits.length} habit{customBoardHabits.length!==1?'s':''} selected</div>
+        {error&&<p className="text-red-400 text-xs text-center mb-2">{error}</p>}
+        {successMsg&&<p className="text-emerald-400 text-xs text-center mb-2">{successMsg}</p>}
+        <button onClick={()=>proposeCustomBoard(customBoardHabits)} disabled={customBoardHabits.length===0} className="w-full px-4 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-xl text-sm font-bold shadow-lg shadow-indigo-500/20 active:scale-[0.98] disabled:opacity-40">Submit for Approval</button>
+        <p className={`text-[10px] ${T.textDim} text-center mt-2`}>Needs majority approval from room members</p>
       </Modal>
 
     </div>
