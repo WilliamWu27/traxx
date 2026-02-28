@@ -8,6 +8,25 @@ import {
   collection, doc, setDoc, getDoc, onSnapshot, deleteDoc, updateDoc, query, where, getDocs, arrayUnion, arrayRemove, orderBy, limit
 } from 'firebase/firestore';
 
+// ─── ERROR BOUNDARY ───
+class ErrorBoundary extends React.Component {
+  constructor(props) { super(props); this.state = { error: null }; }
+  static getDerivedStateFromError(error) { return { error }; }
+  render() {
+    if (this.state.error) return (
+      <div style={{minHeight:'100vh',background:'#0a0a0f',color:'white',display:'flex',alignItems:'center',justifyContent:'center',padding:20}}>
+        <div style={{textAlign:'center',maxWidth:400}}>
+          <h1 style={{fontSize:24,fontWeight:900,marginBottom:12}}>TRAX</h1>
+          <p style={{color:'#f87171',marginBottom:8}}>Something went wrong</p>
+          <pre style={{fontSize:11,color:'#9ca3af',textAlign:'left',background:'rgba(255,255,255,0.05)',padding:12,borderRadius:8,overflow:'auto',maxHeight:200}}>{this.state.error?.message||'Unknown error'}{'\n'}{this.state.error?.stack?.split('\n').slice(0,3).join('\n')}</pre>
+          <button onClick={()=>window.location.reload()} style={{marginTop:16,padding:'8px 24px',background:'#3b82f6',color:'white',border:'none',borderRadius:8,fontWeight:700,cursor:'pointer'}}>Reload</button>
+        </div>
+      </div>
+    );
+    return this.props.children;
+  }
+}
+
 // ─── CONFETTI ───
 function ConfettiCanvas({ trigger }) {
   const canvasRef = useRef(null);
@@ -72,7 +91,7 @@ function ModalHeader({ title, onClose, icon }) {
   );
 }
 
-export default function TraxApp() {
+function TraxAppInner() {
   // ─── DATE HELPERS (must be before state that uses them) ───
   const formatDateStr = (d) => d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
   const getToday = () => { const d = new Date(); return formatDateStr(d); };
@@ -261,16 +280,21 @@ export default function TraxApp() {
     // Room categories listener
     const u8 = onSnapshot(doc(db, 'roomCategories', currentRoom.id), s => { if(s.exists()) setRoomCategories(s.data().categories||[]); else setRoomCategories([]); });
     // Activity feed - today's completions from ALL room members (no composite index needed)
-    const u9 = onSnapshot(query(collection(db, 'activity'), where('roomId', '==', currentRoom.id), where('date', '==', today)), s => {
-      const items = s.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>(b.ts||'').localeCompare(a.ts||''));
-      setActivityFeed(items);
-    });
+    let u9 = ()=>{}, u10 = ()=>{};
+    try {
+      u9 = onSnapshot(query(collection(db, 'activity'), where('roomId', '==', currentRoom.id), where('date', '==', today)), s => {
+        const items = s.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>(b.ts||'').localeCompare(a.ts||''));
+        setActivityFeed(items);
+      }, err => console.warn('Activity feed:', err));
+    } catch(e) { console.warn('Activity listener failed:', e); }
     // Custom boards listener
-    const u10 = onSnapshot(query(collection(db, 'customBoards'), where('roomId', '==', currentRoom.id)), s => {
-      const boards = s.docs.map(d=>({id:d.id,...d.data()}));
-      setPendingBoards(boards);
-      setBoardRequests(boards.filter(b=>b.status==='pending'&&b.userId!==currentUser.id&&!(b.approvals||[]).includes(currentUser.id)&&!(b.rejections||[]).includes(currentUser.id)));
-    });
+    try {
+      u10 = onSnapshot(query(collection(db, 'customBoards'), where('roomId', '==', currentRoom.id)), s => {
+        const boards = s.docs.map(d=>({id:d.id,...d.data()}));
+        setPendingBoards(boards);
+        setBoardRequests(boards.filter(b=>b.status==='pending'&&b.userId!==currentUser.id&&!(b.approvals||[]).includes(currentUser.id)&&!(b.rejections||[]).includes(currentUser.id)));
+      }, err => console.warn('Custom boards:', err));
+    } catch(e) { console.warn('Board listener failed:', e); }
     return () => { u1(); u2(); u4(); u5(); u6(); u7(); u8(); u9(); u10(); weekUnsubs.forEach(u=>u()); };
   }, [currentUser, currentRoom, dateKey]);
 
@@ -1045,12 +1069,12 @@ export default function TraxApp() {
         ))}
 
         {/* Custom board indicator */}
-        {getMyBoard() && (
+        {(() => { const mb = getMyBoard(); return mb ? (
           <div className={`mb-3 p-2.5 rounded-xl border flex items-center justify-between ${darkMode?'bg-indigo-500/5 border-indigo-500/15':'bg-indigo-50 border-indigo-200'}`}>
-            <span className="text-[10px] text-indigo-400 font-medium">🎯 Custom Board Active — {getMyBoard().habitIds.length} habits</span>
-            <button onClick={async()=>{try{await deleteDoc(doc(db,'customBoards',getMyBoard().id));}catch{}}} className="text-[10px] text-gray-500 hover:text-red-400">Reset</button>
+            <span className="text-[10px] text-indigo-400 font-medium">🎯 Custom Board Active — {mb.habitIds?.length||0} habits</span>
+            <button onClick={async()=>{try{await deleteDoc(doc(db,'customBoards',mb.id));}catch{}}} className="text-[10px] text-gray-500 hover:text-red-400">Reset</button>
           </div>
-        )}
+        ) : null; })()}
 
         {/* Toolbar: Heat Map, Insights, Custom Board, Reorder */}
         <div className="flex items-center justify-between mb-3 flex-wrap gap-1">
@@ -1515,4 +1539,8 @@ export default function TraxApp() {
       </Modal>
     </div>
   );
+}
+
+export default function TraxApp() {
+  return <ErrorBoundary><TraxAppInner /></ErrorBoundary>;
 }
