@@ -73,6 +73,11 @@ function ModalHeader({ title, onClose, icon }) {
 }
 
 export default function TraxApp() {
+  // ─── DATE HELPERS (must be before state that uses them) ───
+  const formatDateStr = (d) => d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+  const getToday = () => { const d = new Date(); return formatDateStr(d); };
+  const getYesterday = () => { const d = new Date(); d.setDate(d.getDate()-1); return formatDateStr(d); };
+
   // ─── STATE ───
   const [currentUser, setCurrentUser] = useState(null);
   const [authLoading, setAuthLoading] = useState(true);
@@ -133,9 +138,6 @@ export default function TraxApp() {
   const genCode = () => { const c = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; let r = ''; for (let i=0;i<6;i++) r+=c[Math.floor(Math.random()*c.length)]; return r; };
   const getWeekStart = () => { const n = new Date(), d = n.getDay(), diff = n.getDate()-d+(d===0?-6:1); const m = new Date(n); m.setDate(diff); m.setHours(0,0,0,0); return formatDateStr(m); };
   const getWeekEnd = () => { const ws = getWeekStart(); const d = new Date(ws+'T12:00:00'); d.setDate(d.getDate()+6); return formatDateStr(d); };
-  const getToday = () => { const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0'); };
-  const getYesterday = () => { const d = new Date(); d.setDate(d.getDate()-1); return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0'); };
-  const formatDateStr = (d) => d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
   const formatDate = (ds) => { const d = new Date(ds+'T12:00:00'); return d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }); };
   const getDaysUntilSunday = () => { const d = new Date(); const day = d.getDay(); return day === 0 ? 0 : 7 - day; };
   const getLastWeekStart = () => { const d = new Date(getWeekStart()+'T12:00:00'); d.setDate(d.getDate()-7); return formatDateStr(d); };
@@ -729,7 +731,7 @@ export default function TraxApp() {
         <div className="grid grid-cols-3 gap-3 mb-6">
           <div className="relative bg-white/[0.03] rounded-2xl border border-white/[0.06] p-4 overflow-hidden"><div className="absolute top-0 right-0 w-16 h-16 bg-blue-500/5 rounded-full blur-xl -translate-y-4 translate-x-4"/><div className="text-gray-500 text-[10px] tracking-wider uppercase mb-1 flex items-center gap-1"><Zap size={9}/>Points</div><div className="text-2xl font-black text-transparent bg-clip-text bg-gradient-to-b from-white to-gray-400">{myPts}</div></div>
           <div className="relative bg-white/[0.03] rounded-2xl border border-white/[0.06] p-4 overflow-hidden"><div className="absolute top-0 right-0 w-16 h-16 bg-orange-500/5 rounded-full blur-xl -translate-y-4 translate-x-4"/><div className="text-gray-500 text-[10px] tracking-wider uppercase mb-1 flex items-center gap-1"><Flame size={9}/>Streak</div><div className="text-2xl font-black text-transparent bg-clip-text bg-gradient-to-b from-orange-300 to-orange-600">{streakData.streak||0}<span className="text-sm font-medium text-gray-600 ml-1">d</span></div></div>
-          <div className="relative bg-white/[0.03] rounded-2xl border border-white/[0.06] p-4 overflow-hidden"><div className="absolute top-0 right-0 w-16 h-16 bg-purple-500/5 rounded-full blur-xl -translate-y-4 translate-x-4"/><div className="text-gray-500 text-[10px] tracking-wider uppercase mb-2">Crystals{isPerfect&&<span className="text-amber-400 ml-1">&#9830;</span>}</div><div className="flex items-center gap-2.5">{allCatNames.map(c=><div key={c} className={'w-5 h-5 rounded-full transition-all duration-500 '+(myCr[c]?CT[c].bg+' shadow-md '+CT[c].glow:'bg-white/[0.06] border border-white/[0.08]')}/>)}</div></div>
+          <div className="relative bg-white/[0.03] rounded-2xl border border-white/[0.06] p-4 overflow-hidden"><div className="absolute top-0 right-0 w-16 h-16 bg-purple-500/5 rounded-full blur-xl -translate-y-4 translate-x-4"/><div className="text-gray-500 text-[10px] tracking-wider uppercase mb-2">Crystals{isPerfect&&<span className="text-amber-400 ml-1">&#9830;</span>}</div><div className="flex items-center gap-2.5">{allCatNames.map(c=><div key={c} className={'w-5 h-5 rounded-full transition-all duration-500 '+(myCr[c]?getCT(c).bg+' shadow-md '+getCT(c).glow:'bg-white/[0.06] border border-white/[0.08]')}/>)}</div></div>
         </div>
 
         {/* Edit mode toggle */}
@@ -739,7 +741,7 @@ export default function TraxApp() {
         <div className="space-y-6">
           {allCatNames.map(cat => {
             const ch = getOrderedHabits(cat); if(!ch.length) return null;
-            const t = CT[cat];
+            const t = getCT(cat);
             return (
               <div key={cat}>
                 <div className="flex items-center gap-2.5 mb-3 px-1"><span className="text-sm">{t.icon}</span><h2 className={'text-[11px] font-bold tracking-[0.2em] uppercase '+t.txt}>{t.label}</h2><div className={'flex-1 h-px ml-1 '+(darkMode?'bg-white/[0.04]':'bg-gray-200')}/><span className={'text-[10px] font-semibold '+t.txt}>{getCatPts(currentUser.id,cat)} pts</span></div>
@@ -866,9 +868,9 @@ export default function TraxApp() {
               const pts = (h?.points || c.habitPoints || 0) * (c.count||1);
               const cat = h?.category || c.habitCategory || 'Mind';
               return (
-                <div key={c.id} className={'p-3 rounded-xl border bg-white/[0.02] '+CT[cat]?.bdr+' flex items-center justify-between'}>
-                  <div className="flex items-center gap-2"><span className="text-sm">{CT[cat]?.icon}</span><span className="text-sm text-gray-300">{name}</span></div>
-                  <div className="flex items-center gap-2"><span className="text-xs text-gray-500">x{c.count||1}</span><span className={'text-sm font-bold '+CT[cat]?.txt}>{pts} pts</span></div>
+                <div key={c.id} className={'p-3 rounded-xl border bg-white/[0.02] '+(CT[cat]||getCT(cat)).bdr+' flex items-center justify-between'}>
+                  <div className="flex items-center gap-2"><span className="text-sm">{(CT[cat]||getCT(cat)).icon}</span><span className="text-sm text-gray-300">{name}</span></div>
+                  <div className="flex items-center gap-2"><span className="text-xs text-gray-500">x{c.count||1}</span><span className={'text-sm font-bold '+(CT[cat]||getCT(cat)).txt}>{pts} pts</span></div>
                 </div>
               );
             })}
@@ -928,7 +930,7 @@ export default function TraxApp() {
           return (
             <div key={item.member.id} className={'rounded-xl p-4 border transition-all '+(isMe?'bg-gradient-to-r from-blue-600/20 to-indigo-600/20 border-blue-500/30 shadow-lg shadow-blue-500/10':i===0?'bg-amber-500/5 border-amber-500/20':'bg-white/[0.02] border-white/[0.04] hover:bg-white/[0.04]')}>
               <div className="flex items-center justify-between"><div className="flex items-center gap-3"><div className="text-lg w-8 text-center">{i<3?medals[i]:<span className="text-sm text-gray-600">{i+1}</span>}</div><div><div className={'text-sm font-semibold '+(isMe?'text-blue-300':'text-gray-300')}>{item.member.username}{isMe&&<span className="text-[10px] ml-1.5 text-gray-600">(you)</span>}</div><div className="text-xs text-gray-600">{pts} pts{leaderboardTab==='week'?' \u00b7 '+item.weeklyCrystals+' crystals':''}</div></div></div>
-                <div className="flex items-center gap-3">{leaderboardTab==='today'&&<div className="flex items-center gap-1.5">{allCatNames.map(c=><div key={c} className={'w-2.5 h-2.5 rounded-full '+(item.crystals[c]?CT[c].bg.replace('bg-','bg-').replace('500','400')+' shadow-sm shadow-'+CT[c].neon.replace('#','')+'/50':isMe?'bg-white/10':'bg-white/[0.06]')}/>)}</div>}{!isMe&&<button onClick={()=>{setShowLeaderboard(false);setShowCompetitor(item.member);}} className="text-[10px] text-gray-600 hover:text-white uppercase tracking-wider font-medium">View</button>}</div>
+                <div className="flex items-center gap-3">{leaderboardTab==='today'&&<div className="flex items-center gap-1.5">{allCatNames.map(c=><div key={c} className={'w-2.5 h-2.5 rounded-full '+(item.crystals[c]?getCT(c).bg.replace('bg-','bg-').replace('500','400')+' shadow-sm shadow-'+getCT(c).neon.replace('#','')+'/50':isMe?'bg-white/10':'bg-white/[0.06]')}/>)}</div>}{!isMe&&<button onClick={()=>{setShowLeaderboard(false);setShowCompetitor(item.member);}} className="text-[10px] text-gray-600 hover:text-white uppercase tracking-wider font-medium">View</button>}</div>
               </div>
             </div>
           );
@@ -942,7 +944,7 @@ export default function TraxApp() {
         <div className="text-center mb-6"><div className="relative inline-block"><ProgressRing progress={dailyProg} size={80} stroke={4} color={dailyProg>=1?'#10b981':'#3b82f6'}/><div className="absolute inset-0 flex items-center justify-center"><span className="text-xl font-black">{Math.round(dailyProg*100)}%</span></div></div><h3 className="text-xl font-bold mt-3">{currentUser.username}</h3><p className="text-gray-600 text-xs">{currentUser.email}</p></div>
         <div className="grid grid-cols-3 gap-3 mb-4">{[{v:streakData.streak||0,l:'Streak',c:'text-orange-400',i:<Flame size={16} className="text-orange-400 mx-auto mb-1"/>},{v:myPts,l:'Today',c:'text-blue-400',i:<Star size={16} className="text-blue-400 mx-auto mb-1"/>},{v:getWeeklyPts(currentUser.id),l:'Week',c:'text-emerald-400',i:<TrendingUp size={16} className="text-emerald-400 mx-auto mb-1"/>}].map((s,i)=><div key={i} className="text-center p-3 bg-white/[0.03] rounded-xl border border-white/[0.04]">{s.i}<div className={'text-xl font-black '+s.c}>{s.v}</div><div className="text-[9px] text-gray-600 tracking-wider uppercase mt-0.5">{s.l}</div></div>)}</div>
         <div className="grid grid-cols-2 gap-3 mb-4"><div className="text-center p-3 bg-white/[0.03] rounded-xl border border-white/[0.04]"><div className="text-lg font-black text-purple-400">{streakData.activeDays||0}</div><div className="text-[9px] text-gray-600 tracking-wider uppercase mt-0.5">Active Days</div></div><div className="text-center p-3 bg-white/[0.03] rounded-xl border border-white/[0.04]"><div className="text-lg font-black text-cyan-400">{streakData.totalCompletions||0}</div><div className="text-[9px] text-gray-600 tracking-wider uppercase mt-0.5">Completions</div></div></div>
-        <div className="p-3 bg-white/[0.03] rounded-xl border border-white/[0.04]"><div className="text-[9px] text-gray-600 tracking-wider uppercase mb-2">Crystals</div><div className="flex justify-center gap-4">{allCatNames.map(c=><div key={c} className="text-center"><div className={'w-6 h-6 rounded-full mx-auto mb-1 transition-all '+(myCr[c]?CT[c].bg+' shadow-md '+CT[c].glow:'bg-white/[0.06]')}/><span className="text-[9px] text-gray-600">{c}</span></div>)}</div></div>
+        <div className="p-3 bg-white/[0.03] rounded-xl border border-white/[0.04]"><div className="text-[9px] text-gray-600 tracking-wider uppercase mb-2">Crystals</div><div className="flex justify-center gap-4">{allCatNames.map(c=><div key={c} className="text-center"><div className={'w-6 h-6 rounded-full mx-auto mb-1 transition-all '+(myCr[c]?getCT(c).bg+' shadow-md '+getCT(c).glow:'bg-white/[0.06]')}/><span className="text-[9px] text-gray-600">{c}</span></div>)}</div></div>
         <div className="mt-4 p-3 bg-white/[0.03] rounded-xl border border-white/[0.04] flex items-center justify-between"><div><div className="text-sm text-gray-300 font-medium">Email Reminders</div><div className="text-[10px] text-gray-600">Daily nudges at 12pm & 6pm</div></div><button onClick={async()=>{const newVal=currentUser.emailReminders===false?true:false;try{await updateDoc(doc(db,'users',currentUser.id),{emailReminders:!newVal});setCurrentUser(p=>({...p,emailReminders:!newVal}));}catch{}}} className={'relative w-11 h-6 rounded-full transition-all '+(currentUser.emailReminders!==false?'bg-blue-500':'bg-white/[0.08]')}><div className={'absolute top-1 w-4 h-4 rounded-full bg-white transition-all shadow-sm '+(currentUser.emailReminders!==false?'left-6':'left-1')}/></button></div>
       </Modal>
 
@@ -965,7 +967,7 @@ export default function TraxApp() {
       {/* Competitor */}
       <Modal show={!!showCompetitor} onClose={()=>setShowCompetitor(null)}>
         {showCompetitor&&<><ModalHeader title={showCompetitor.username} onClose={()=>setShowCompetitor(null)}/>
-        <div className="space-y-3"><div className="grid grid-cols-3 gap-3">{allCatNames.map(c=><div key={c} className={'text-center p-4 rounded-xl border '+CT[c].bgS+' '+CT[c].bdr}><div className={'text-2xl font-black '+CT[c].txt}>{getCatPts(showCompetitor.id,c)}</div><div className="text-[9px] text-gray-600 mt-1 tracking-wider uppercase">{c}</div></div>)}</div><div className="text-center p-5 bg-gradient-to-r from-blue-600/20 to-indigo-600/20 rounded-xl border border-blue-500/20"><div className="text-3xl font-black">{getTodayPts(showCompetitor.id)}</div><div className="text-[10px] text-gray-500 mt-1 tracking-wider uppercase">Total Today</div></div></div></>}
+        <div className="space-y-3"><div className="grid grid-cols-3 gap-3">{allCatNames.map(c=><div key={c} className={'text-center p-4 rounded-xl border '+getCT(c).bgS+' '+getCT(c).bdr}><div className={'text-2xl font-black '+getCT(c).txt}>{getCatPts(showCompetitor.id,c)}</div><div className="text-[9px] text-gray-600 mt-1 tracking-wider uppercase">{c}</div></div>)}</div><div className="text-center p-5 bg-gradient-to-r from-blue-600/20 to-indigo-600/20 rounded-xl border border-blue-500/20"><div className="text-3xl font-black">{getTodayPts(showCompetitor.id)}</div><div className="text-[10px] text-gray-500 mt-1 tracking-wider uppercase">Total Today</div></div></div></>}
       </Modal>
 
       {/* Weekly Recap */}
@@ -990,8 +992,8 @@ export default function TraxApp() {
                     <span className={`text-sm font-bold ${T.text}`}>{s.pts} pts</span>
                   </div>
                   <div className="grid grid-cols-3 gap-2">{allCatNames.map(c=>(
-                    <div key={c} className={'text-center p-1.5 rounded-lg '+CT[c].bgS}>
-                      <div className={'text-xs font-bold '+CT[c].txt}>{s.catPts[c]}</div>
+                    <div key={c} className={'text-center p-1.5 rounded-lg '+getCT(c).bgS}>
+                      <div className={'text-xs font-bold '+getCT(c).txt}>{s.catPts[c]}</div>
                       <div className="text-[8px] text-gray-500">{c}</div>
                     </div>
                   ))}</div>
