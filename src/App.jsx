@@ -957,6 +957,7 @@ export default function TraxApp() {
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <h1 className="text-lg font-black tracking-[0.2em]">TRAX</h1>
+              <span className={`text-[8px] ${T.textDim}`}>v7</span>
               <div className="flex gap-1"><div className="w-1.5 h-1.5 rounded-full bg-blue-500"/><div className="w-1.5 h-1.5 rounded-full bg-orange-500"/><div className="w-1.5 h-1.5 rounded-full bg-emerald-500"/></div>
               <button onClick={()=>setShowSwitchRoom(true)} className={`ml-2 flex items-center gap-1 px-2 py-1 ${T.bgCard} border ${T.border} rounded-lg text-[10px] ${T.textMuted} hover:${T.text} transition-all`}><span className="font-mono tracking-wider">{currentRoom?.code}</span>{userRooms.length>1&&<ArrowLeftRight size={10}/>}</button>
             </div>
