@@ -8,25 +8,6 @@ import {
   collection, doc, setDoc, getDoc, onSnapshot, deleteDoc, updateDoc, query, where, getDocs, arrayUnion, arrayRemove, orderBy, limit
 } from 'firebase/firestore';
 
-// ─── ERROR BOUNDARY ───
-class ErrorBoundary extends React.Component {
-  constructor(props) { super(props); this.state = { error: null }; }
-  static getDerivedStateFromError(error) { return { error }; }
-  render() {
-    if (this.state.error) return (
-      <div style={{minHeight:'100vh',background:'#0a0a0f',color:'white',display:'flex',alignItems:'center',justifyContent:'center',padding:20}}>
-        <div style={{textAlign:'center',maxWidth:400}}>
-          <h1 style={{fontSize:24,fontWeight:900,marginBottom:12}}>TRAX</h1>
-          <p style={{color:'#f87171',marginBottom:8}}>Something went wrong</p>
-          <pre style={{fontSize:11,color:'#9ca3af',textAlign:'left',background:'rgba(255,255,255,0.05)',padding:12,borderRadius:8,overflow:'auto',maxHeight:200}}>{this.state.error?.message||'Unknown error'}{'\n'}{this.state.error?.stack?.split('\n').slice(0,3).join('\n')}</pre>
-          <button onClick={()=>window.location.reload()} style={{marginTop:16,padding:'8px 24px',background:'#3b82f6',color:'white',border:'none',borderRadius:8,fontWeight:700,cursor:'pointer'}}>Reload</button>
-        </div>
-      </div>
-    );
-    return this.props.children;
-  }
-}
-
 // ─── CONFETTI ───
 function ConfettiCanvas({ trigger }) {
   const canvasRef = useRef(null);
@@ -91,7 +72,7 @@ function ModalHeader({ title, onClose, icon }) {
   );
 }
 
-function TraxAppInner() {
+export default function TraxApp() {
   // ─── DATE HELPERS (must be before state that uses them) ───
   const formatDateStr = (d) => d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
   const getToday = () => { const d = new Date(); return formatDateStr(d); };
@@ -163,6 +144,16 @@ function TraxAppInner() {
   const [customBoardHabits, setCustomBoardHabits] = useState([]);
   const [pendingBoards, setPendingBoards] = useState([]);
   const [boardRequests, setBoardRequests] = useState([]);
+
+  const prevProgRef = useRef(0);
+  const [celebrateComplete, setCelebrateComplete] = useState(false);
+  useEffect(() => {
+    if (celebrateComplete) {
+      setConfettiTrigger(v=>v+1);
+      setTimeout(() => setConfettiTrigger(v=>v+1), 400);
+      setCelebrateComplete(false);
+    }
+  }, [celebrateComplete]);
 
   // ─── HELPERS ───
   const genCode = () => { const c = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; let r = ''; for (let i=0;i<6;i++) r+=c[Math.floor(Math.random()*c.length)]; return r; };
@@ -798,15 +789,11 @@ function TraxAppInner() {
   const myPts = currentUser&&currentRoom ? getTodayPts(currentUser.id) : 0;
   const isPerfect = allCatNames.length > 0 && allCatNames.every(c => myCr[c]);
   const dailyProg = currentUser&&currentRoom ? getDailyProgress() : 0;
-  const prevProgRef = useRef(0);
-  useEffect(() => {
-    if (dailyProg >= 1 && prevProgRef.current < 1 && prevProgRef.current > 0) {
-      // Just hit 100%! Double confetti burst
-      setConfettiTrigger(v=>v+1);
-      setTimeout(() => setConfettiTrigger(v=>v+1), 400);
-    }
-    prevProgRef.current = dailyProg;
-  }, [dailyProg]);
+  if (dailyProg >= 1 && prevProgRef.current < 1 && prevProgRef.current > 0) {
+    // Schedule celebration (can't call hooks here but can set ref + trigger state in next tick)
+    setTimeout(() => setCelebrateComplete(true), 0);
+  }
+  prevProgRef.current = dailyProg;
   const soloMode = roomMembers.length < 2;
 
   // ═══════════════════════════════════════
@@ -1539,8 +1526,4 @@ function TraxAppInner() {
       </Modal>
     </div>
   );
-}
-
-export default function TraxApp() {
-  return <ErrorBoundary><TraxAppInner /></ErrorBoundary>;
 }
