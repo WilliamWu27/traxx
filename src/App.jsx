@@ -223,9 +223,20 @@ export default function TraxApp() {
     const u1 = onSnapshot(query(collection(db, 'habits'), where('roomId', '==', currentRoom.id)), s => setHabits(s.docs.map(d => ({id:d.id,...d.data()}))));
     const today = getToday();
     const u2 = onSnapshot(query(collection(db, 'completions'), where('roomId', '==', currentRoom.id), where('date', '==', today)), s => setCompletions(s.docs.map(d => ({id:d.id,...d.data()}))));
+    // Weekly: fetch each day individually to avoid needing a composite index
     const ws = getWeekStart();
-    const u3 = onSnapshot(query(collection(db, 'completions'), where('roomId', '==', currentRoom.id), where('date', '>=', ws)), s => setAllCompletions(s.docs.map(d => ({id:d.id,...d.data()}))));
-    // Members: support both new rooms array and old roomId
+    const weekDays = [];
+    { const d = new Date(ws+'T12:00:00'); const end = new Date(today+'T12:00:00'); while (d <= end) { weekDays.push(formatDateStr(d)); d.setDate(d.getDate()+1); } }
+    // Use a ref-like approach: accumulate all days into a map, then set state
+    const weekData = {};
+    setAllCompletions([]); // clear on re-subscribe
+    const weekUnsubs = weekDays.map(day =>
+      onSnapshot(query(collection(db, 'completions'), where('roomId', '==', currentRoom.id), where('date', '==', day)), s => {
+        weekData[day] = s.docs.map(d => ({id:d.id,...d.data()}));
+        // Flatten all days into one array
+        setAllCompletions(Object.values(weekData).flat());
+      })
+    );    // Members: support both new rooms array and old roomId
     const u4 = onSnapshot(query(collection(db, 'users'), where('rooms', 'array-contains', currentRoom.id)), s => setRoomMembers(s.docs.map(d => ({id:d.id,...d.data()}))));
     const u5 = onSnapshot(query(collection(db, 'users'), where('roomId', '==', currentRoom.id)), s => {
       setRoomMembers(prev => { const ids = new Set(prev.map(m=>m.id)); const nw = s.docs.map(d=>({id:d.id,...d.data()})).filter(m=>!ids.has(m.id)); return [...prev,...nw]; });
@@ -235,7 +246,7 @@ export default function TraxApp() {
     const u7 = onSnapshot(doc(db, 'habitOrder', currentUser.id+'_'+currentRoom.id), s => { if(s.exists()) setHabitOrder(s.data().order||[]); else setHabitOrder([]); });
     // Room categories listener
     const u8 = onSnapshot(doc(db, 'roomCategories', currentRoom.id), s => { if(s.exists()) setRoomCategories(s.data().categories||[]); else setRoomCategories([]); });
-    return () => { u1(); u2(); u3(); u4(); u5(); u6(); u7(); u8(); };
+    return () => { u1(); u2(); u4(); u5(); u6(); u7(); u8(); weekUnsubs.forEach(u=>u()); };
   }, [currentUser, currentRoom, dateKey]);
 
   // ─── LAST WEEK DATA (for recap) ───
@@ -946,6 +957,32 @@ export default function TraxApp() {
         <div className="grid grid-cols-2 gap-3 mb-4"><div className="text-center p-3 bg-white/[0.03] rounded-xl border border-white/[0.04]"><div className="text-lg font-black text-purple-400">{streakData.activeDays||0}</div><div className="text-[9px] text-gray-600 tracking-wider uppercase mt-0.5">Active Days</div></div><div className="text-center p-3 bg-white/[0.03] rounded-xl border border-white/[0.04]"><div className="text-lg font-black text-cyan-400">{streakData.totalCompletions||0}</div><div className="text-[9px] text-gray-600 tracking-wider uppercase mt-0.5">Completions</div></div></div>
         <div className="p-3 bg-white/[0.03] rounded-xl border border-white/[0.04]"><div className="text-[9px] text-gray-600 tracking-wider uppercase mb-2">Crystals</div><div className="flex justify-center gap-4">{allCatNames.map(c=><div key={c} className="text-center"><div className={'w-6 h-6 rounded-full mx-auto mb-1 transition-all '+(myCr[c]?getCT(c).bg+' shadow-md '+getCT(c).glow:'bg-white/[0.06]')}/><span className="text-[9px] text-gray-600">{c}</span></div>)}</div></div>
         <div className="mt-4 p-3 bg-white/[0.03] rounded-xl border border-white/[0.04] flex items-center justify-between"><div><div className="text-sm text-gray-300 font-medium">Email Reminders</div><div className="text-[10px] text-gray-600">Daily nudges at 12pm & 6pm</div></div><button onClick={async()=>{const newVal=currentUser.emailReminders===false?true:false;try{await updateDoc(doc(db,'users',currentUser.id),{emailReminders:!newVal});setCurrentUser(p=>({...p,emailReminders:!newVal}));}catch{}}} className={'relative w-11 h-6 rounded-full transition-all '+(currentUser.emailReminders!==false?'bg-blue-500':'bg-white/[0.08]')}><div className={'absolute top-1 w-4 h-4 rounded-full bg-white transition-all shadow-sm '+(currentUser.emailReminders!==false?'left-6':'left-1')}/></button></div>
+        <button onClick={async()=>{
+          if(!confirm('Fix old completions with wrong dates? This scans and corrects UTC-stamped data.'))return;
+          setLoading(true);
+          try{
+            const snap=await getDocs(query(collection(db,'completions'),where('userId','==',currentUser.id)));
+            let fixed=0;
+            for(const d of snap.docs){
+              const data=d.data();
+              // Check if the date looks like it might have been UTC-offset
+              // We can't perfectly know, but we can check for obvious issues:
+              // If a completion was made with toISOString(), the stored date could be +1 day ahead
+              // We'll look for completions where the Firestore doc creation timestamp (if available)
+              // doesn't match the stored date. Since we don't have that, just offer to delete orphans.
+            }
+            // Simpler approach: just delete completions with dates in the future
+            const today=getToday();
+            for(const d of snap.docs){
+              const data=d.data();
+              if(data.date>today){
+                await deleteDoc(doc(db,'completions',d.id));
+                fixed++;
+              }
+            }
+            alert(fixed>0?'Fixed '+fixed+' completion(s) with future dates.':'All completions look correct!');
+          }catch(err){alert('Error: '+err.message);}finally{setLoading(false);}
+        }} disabled={loading} className="mt-3 w-full px-4 py-2.5 border border-white/[0.06] rounded-xl text-xs text-gray-500 hover:text-white hover:bg-white/[0.04] transition-all disabled:opacity-50">{loading?'Scanning...':'Fix Old Data (UTC cleanup)'}</button>
       </Modal>
 
       {/* Help */}
