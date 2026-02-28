@@ -272,7 +272,7 @@ export default function TraxApp() {
     // Room categories listener
     const u8 = onSnapshot(doc(db, 'roomCategories', currentRoom.id), s => { if(s.exists()) setRoomCategories(s.data().categories||[]); else setRoomCategories([]); });
     // Activity feed - today's completions from ALL room members (no composite index needed)
-    let u9 = ()=>{}, u10 = ()=>{};
+    let u9 = ()=>{}, u10 = ()=>{}, u11 = ()=>{};
     try {
       u9 = onSnapshot(query(collection(db, 'activity'), where('roomId', '==', currentRoom.id), where('date', '==', today)), s => {
         const items = s.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>(b.ts||'').localeCompare(a.ts||''));
@@ -280,7 +280,6 @@ export default function TraxApp() {
       }, err => console.warn('Activity feed:', err));
     } catch(e) { console.warn('Activity listener failed:', e); }
     // Personal board listener
-    let u10 = ()=>{}, u11 = ()=>{};
     try {
       u10 = onSnapshot(doc(db, 'myBoard', currentUser.id+'_'+currentRoom.id), s => {
         if (s.exists() && s.data().habitIds) setMyBoardIds(s.data().habitIds);
