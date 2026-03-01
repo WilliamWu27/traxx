@@ -1942,7 +1942,6 @@ export default function TraxApp() {
               </div>
             </div>
           )}
-          </div>
         </div>
 
         {/* Room Actions */}
