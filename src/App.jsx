@@ -342,7 +342,7 @@ export default function TraxApp() {
       } catch { setLastWeekData(null); }
     };
     loadLastWeek();
-  }, [currentUser, currentRoom, activeMembers, habits]);
+  }, [currentUser, currentRoom, roomMembers, roomKicked, habits]);
 
   // ─── STREAK + YESTERDAY ───
   useEffect(() => {
