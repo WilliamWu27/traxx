@@ -274,6 +274,17 @@ export default function TraxApp() {
       setRoomMembers(prev => { const ids = new Set(prev.map(m=>m.id)); const nw = s.docs.map(d=>({id:d.id,...d.data()})).filter(m=>!ids.has(m.id)); return [...prev,...nw]; });
     });
     const u6 = onSnapshot(doc(db, 'stakes', currentRoom.id), s => { if(s.exists()) setRoomStakes({id:s.id,...s.data()}); else setRoomStakes(null); });
+    // Listen to room doc for kicked list and metadata
+    const u6b = onSnapshot(doc(db, 'rooms', currentRoom.id), s => {
+      if (s.exists()) {
+        const data = s.data();
+        setCurrentRoom(prev => ({...prev, ...data, id: s.id}));
+        // If current user is kicked, leave the room
+        if ((data.kicked||[]).includes(currentUser.id)) {
+          leaveRoom(currentRoom.id);
+        }
+      }
+    });
     // Habit order listener
     const u7 = onSnapshot(doc(db, 'habitOrder', currentUser.id+'_'+currentRoom.id), s => { if(s.exists()) setHabitOrder(s.data().order||[]); else setHabitOrder([]); });
     // Room categories listener
@@ -301,19 +312,19 @@ export default function TraxApp() {
         setBoardRequests(boards.filter(b=>b.status==='pending'&&b.userId!==currentUser.id&&!(b.approvals||[]).includes(currentUser.id)&&!(b.rejections||[]).includes(currentUser.id)));
       }, err => console.warn('Custom boards:', err));
     } catch(e) { console.warn('Board proposals listener failed:', e); }
-    return () => { cancelled = true; u1(); u2(); u4(); u5(); u6(); u7(); u8(); u9(); u10(); u11(); weekUnsubs.forEach(u=>u()); };
+    return () => { cancelled = true; u1(); u2(); u4(); u5(); u6(); u6b(); u7(); u8(); u9(); u10(); u11(); weekUnsubs.forEach(u=>u()); };
   }, [currentUser, currentRoom, dateKey]);
 
   // ─── LAST WEEK DATA (for recap) ───
   useEffect(() => {
-    if (!currentUser || !currentRoom || roomMembers.length < 1) return;
+    if (!currentUser || !currentRoom || activeMembers.length < 1) return;
     const loadLastWeek = async () => {
       try {
         const lws = getLastWeekStart(), lwe = getLastWeekEnd();
         const snap = await getDocs(query(collection(db,'completions'), where('roomId','==',currentRoom.id), where('date','>=',lws), where('date','<=',lwe)));
         const comps = snap.docs.map(d=>({id:d.id,...d.data()}));
         if (!comps.length) { setLastWeekData(null); return; }
-        const scores = roomMembers.map(m => {
+        const scores = activeMembers.map(m => {
           const mc = comps.filter(c=>c.userId===m.id);
           const pts = mc.reduce((s,c)=>{const h=habits.find(x=>x.id===c.habitId);return s+((h?.points||c.habitPoints||0)*(c.count||1));},0);
           const catPts = {}; allCatNames.forEach(c => catPts[c] = 0);
@@ -325,7 +336,7 @@ export default function TraxApp() {
       } catch { setLastWeekData(null); }
     };
     loadLastWeek();
-  }, [currentUser, currentRoom, roomMembers, habits]);
+  }, [currentUser, currentRoom, activeMembers, habits]);
 
   // ─── STREAK + YESTERDAY ───
   useEffect(() => {
@@ -371,13 +382,13 @@ export default function TraxApp() {
 
   // ─── WEEKLY WINNER ───
   useEffect(() => {
-    if (!currentRoom || roomMembers.length < 2 || allCompletions.length === 0) { setWeeklyWinner(null); return; }
+    if (!currentRoom || activeMembers.length < 2 || allCompletions.length === 0) { setWeeklyWinner(null); return; }
     // Check if we're past Sunday (i.e. it's a new week and last week had data)
     const today = getToday();
     const ws = getWeekStart();
     // Calculate last week's winner from allCompletions that might span into prev week
     // Actually, let's compute current week leader as "projected winner"
-    const scores = roomMembers.map(m => ({
+    const scores = activeMembers.map(m => ({
       member: m,
       pts: allCompletions.filter(c=>c.userId===m.id && c.date>=ws && c.date<=today).reduce((s,c)=>{
         const h = habits.find(hb=>hb.id===c.habitId);
@@ -388,13 +399,13 @@ export default function TraxApp() {
       const isTied = scores.length > 1 && scores[0].pts === scores[1].pts;
       setWeeklyWinner(isTied ? null : { ...scores[0], daysLeft: getDaysUntilReset() });
     } else setWeeklyWinner(null);
-  }, [roomMembers, allCompletions, habits, currentRoom]);
+  }, [activeMembers, allCompletions, habits, currentRoom]);
 
   // ─── RIVAL STATUS (what your competition is doing today) ───
   useEffect(() => {
-    if (!currentUser || !currentRoom || roomMembers.length < 2) { setRivalStatus([]); return; }
+    if (!currentUser || !currentRoom || activeMembers.length < 2) { setRivalStatus([]); return; }
     const today = getToday();
-    const rivals = roomMembers.filter(m=>m.id!==currentUser.id).map(m => {
+    const rivals = activeMembers.filter(m=>m.id!==currentUser.id).map(m => {
       const todayComps = completions.filter(c=>c.userId===m.id&&c.date===today);
       const pts = todayComps.reduce((s,c)=>{const h=habits.find(x=>x.id===c.habitId);return s+((h?.points||c.habitPoints||0)*(c.count||1));},0);
       const habitCount = todayComps.length;
@@ -402,7 +413,7 @@ export default function TraxApp() {
       return { member: m, pts, habitCount, weekPts };
     }).sort((a,b)=>b.pts-a.pts);
     setRivalStatus(rivals);
-  }, [currentUser, currentRoom, roomMembers, completions, allCompletions, habits]);
+  }, [currentUser, currentRoom, activeMembers, completions, allCompletions, habits]);
 
   // ─── HEAT MAP (load on demand) ───
   const loadHeatMap = async () => {
@@ -501,7 +512,7 @@ export default function TraxApp() {
     if (!currentUser || !currentRoom || !selectedHabitIds.length) return;
     try {
       const boardId = currentUser.id + '_' + currentRoom.id;
-      const otherMembers = roomMembers.filter(m=>m.id!==currentUser.id).length;
+      const otherMembers = activeMembers.filter(m=>m.id!==currentUser.id).length;
       if (otherMembers === 0) {
         // Solo mode: apply directly, no approval needed
         await setDoc(doc(db, 'myBoard', boardId), { habitIds: selectedHabitIds, userId: currentUser.id, roomId: currentRoom.id });
@@ -527,7 +538,7 @@ export default function TraxApp() {
       const other = approve ? 'rejections' : 'approvals';
       const updList = [...(boardDoc[field]||[]).filter(id=>id!==currentUser.id), currentUser.id];
       const otherList = (boardDoc[other]||[]).filter(id=>id!==currentUser.id);
-      const otherMembers = roomMembers.filter(m=>m.id!==boardDoc.userId).length;
+      const otherMembers = activeMembers.filter(m=>m.id!==boardDoc.userId).length;
       const needed = Math.max(1, Math.ceil(otherMembers / 2));
       let status = boardDoc.status;
       if (approve && updList.length >= needed) status = 'approved';
@@ -631,17 +642,17 @@ export default function TraxApp() {
 
   // ─── ROOM CREATOR PERMISSIONS ───
   const isRoomCreator = currentRoom?.createdBy === currentUser?.id;
+  const kickedIds = currentRoom?.kicked || [];
+  const activeMembers = roomMembers.filter(m => !kickedIds.includes(m.id));
   const kickMember = async (uid) => {
     if (!isRoomCreator || uid === currentUser.id) return;
-    const m = roomMembers.find(x=>x.id===uid);
+    const m = activeMembers.find(x=>x.id===uid);
     if (!confirm(`Remove ${m?.username||'this member'} from the room?`)) return;
     try {
-      await updateDoc(doc(db, 'users', uid), { rooms: arrayRemove(currentRoom.id) });
-      const userSnap = await getDoc(doc(db, 'users', uid));
-      if (userSnap.exists() && userSnap.data().activeRoom === currentRoom.id) {
-        await updateDoc(doc(db, 'users', uid), { activeRoom: null, roomId: null });
-      }
-    } catch { setError('Failed to remove member'); }
+      // Add to kicked list on the room doc (we own this doc as creator)
+      await updateDoc(doc(db, 'rooms', currentRoom.id), { kicked: arrayUnion(uid) });
+      setSuccessMsg(`${m?.username||'Member'} removed`); setTimeout(()=>setSuccessMsg(''),2000);
+    } catch (err) { console.error(err); setError('Failed to remove member'); }
   };
   const clearAllHabits = async () => {
     if (!isRoomCreator) return;
@@ -654,7 +665,7 @@ export default function TraxApp() {
   };
   const transferOwnership = async (uid) => {
     if (!isRoomCreator || uid === currentUser.id) return;
-    const m = roomMembers.find(x=>x.id===uid);
+    const m = activeMembers.find(x=>x.id===uid);
     if (!confirm(`Transfer room ownership to ${m?.username||'this member'}? You will lose creator permissions.`)) return;
     try {
       await updateDoc(doc(db, 'rooms', currentRoom.id), { createdBy: uid });
@@ -815,13 +826,13 @@ export default function TraxApp() {
   const getTodayCrystals = (uid) => {
     const cr = {}; allCatNames.forEach(c => cr[c] = false);
     // Solo mode: earn crystal if you beat yesterday's category points
-    if (roomMembers.length < 2) {
+    if (activeMembers.length < 2) {
       allCatNames.forEach(cat => { if(getCatPts(uid,cat) > 0) cr[cat] = true; });
       return cr;
     }
     allCatNames.forEach(cat => {
       let mx=0, w=null;
-      roomMembers.forEach(m=>{ const p=getCatPts(m.id,cat); if(p>mx){mx=p;w=m;}else if(p===mx&&p>0)w=null; });
+      activeMembers.forEach(m=>{ const p=getCatPts(m.id,cat); if(p>mx){mx=p;w=m;}else if(p===mx&&p>0)w=null; });
       if(w&&w.id===uid) cr[cat]=true;
     });
     return cr;
@@ -833,14 +844,14 @@ export default function TraxApp() {
     const dates=[...new Set(allCompletions.filter(c=>c.date>=ws&&c.date<=td).map(c=>c.date))];
     dates.forEach(date=>{ allCatNames.forEach(cat=>{
       let mx=0, w=null;
-      roomMembers.forEach(m=>{ const p=allCompletions.filter(c=>c.userId===m.id&&c.date===date).reduce((s,c)=>{const h=habits.find(x=>x.id===c.habitId);if(h&&h.category===cat)return s+(h.points*(c.count||1));return s;},0); if(p>mx){mx=p;w=m;}else if(p===mx&&p>0)w=null; });
+      activeMembers.forEach(m=>{ const p=allCompletions.filter(c=>c.userId===m.id&&c.date===date).reduce((s,c)=>{const h=habits.find(x=>x.id===c.habitId);if(h&&h.category===cat)return s+(h.points*(c.count||1));return s;},0); if(p>mx){mx=p;w=m;}else if(p===mx&&p>0)w=null; });
       if(w&&w.id===uid) t++;
     }); });
     return t;
   };
   const getCount = (hid) => { const e=getExisting(hid); return e?.count||0; };
   const getDailyProgress = () => { const dh=myBoardIds?habits.filter(h=>myBoardIds.includes(h.id)):habits; if(!dh.length)return 0; let tm=0,td=0; dh.forEach(h=>{const mx=h.isRepeatable?(h.maxCompletions||1):1;tm+=mx;td+=Math.min(getCount(h.id),mx);}); return tm>0?td/tm:0; };
-  const getLeaderboard = () => roomMembers.map(m=>({member:m,todayPts:getTodayPts(m.id),weeklyPts:getWeeklyPts(m.id),crystals:getTodayCrystals(m.id),weeklyCrystals:getWeeklyCrystals(m.id)})).sort((a,b)=>leaderboardTab==='today'?b.todayPts-a.todayPts:b.weeklyPts-a.weeklyPts);
+  const getLeaderboard = () => activeMembers.map(m=>({member:m,todayPts:getTodayPts(m.id),weeklyPts:getWeeklyPts(m.id),crystals:getTodayCrystals(m.id),weeklyCrystals:getWeeklyCrystals(m.id)})).sort((a,b)=>leaderboardTab==='today'?b.todayPts-a.todayPts:b.weeklyPts-a.weeklyPts);
 
   // ─── CATEGORY SYSTEM ───
   const COLOR_PALETTE = [
@@ -928,7 +939,7 @@ export default function TraxApp() {
     setTimeout(() => setCelebrateComplete(true), 0);
   }
   prevProgRef.current = dailyProg;
-  const soloMode = roomMembers.length < 2;
+  const soloMode = activeMembers.length < 2;
 
   // ═══════════════════════════════════════
   // ONBOARDING
@@ -1216,7 +1227,7 @@ export default function TraxApp() {
         )}
 
         {/* ─── WEEKLY DRAMA COUNTDOWN (Sunday) ─── */}
-        {weeklyWinner && weeklyWinner.daysLeft <= 1 && roomMembers.length > 1 && (
+        {weeklyWinner && weeklyWinner.daysLeft <= 1 && activeMembers.length > 1 && (
           <div className="mb-4 p-4 bg-gradient-to-r from-amber-500/10 via-red-500/10 to-purple-500/10 border border-amber-500/20 rounded-2xl text-center">
             <div className="text-2xl mb-1">{weeklyWinner.daysLeft === 0 ? '⏰' : '⚡'}</div>
             <div className="text-sm font-bold text-amber-300">{weeklyWinner.daysLeft === 0 ? 'Final Hours — '+timeDisplay+' to go' : 'Final Day — Last Chance'}</div>
@@ -1420,7 +1431,7 @@ export default function TraxApp() {
             <div className="p-4 bg-gradient-to-r from-red-500/10 via-pink-500/10 to-purple-500/10 border border-red-500/15 rounded-xl mb-4">
               <div className="flex items-center gap-2 mb-2"><span className={'text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider '+(roomStakes.type==='buyout'?'bg-amber-500/20 text-amber-400':roomStakes.type==='dare'?'bg-pink-500/20 text-pink-400':roomStakes.type==='service'?'bg-cyan-500/20 text-cyan-400':'bg-purple-500/20 text-purple-400')}>{roomStakes.type}</span><span className="text-[10px] text-gray-600 uppercase tracking-wider">{roomStakes.duration}</span></div>
               <p className="text-white font-medium">{roomStakes.description}</p>
-              <p className="text-[11px] text-gray-600 mt-2">Set by {roomMembers.find(m=>m.id===roomStakes.createdBy)?.username||'unknown'}</p>
+              <p className="text-[11px] text-gray-600 mt-2">Set by {activeMembers.find(m=>m.id===roomStakes.createdBy)?.username||'unknown'}</p>
             </div>
             {(isRoomCreator||roomStakes.createdBy===currentUser.id)&&<button onClick={clearStake} className="w-full px-4 py-2.5 border border-red-500/20 text-red-400 rounded-xl hover:bg-red-500/10 text-sm transition-all">Remove Stake</button>}
           </div>
@@ -1465,7 +1476,7 @@ export default function TraxApp() {
             </div>
           );
         })}</div>
-        {roomMembers.length<2&&<div className="text-center py-8"><p className="text-gray-600 text-sm">Invite friends to compete!</p></div>}
+        {activeMembers.length<2&&<div className="text-center py-8"><p className="text-gray-600 text-sm">Invite friends to compete!</p></div>}
       </Modal>
 
       {/* Profile */}
@@ -1731,8 +1742,8 @@ export default function TraxApp() {
         <div className={`text-xs ${T.textDim} mb-3`}>{customBoardHabits.length} habit{customBoardHabits.length!==1?'s':''} selected</div>
         {error&&<p className="text-red-400 text-xs text-center mb-2">{error}</p>}
         {successMsg&&<p className="text-emerald-400 text-xs text-center mb-2">{successMsg}</p>}
-        <button onClick={()=>proposeCustomBoard(customBoardHabits)} disabled={customBoardHabits.length===0} className="w-full px-4 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-xl text-sm font-bold shadow-lg shadow-indigo-500/20 active:scale-[0.98] disabled:opacity-40">{roomMembers.filter(m=>m.id!==currentUser?.id).length>0?'Submit for Approval':'Apply Board'}</button>
-        {roomMembers.filter(m=>m.id!==currentUser?.id).length>0&&<p className={`text-[10px] ${T.textDim} text-center mt-2`}>Needs majority approval from room members</p>}
+        <button onClick={()=>proposeCustomBoard(customBoardHabits)} disabled={customBoardHabits.length===0} className="w-full px-4 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-xl text-sm font-bold shadow-lg shadow-indigo-500/20 active:scale-[0.98] disabled:opacity-40">{activeMembers.filter(m=>m.id!==currentUser?.id).length>0?'Submit for Approval':'Apply Board'}</button>
+        {activeMembers.filter(m=>m.id!==currentUser?.id).length>0&&<p className={`text-[10px] ${T.textDim} text-center mt-2`}>Needs majority approval from room members</p>}
       </Modal>
 
       {/* Room Settings (Creator only) */}
@@ -1746,29 +1757,34 @@ export default function TraxApp() {
 
         {/* Members */}
         <div className="mb-5">
-          <h3 className={`text-xs font-bold ${T.textMuted} tracking-wider uppercase mb-3`}>Members ({roomMembers.length})</h3>
+          <h3 className={`text-xs font-bold ${T.textMuted} tracking-wider uppercase mb-3`}>Members ({activeMembers.length})</h3>
           <div className="space-y-2">
             {roomMembers.map(m => {
               const isMe = m.id === currentUser.id;
               const isCreator = m.id === currentRoom?.createdBy;
+              const isKicked = kickedIds.includes(m.id);
               return (
-                <div key={m.id} className={`flex items-center justify-between p-3 rounded-xl border ${darkMode?'border-white/[0.06] bg-white/[0.02]':'border-gray-200 bg-gray-50'}`}>
+                <div key={m.id} className={`flex items-center justify-between p-3 rounded-xl border ${isKicked?'opacity-50 ':''} ${darkMode?'border-white/[0.06] bg-white/[0.02]':'border-gray-200 bg-gray-50'}`}>
                   <div className="flex items-center gap-3">
-                    <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-black ${isCreator?'bg-amber-500/20 text-amber-400':'bg-blue-500/20 text-blue-400'}`}>{m.username?.charAt(0)?.toUpperCase()}</div>
+                    <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-black ${isCreator?'bg-amber-500/20 text-amber-400':isKicked?'bg-red-500/20 text-red-400':'bg-blue-500/20 text-blue-400'}`}>{m.username?.charAt(0)?.toUpperCase()}</div>
                     <div>
                       <div className="flex items-center gap-1.5">
                         <span className={`text-sm font-medium ${darkMode?'text-gray-200':'text-gray-800'}`}>{m.username}</span>
                         {isCreator&&<span className="text-[9px] bg-amber-500/20 text-amber-400 px-1.5 py-0.5 rounded-full font-bold">Creator</span>}
+                        {isKicked&&<span className="text-[9px] bg-red-500/20 text-red-400 px-1.5 py-0.5 rounded-full font-bold">Removed</span>}
                         {isMe&&<span className={`text-[9px] ${T.textDim}`}>(you)</span>}
                       </div>
                       <div className={`text-[10px] ${T.textDim}`}>{m.email}</div>
                     </div>
                   </div>
-                  {!isMe && (
+                  {!isMe && !isKicked && (
                     <div className="flex items-center gap-1.5">
                       <button onClick={()=>transferOwnership(m.id)} className={`text-[9px] px-2 py-1 rounded-lg font-medium transition-all ${darkMode?'text-gray-600 hover:text-amber-400 hover:bg-amber-500/10':'text-gray-400 hover:text-amber-600 hover:bg-amber-50'}`}>Transfer</button>
                       <button onClick={()=>kickMember(m.id)} className={`text-[9px] px-2 py-1 rounded-lg font-medium transition-all ${darkMode?'text-gray-600 hover:text-red-400 hover:bg-red-500/10':'text-gray-400 hover:text-red-600 hover:bg-red-50'}`}>Remove</button>
                     </div>
+                  )}
+                  {isKicked && (
+                    <button onClick={async()=>{try{await updateDoc(doc(db,'rooms',currentRoom.id),{kicked:arrayRemove(m.id)});}catch{}}} className={`text-[9px] px-2 py-1 rounded-lg font-medium transition-all ${darkMode?'text-gray-600 hover:text-emerald-400 hover:bg-emerald-500/10':'text-gray-400 hover:text-emerald-600 hover:bg-emerald-50'}`}>Restore</button>
                   )}
                 </div>
               );
