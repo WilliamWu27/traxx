@@ -1238,186 +1238,96 @@ export default function TraxApp() {
           </div>
         </div>
       )}
-      {/* Header */}
+      {/* Header — slim */}
       <div className={`${T.headerBg} ${T.blurBg} border-b ${T.border} sticky top-0 z-40`}>
-        <div className="max-w-2xl mx-auto px-4 py-3">
+        <div className="max-w-2xl mx-auto px-4 py-2.5">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <h1 className="text-lg font-black tracking-[0.2em]">TRAX</h1>
-              <span className={`text-[8px] ${T.textDim}`}>v9</span>
-              <div className="flex gap-1"><div className="w-1.5 h-1.5 rounded-full bg-blue-500"/><div className="w-1.5 h-1.5 rounded-full bg-orange-500"/><div className="w-1.5 h-1.5 rounded-full bg-emerald-500"/></div>
-              <button onClick={()=>setShowSwitchRoom(true)} className={`ml-2 flex items-center gap-1 px-2 py-1 ${T.bgCard} border ${T.border} rounded-lg text-[10px] ${T.textMuted} hover:${T.text} transition-all`}><span className="font-mono tracking-wider">{currentRoom?.code}</span>{userRooms.length>1&&<ArrowLeftRight size={10}/>}</button>
-              {isRoomCreator&&<button onClick={()=>setShowRoomSettings(true)} className={`p-1.5 ${T.textDim} hover:text-amber-400 transition-colors`} title="Room Settings"><Crown size={13}/></button>}
+              <h1 className="text-base font-black tracking-[0.15em]">TRAX</h1>
+              <div className="flex gap-0.5"><div className="w-1 h-1 rounded-full bg-blue-500"/><div className="w-1 h-1 rounded-full bg-orange-500"/><div className="w-1 h-1 rounded-full bg-emerald-500"/></div>
+              {streakData.streak>0&&<div className="flex items-center gap-1 ml-1"><Flame size={11} className="text-orange-400"/><span className="text-orange-400 text-xs font-bold">{streakData.streak}</span>{streakMulti.multi>1&&<span className={`text-[8px] font-bold ${streakMulti.color}`}>{streakMulti.label}</span>}</div>}
             </div>
-            <div className="flex items-center gap-1.5">
-              <button onClick={()=>setShowLeaderboard(true)} className="flex items-center gap-1 px-2.5 py-1.5 bg-gradient-to-r from-amber-500/20 to-orange-500/20 border border-amber-500/20 text-amber-400 rounded-lg hover:border-amber-500/40 transition-all text-xs font-semibold"><Trophy size={12}/></button>
-              {roomStakes&&<button onClick={()=>setShowStakes(true)} className="p-1.5 text-red-400"><Zap size={14}/></button>}
-              <button onClick={()=>{setHistoryDate(getYesterday());loadHistoryDate(getYesterday());setShowHistory(true);}} className={`p-1.5 ${T.textDim} hover:${T.text} transition-colors`}><Calendar size={14}/></button>
-              {lastWeekData&&<button onClick={()=>setShowWeeklyRecap(true)} className={`p-1.5 ${T.textDim} hover:text-purple-400 transition-colors`}><BarChart3 size={14}/></button>}
-              <button onClick={()=>setShowInviteModal(true)} className={`p-1.5 ${T.textDim} hover:${T.text} transition-colors`}><UserPlus size={14}/></button>
-              <button onClick={toggleTheme} className={`p-1.5 ${T.textDim} hover:text-amber-400 transition-colors`}>{darkMode?<Sun size={14}/>:<Moon size={14}/>}</button>
-              <button onClick={()=>setShowProfile(true)} className={`p-2 ${T.textDim} hover:${T.text} transition-colors`}><User size={16}/></button>
+            <div className="flex items-center gap-1">
+              <button onClick={()=>setShowLeaderboard(true)} className="p-1.5 text-amber-400 hover:text-amber-300 transition-colors"><Trophy size={13}/></button>
+              {roomStakes&&<button onClick={()=>setShowStakes(true)} className="p-1.5 text-red-400"><Zap size={13}/></button>}
+              <button onClick={()=>setShowInviteModal(true)} className={`p-1.5 ${T.textDim} hover:${T.text} transition-colors`}><UserPlus size={13}/></button>
+              <button onClick={()=>setShowProfile(true)} className={`p-1.5 ${T.textDim} hover:${T.text} transition-colors`}><User size={14}/></button>
+              <button onClick={()=>setShowSwitchRoom(true)} className={`flex items-center gap-1 px-2 py-1 ${T.bgCard} border ${T.border} rounded-lg text-[9px] ${T.textMuted} hover:${T.text} transition-all ml-0.5`}><span className="font-mono tracking-wider">{currentRoom?.code}</span>{userRooms.length>1&&<ArrowLeftRight size={9}/>}</button>
+              {isRoomCreator&&<button onClick={()=>setShowRoomSettings(true)} className={`p-1 ${T.textDim} hover:text-amber-400 transition-colors`}><Crown size={11}/></button>}
             </div>
           </div>
         </div>
       </div>
 
-      <div className="max-w-2xl mx-auto px-4 py-5">
-        {/* Greeting */}
-        <div className="mb-5">
-          <div className="flex items-center justify-between mb-2">
-            <div><h2 className="text-lg font-bold">{getGreeting()}, <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 via-purple-400 to-emerald-400">{currentUser.username}</span></h2><p className="text-gray-600 text-xs mt-0.5 italic">{getMotivation()}</p></div>
-            {streakData.streak>0&&<div className="flex items-center gap-1.5 px-3 py-1.5 bg-orange-500/10 border border-orange-500/20 rounded-full"><Flame size={14} className="text-orange-400"/><span className="text-orange-400 text-sm font-bold">{streakData.streak}</span>{streakMulti.multi>1&&<span className={`text-[9px] font-bold ${streakMulti.color} ml-0.5`}>{streakMulti.label}</span>}</div>}
+      <div className="max-w-2xl mx-auto px-4 py-4">
+        {/* Motivational line + progress — compact */}
+        <div className="mb-3">
+          <div className="flex items-center justify-between mb-1.5">
+            <p className={`text-xs ${T.textDim} italic flex-1 min-w-0 truncate`}>{dailyProg>=1?'🎉 All done — nice work.':getMotivation()}</p>
+            <div className="flex items-center gap-2 shrink-0 ml-2">
+              <span className={`text-[10px] font-bold ${dailyProg>=1?'text-emerald-400':'text-blue-400'}`}>{Math.round(dailyProg*100)}%</span>
+              <span className={`text-[10px] ${T.textDim}`}>{timeDisplay}</span>
+            </div>
           </div>
-
-          {/* Weekly winner / countdown banner */}
-          {weeklyWinner && (
-            <div className="mb-3 p-3 bg-gradient-to-r from-amber-500/10 to-yellow-500/10 border border-amber-500/15 rounded-xl flex items-center justify-between">
-              <div className="flex items-center gap-2"><Crown size={14} className="text-amber-400"/><span className="text-sm text-amber-300 font-medium">{weeklyWinner.member.username}</span>{getRoomRole(weeklyWinner.member.id)&&<span className={`text-[9px] font-bold ${getRoomRole(weeklyWinner.member.id).color}`}>{getRoomRole(weeklyWinner.member.id).icon} {getRoomRole(weeklyWinner.member.id).role}</span>}<span className={`text-xs ${T.textDim}`}>leads this week</span></div>
-              <span className={`text-[10px] ${T.textDim}`}>{weeklyWinner.daysLeft > 0 ? weeklyWinner.daysLeft+'d left' : timeDisplay+' left'}</span>
-            </div>
-          )}
-
-          {/* Solo mode banner */}
-          {soloMode && (
-            <div className="mb-3 p-3 bg-gradient-to-r from-purple-500/10 to-blue-500/10 border border-purple-500/15 rounded-xl flex items-center justify-between">
-              <div className="flex items-center gap-2"><Target size={14} className="text-purple-400"/><span className="text-sm text-purple-300">Solo mode — beat yesterday's {yesterdayPoints} pts</span></div>
-              {myPts > yesterdayPoints && myPts > 0 && <span className="text-[10px] text-emerald-400 font-bold flex items-center gap-0.5"><ArrowUp size={10}/>Ahead!</span>}
-            </div>
-          )}
-
-          {/* Stakes banner */}
-          {roomStakes && <button onClick={()=>setShowStakes(true)} className="w-full mb-3 p-3 bg-gradient-to-r from-red-500/10 via-pink-500/10 to-purple-500/10 border border-red-500/15 rounded-xl flex items-center justify-between hover:border-red-500/30 transition-all"><div className="flex items-center gap-2"><Zap size={14} className="text-red-400"/><span className="text-sm text-red-300 font-medium">{roomStakes.description}</span></div><span className="text-[10px] text-gray-600 uppercase tracking-wider">{roomStakes.duration}</span></button>}
-
-          {/* Progress bar */}
-          <div className="relative h-2 bg-white/[0.04] rounded-full overflow-hidden"><div className="absolute inset-y-0 left-0 rounded-full transition-all duration-700 ease-out" style={{width:(dailyProg*100)+'%',background:dailyProg>=1?'linear-gradient(90deg,#10b981,#34d399)':'linear-gradient(90deg,#3b82f6,#8b5cf6,#10b981)'}}/></div>
-          <div className="flex justify-between mt-1.5"><span className={`text-[10px] ${T.textDim}`}>{dailyProg>=1?'🎉 All habits complete!':Math.round(dailyProg*100)+'% daily progress'}</span><span className={`text-[10px] ${T.textDim}`}>{timeDisplay} left</span></div>
+          <div className="relative h-1 bg-white/[0.04] rounded-full overflow-hidden"><div className="absolute inset-y-0 left-0 rounded-full transition-all duration-700 ease-out" style={{width:(dailyProg*100)+'%',background:dailyProg>=1?'linear-gradient(90deg,#10b981,#34d399)':'linear-gradient(90deg,#3b82f6,#8b5cf6)'}}/></div>
         </div>
 
-        {/* Stats */}
-        <div className="grid grid-cols-3 gap-3 mb-6">
-          <div className={`relative ${T.bgCard} rounded-2xl border ${T.border} p-4 overflow-hidden`}><div className="absolute top-0 right-0 w-16 h-16 bg-blue-500/5 rounded-full blur-xl -translate-y-4 translate-x-4"/><div className={`${T.textMuted} text-[10px] tracking-wider uppercase mb-1 flex items-center gap-1`}><Zap size={9}/>Points</div><div className={`text-2xl font-black ${darkMode?'text-transparent bg-clip-text bg-gradient-to-b from-white to-gray-400':''}`}>{myPts}</div></div>
-          <div className={`relative ${T.bgCard} rounded-2xl border ${T.border} p-4 overflow-hidden`}><div className="absolute top-0 right-0 w-16 h-16 bg-orange-500/5 rounded-full blur-xl -translate-y-4 translate-x-4"/><div className={`${T.textMuted} text-[10px] tracking-wider uppercase mb-1 flex items-center gap-1`}><Flame size={9}/>Streak</div><div className="flex items-baseline gap-1.5"><span className="text-2xl font-black text-transparent bg-clip-text bg-gradient-to-b from-orange-300 to-orange-600">{streakData.streak||0}<span className={`text-sm font-medium ${T.textDim} ml-1`}>d</span></span>{streakMulti.multi>1&&<span className={`text-[9px] font-bold ${streakMulti.color} ${streakMulti.bg} px-1.5 py-0.5 rounded-full`}>{streakMulti.label}</span>}</div>{(()=>{const s=streakData.streak||0;const tiers=[3,7,14,30,60];const next=tiers.find(t=>t>s);if(!next)return null;const prev=tiers[tiers.indexOf(next)-1]||0;const pct=((s-prev)/(next-prev))*100;return<div className="mt-1.5"><div className={`h-1 rounded-full overflow-hidden ${darkMode?'bg-white/[0.06]':'bg-gray-200'}`}><div className="h-full rounded-full bg-gradient-to-r from-orange-400 to-red-400 transition-all" style={{width:pct+'%'}}/></div><div className={`text-[8px] ${T.textDim} mt-0.5`}>{next-s}d to next tier</div></div>;})()}</div>
-          <div className={`relative ${T.bgCard} rounded-2xl border ${T.border} p-4 overflow-hidden`}><div className="absolute top-0 right-0 w-16 h-16 bg-purple-500/5 rounded-full blur-xl -translate-y-4 translate-x-4"/><div className={`${T.textMuted} text-[10px] tracking-wider uppercase mb-2`}>Crystals{isPerfect&&<span className="text-amber-400 ml-1">&#9830;</span>}</div><div className="flex items-center gap-2.5">{allCatNames.map(c=><div key={c} className={'w-5 h-5 rounded-full transition-all duration-500 '+(myCr[c]?getCT(c).bg+' shadow-md '+getCT(c).glow:darkMode?'bg-white/[0.06] border border-white/[0.08]':'bg-gray-200 border border-gray-300')}/>)}</div></div>
-        </div>
-
-        {/* ─── RIVAL STATUS (always visible) ─── */}
+        {/* Rival pills — inline, small */}
         {rivalStatus.length > 0 && (
-          <div className={`mb-4 rounded-2xl border ${T.border} ${T.bgCard} overflow-hidden`}>
-            <div className="px-4 py-2.5 border-b border-white/[0.04] flex items-center justify-between">
-              <span className={`text-[10px] font-bold tracking-wider uppercase ${T.textMuted}`}>Rival Status</span>
-              <span className={`text-[10px] ${T.textDim}`}>Live</span>
-            </div>
-            <div className="divide-y divide-white/[0.04]">{rivalStatus.slice(0,3).map(r => {
-              const role = getRoomRole(r.member.id);
+          <div className="flex items-center gap-2 mb-4 overflow-x-auto pb-0.5 -mx-1 px-1">
+            {rivalStatus.slice(0,4).map(r => {
               const ahead = r.pts > myPts;
-              const diff = Math.abs(r.pts - myPts);
               return (
-                <div key={r.member.id} className="px-4 py-2.5 flex items-center justify-between">
-                  <div className="flex items-center gap-2.5">
-                    <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-black ${ahead?'bg-red-500/20 text-red-400':'bg-emerald-500/20 text-emerald-400'}`}>{r.member.username?.charAt(0)?.toUpperCase()}</div>
-                    <div>
-                      <div className="flex items-center gap-1.5"><span className={`text-sm font-medium ${darkMode?'text-gray-300':'text-gray-700'}`}>{r.member.username}</span>{role&&<span className={`text-[9px] ${role.color} font-semibold`}>{role.icon} {role.role}</span>}</div>
-                      <div className={`text-[10px] ${T.textDim}`}>{r.habitCount===0?'No habits logged yet':r.habitCount+' habit'+(r.habitCount>1?'s':'')+' today'}</div>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <div className={`text-sm font-bold ${ahead?'text-red-400':'text-emerald-400'}`}>{r.pts} pts</div>
-                    {diff>0&&<div className={`text-[9px] font-medium ${ahead?'text-red-400/70':'text-emerald-400/70'}`}>{ahead?'+'+diff+' ahead':''+diff+' behind'}</div>}
-                  </div>
+                <div key={r.member.id} className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border shrink-0 ${ahead?'border-red-500/15 bg-red-500/5':'border-emerald-500/15 bg-emerald-500/5'}`}>
+                  <div className={`w-5 h-5 rounded-full flex items-center justify-center text-[9px] font-black ${ahead?'bg-red-500/20 text-red-400':'bg-emerald-500/20 text-emerald-400'}`}>{r.member.username?.charAt(0)?.toUpperCase()}</div>
+                  <span className={`text-[10px] font-medium ${darkMode?'text-gray-400':'text-gray-600'}`}>{r.member.username}</span>
+                  <span className={`text-[10px] font-bold ${ahead?'text-red-400':'text-emerald-400'}`}>{r.pts}</span>
                 </div>
               );
-            })}</div>
-            {/* Loss aversion nudge */}
-            {myPts === 0 && rivalStatus.some(r=>r.pts>0) && (
-              <div className="px-4 py-2 bg-red-500/5 border-t border-red-500/10">
-                <p className="text-[10px] text-red-400">⚠️ Your rivals are logging. You haven't started today.</p>
-              </div>
-            )}
-            {myPts > 0 && rivalStatus[0]?.pts > myPts && (
-              <div className="px-4 py-2 bg-amber-500/5 border-t border-amber-500/10">
-                <p className="text-[10px] text-amber-400">📉 You're {rivalStatus[0].pts - myPts} pts behind {rivalStatus[0].member.username}. Keep pushing.</p>
-              </div>
-            )}
+            })}
+            {myPts === 0 && rivalStatus.some(r=>r.pts>0) && <span className="text-[9px] text-red-400/70 shrink-0">⚠️ They started</span>}
           </div>
         )}
 
-        {/* ─── ACTIVITY FEED ─── */}
-        {activityFeed.length > 0 && (
-          <div className={`mb-4 rounded-2xl border ${T.border} ${T.bgCard} overflow-hidden`}>
-            <div className="px-4 py-2.5 border-b border-white/[0.04]">
-              <span className={`text-[10px] font-bold tracking-wider uppercase ${T.textMuted}`}>Activity</span>
-            </div>
-            <div className="max-h-32 overflow-y-auto divide-y divide-white/[0.04]">{activityFeed.slice(0,8).map(a => {
-              const isMe = a.userId === currentUser.id;
-              const ts = a.ts ? new Date(a.ts) : null;
-              const timeAgo = ts ? (Math.floor((Date.now()-ts.getTime())/60000)<60 ? Math.floor((Date.now()-ts.getTime())/60000)+'m ago' : Math.floor((Date.now()-ts.getTime())/3600000)+'h ago') : '';
-              return (
-                <div key={a.id} className="px-4 py-2 flex items-center justify-between">
-                  <div className="flex-1 min-w-0">
-                    <span className={`text-xs ${isMe?'text-blue-400':'text-gray-400'} font-medium`}>{isMe?'You':a.username}</span>
-                    <span className={`text-xs ${T.textDim} ml-1.5`}>{a.text}</span>
-                    {a.bonus==='jackpot'&&<span className="ml-1 text-[10px] bg-amber-500/20 text-amber-300 px-1.5 py-0.5 rounded-full font-bold">JACKPOT</span>}
-                    {a.bonus==='bonus'&&<span className="ml-1 text-[10px] bg-purple-500/20 text-purple-300 px-1.5 py-0.5 rounded-full font-bold">2×</span>}
-                  </div>
-                  <span className={`text-[9px] ${T.textFaint} shrink-0 ml-2`}>{timeAgo}</span>
-                </div>
-              );
-            })}</div>
+        {/* Solo nudge — one line */}
+        {soloMode && !rivalStatus.length && yesterdayPoints > 0 && (
+          <div className="flex items-center justify-between mb-3">
+            <span className={`text-xs ${T.textDim}`}>Yesterday: {yesterdayPoints} pts</span>
+            {myPts > yesterdayPoints && myPts > 0 && <span className="text-[10px] text-emerald-400 font-bold">↑ Ahead</span>}
           </div>
         )}
 
-        {/* ─── WEEKLY DRAMA COUNTDOWN (Sunday) ─── */}
-        {weeklyWinner && weeklyWinner.daysLeft <= 1 && activeMembers.length > 1 && (
-          <div className="mb-4 p-4 bg-gradient-to-r from-amber-500/10 via-red-500/10 to-purple-500/10 border border-amber-500/20 rounded-2xl text-center">
-            <div className="text-2xl mb-1">{weeklyWinner.daysLeft === 0 ? '⏰' : '⚡'}</div>
-            <div className="text-sm font-bold text-amber-300">{weeklyWinner.daysLeft === 0 ? 'Final Hours — '+timeDisplay+' to go' : 'Final Day — Last Chance'}</div>
-            <div className={`text-xs ${T.textDim} mt-1`}>{weeklyWinner.member.username} leads with {weeklyWinner.pts} pts</div>
-          </div>
-        )}
+        {/* Stakes — tiny banner */}
+        {roomStakes && <button onClick={()=>setShowStakes(true)} className="w-full mb-3 px-3 py-1.5 bg-red-500/5 border border-red-500/10 rounded-lg flex items-center gap-2 hover:border-red-500/20 transition-all"><Zap size={10} className="text-red-400 shrink-0"/><span className="text-[10px] text-red-300/70 truncate">{roomStakes.description}</span></button>}
 
-        {/* Board approval requests from other members */}
+        {/* Board requests */}
         {boardRequests.length > 0 && boardRequests.map(br => (
-          <div key={br.id} className={`mb-3 p-3 rounded-xl border ${darkMode?'bg-purple-500/5 border-purple-500/15':'bg-purple-50 border-purple-200'}`}>
+          <div key={br.id} className={`mb-2 p-2.5 rounded-lg border ${darkMode?'bg-purple-500/5 border-purple-500/15':'bg-purple-50 border-purple-200'}`}>
             <div className="flex items-center justify-between">
-              <div><span className="text-sm font-medium text-purple-400">{br.username}</span><span className={`text-xs ${T.textDim} ml-1`}>wants a custom board</span></div>
-              <div className="flex gap-2">
-                <button onClick={()=>voteOnBoard(br,true)} className="px-3 py-1 bg-emerald-500/20 text-emerald-400 text-[10px] font-bold rounded-lg hover:bg-emerald-500/30">Approve</button>
-                <button onClick={()=>voteOnBoard(br,false)} className="px-3 py-1 bg-red-500/20 text-red-400 text-[10px] font-bold rounded-lg hover:bg-red-500/30">Deny</button>
+              <div><span className="text-xs font-medium text-purple-400">{br.username}</span><span className={`text-[10px] ${T.textDim} ml-1`}>wants a custom board</span></div>
+              <div className="flex gap-1.5">
+                <button onClick={()=>voteOnBoard(br,true)} className="px-2.5 py-1 bg-emerald-500/20 text-emerald-400 text-[9px] font-bold rounded-md">Approve</button>
+                <button onClick={()=>voteOnBoard(br,false)} className="px-2.5 py-1 bg-red-500/20 text-red-400 text-[9px] font-bold rounded-md">Deny</button>
               </div>
             </div>
-            <div className={`text-[10px] ${T.textDim} mt-1`}>{br.habitIds?.length||0} habits selected · {(br.approvals||[]).length} approval(s) so far</div>
           </div>
         ))}
 
         {/* Board indicator */}
         {boardActive && (
-          <div className={`mb-3 p-2.5 rounded-xl border flex items-center justify-between ${darkMode?'bg-indigo-500/5 border-indigo-500/15':'bg-indigo-50 border-indigo-200'}`}>
-            <span className="text-[10px] text-indigo-400 font-medium">🎯 Custom Board — {myBoardIds?.length||0} of {habits.length} habits</span>
+          <div className={`mb-2 p-2 rounded-lg border flex items-center justify-between ${darkMode?'bg-indigo-500/5 border-indigo-500/15':'bg-indigo-50 border-indigo-200'}`}>
+            <span className="text-[10px] text-indigo-400 font-medium">🎯 Custom Board — {myBoardIds?.length||0} of {habits.length}</span>
             <button onClick={resetBoard} className="text-[10px] text-gray-500 hover:text-red-400">Show All</button>
           </div>
         )}
 
-        {/* Toolbar: Heat Map, Insights, Reorder */}
-        <div className="flex items-center justify-between mb-3 flex-wrap gap-1">
-          <div className="flex gap-1">
-            <button onClick={loadHeatMap} className={`text-[10px] font-medium tracking-wider uppercase px-3 py-1.5 rounded-lg transition-all ${T.textDim} hover:text-purple-400`}>📊 Map</button>
-            <button onClick={loadInsights} className={`text-[10px] font-medium tracking-wider uppercase px-3 py-1.5 rounded-lg transition-all ${T.textDim} hover:text-blue-400`}>📈 Insights</button>
-            <button onClick={()=>{setCustomBoardHabits(myBoardIds||habits.map(h=>h.id));setShowCustomBoard(true);}} className={`text-[10px] font-medium tracking-wider uppercase px-3 py-1.5 rounded-lg transition-all ${T.textDim} hover:text-indigo-400`}>🎯 Board</button>
-          </div>
-          <div className="flex gap-1">
-            {habits.length>0&&<button onClick={()=>setEditMode(!editMode)} className={'text-[10px] font-medium tracking-wider uppercase px-3 py-1.5 rounded-lg transition-all flex items-center gap-1 '+(editMode?'bg-blue-500/20 text-blue-400 border border-blue-500/30':T.textDim+' hover:text-gray-400')}>{editMode?'Done':'✏️ Edit Board'}</button>}
-          </div>
-        </div>
         {editMode && (
-          <div className={`mb-3 p-3 rounded-xl border ${darkMode?'bg-blue-500/5 border-blue-500/15':'bg-blue-50 border-blue-200'}`}>
-            <p className={`text-[10px] ${darkMode?'text-blue-300':'text-blue-600'}`}>
-              <strong>Editing:</strong> Drag to reorder · <span className="text-indigo-400">✓</span> to show/hide habits on your board · ✏️ to edit · ✕ to delete
-            </p>
+          <div className={`mb-2 p-2.5 rounded-lg border ${darkMode?'bg-blue-500/5 border-blue-500/15':'bg-blue-50 border-blue-200'}`}>
+            <p className={`text-[10px] ${darkMode?'text-blue-300':'text-blue-600'}`}>Drag to reorder · ✓ show/hide · ✏️ edit · ✕ delete</p>
           </div>
         )}
 
-        {/* Habits */}
+        {/* ═══ HABITS — THE MAIN EVENT ═══ */}
         <div className="space-y-6">
           {allCatNames.map(cat => {
             const ch = getOrderedHabits(cat); if(!ch.length) return null;
@@ -1471,6 +1381,61 @@ export default function TraxApp() {
               <button onClick={()=>setShowAddCategory(true)} className={'border border-dashed rounded-xl p-4 hover:text-purple-400 hover:border-purple-500/30 hover:bg-purple-500/5 flex items-center justify-center gap-2 transition-all '+(darkMode?'border-white/[0.08] text-gray-600':'border-gray-300 text-gray-400')}><span className="text-xs font-medium tracking-wide">+ Category</span></button>
             </div>
           )}
+        </div>
+
+        {/* ═══ SECONDARY CONTENT (below habits) ═══ */}
+
+        {/* Quick stats */}
+        <div className="grid grid-cols-3 gap-2 mt-6 mb-4">
+          <div className={`${T.bgCard} rounded-xl border ${T.border} p-3 text-center`}><div className="text-lg font-black text-blue-400">{myPts}</div><div className={`text-[8px] ${T.textDim} uppercase tracking-wider`}>Today</div></div>
+          <div className={`${T.bgCard} rounded-xl border ${T.border} p-3 text-center`}><div className="text-lg font-black text-emerald-400">{getWeeklyPts(currentUser.id)}</div><div className={`text-[8px] ${T.textDim} uppercase tracking-wider`}>Week</div></div>
+          <div className={`${T.bgCard} rounded-xl border ${T.border} p-3 text-center`}><div className="flex justify-center gap-1.5 mb-0.5">{allCatNames.map(c=><div key={c} className={'w-4 h-4 rounded-full transition-all '+(myCr[c]?getCT(c).bg+' shadow-sm':darkMode?'bg-white/[0.06]':'bg-gray-200')}/>)}</div><div className={`text-[8px] ${T.textDim} uppercase tracking-wider`}>Crystals</div></div>
+        </div>
+
+        {/* Weekly winner */}
+        {weeklyWinner && (
+          <div className="mb-3 p-2.5 bg-amber-500/5 border border-amber-500/10 rounded-lg flex items-center justify-between">
+            <div className="flex items-center gap-2"><Crown size={11} className="text-amber-400"/><span className="text-[11px] text-amber-300/80">{weeklyWinner.member.username} leads · {weeklyWinner.pts} pts</span></div>
+            <span className={`text-[10px] ${T.textDim}`}>{weeklyWinner.daysLeft > 0 ? weeklyWinner.daysLeft+'d left' : timeDisplay}</span>
+          </div>
+        )}
+
+        {/* Weekly drama countdown */}
+        {weeklyWinner && weeklyWinner.daysLeft <= 1 && activeMembers.length > 1 && (
+          <div className="mb-3 p-3 bg-gradient-to-r from-amber-500/5 via-red-500/5 to-purple-500/5 border border-amber-500/10 rounded-lg text-center">
+            <div className="text-sm font-bold text-amber-300">{weeklyWinner.daysLeft === 0 ? '⏰ Final Hours — '+timeDisplay : '⚡ Final Day'}</div>
+          </div>
+        )}
+
+        {/* Activity Feed */}
+        {activityFeed.length > 0 && (
+          <div className={`mb-4 rounded-xl border ${T.border} ${T.bgCard} overflow-hidden`}>
+            <div className="px-3 py-2 border-b border-white/[0.04]">
+              <span className={`text-[9px] font-bold tracking-wider uppercase ${T.textMuted}`}>Activity</span>
+            </div>
+            <div className="max-h-24 overflow-y-auto divide-y divide-white/[0.04]">{activityFeed.slice(0,6).map(a => {
+              const isMe = a.userId === currentUser.id;
+              const ts = a.ts ? new Date(a.ts) : null;
+              const timeAgo = ts ? (Math.floor((Date.now()-ts.getTime())/60000)<60 ? Math.floor((Date.now()-ts.getTime())/60000)+'m' : Math.floor((Date.now()-ts.getTime())/3600000)+'h') : '';
+              return (
+                <div key={a.id} className="px-3 py-1.5 flex items-center justify-between">
+                  <div className="flex-1 min-w-0 truncate"><span className={`text-[10px] ${isMe?'text-blue-400':'text-gray-500'} font-medium`}>{isMe?'You':a.username}</span><span className={`text-[10px] ${T.textDim} ml-1`}>{a.text}</span>{a.bonus==='jackpot'&&<span className="ml-1 text-[9px] text-amber-300 font-bold">JACKPOT</span>}</div>
+                  <span className={`text-[8px] ${T.textFaint} shrink-0 ml-2`}>{timeAgo}</span>
+                </div>
+              );
+            })}</div>
+          </div>
+        )}
+
+        {/* Tools */}
+        <div className="flex items-center justify-center gap-1 flex-wrap mb-4">
+          <button onClick={loadHeatMap} className={`text-[9px] font-medium tracking-wider uppercase px-2.5 py-1 rounded-md transition-all ${T.textDim} hover:text-purple-400`}>📊 Map</button>
+          <button onClick={loadInsights} className={`text-[9px] font-medium tracking-wider uppercase px-2.5 py-1 rounded-md transition-all ${T.textDim} hover:text-blue-400`}>📈 Insights</button>
+          <button onClick={()=>{setCustomBoardHabits(myBoardIds||habits.map(h=>h.id));setShowCustomBoard(true);}} className={`text-[9px] font-medium tracking-wider uppercase px-2.5 py-1 rounded-md transition-all ${T.textDim} hover:text-indigo-400`}>🎯 Board</button>
+          {habits.length>0&&<button onClick={()=>setEditMode(!editMode)} className={'text-[9px] font-medium tracking-wider uppercase px-2.5 py-1 rounded-md transition-all '+(editMode?'bg-blue-500/20 text-blue-400':T.textDim+' hover:text-gray-400')}>{editMode?'Done':'✏️ Edit'}</button>}
+          <button onClick={()=>{setHistoryDate(getYesterday());loadHistoryDate(getYesterday());setShowHistory(true);}} className={`text-[9px] font-medium tracking-wider uppercase px-2.5 py-1 rounded-md transition-all ${T.textDim} hover:text-gray-400`}>📅 History</button>
+          {lastWeekData&&<button onClick={()=>setShowWeeklyRecap(true)} className={`text-[9px] font-medium tracking-wider uppercase px-2.5 py-1 rounded-md transition-all ${T.textDim} hover:text-purple-400`}>📊 Recap</button>}
+          <button onClick={toggleTheme} className={`text-[9px] font-medium tracking-wider uppercase px-2.5 py-1 rounded-md transition-all ${T.textDim} hover:text-amber-400`}>{darkMode?'☀️ Light':'🌙 Dark'}</button>
         </div>
       </div>
 
