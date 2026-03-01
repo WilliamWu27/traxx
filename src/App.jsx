@@ -96,6 +96,7 @@ export default function TraxApp() {
   const [showProfile, setShowProfile] = useState(false);
   const [showStakes, setShowStakes] = useState(false);
   const [showSwitchRoom, setShowSwitchRoom] = useState(false);
+  const [showRoomSettings, setShowRoomSettings] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
   const [showEditHabit, setShowEditHabit] = useState(null);
   const [copied, setCopied] = useState(false);
@@ -628,6 +629,40 @@ export default function TraxApp() {
   };
   const copyCode = () => { navigator.clipboard.writeText(currentRoom.code); setCopied(true); setTimeout(()=>setCopied(false),2000); };
 
+  // ─── ROOM CREATOR PERMISSIONS ───
+  const isRoomCreator = currentRoom?.createdBy === currentUser?.id;
+  const kickMember = async (uid) => {
+    if (!isRoomCreator || uid === currentUser.id) return;
+    const m = roomMembers.find(x=>x.id===uid);
+    if (!confirm(`Remove ${m?.username||'this member'} from the room?`)) return;
+    try {
+      await updateDoc(doc(db, 'users', uid), { rooms: arrayRemove(currentRoom.id) });
+      const userSnap = await getDoc(doc(db, 'users', uid));
+      if (userSnap.exists() && userSnap.data().activeRoom === currentRoom.id) {
+        await updateDoc(doc(db, 'users', uid), { activeRoom: null, roomId: null });
+      }
+    } catch { setError('Failed to remove member'); }
+  };
+  const clearAllHabits = async () => {
+    if (!isRoomCreator) return;
+    if (!confirm('Delete ALL habits in this room? This cannot be undone.')) return;
+    try {
+      const snap = await getDocs(query(collection(db, 'habits'), where('roomId', '==', currentRoom.id)));
+      for (const d of snap.docs) await deleteDoc(doc(db, 'habits', d.id));
+      setSuccessMsg('All habits cleared'); setTimeout(()=>setSuccessMsg(''),2000);
+    } catch { setError('Failed to clear habits'); }
+  };
+  const transferOwnership = async (uid) => {
+    if (!isRoomCreator || uid === currentUser.id) return;
+    const m = roomMembers.find(x=>x.id===uid);
+    if (!confirm(`Transfer room ownership to ${m?.username||'this member'}? You will lose creator permissions.`)) return;
+    try {
+      await updateDoc(doc(db, 'rooms', currentRoom.id), { createdBy: uid });
+      setCurrentRoom(prev => ({...prev, createdBy: uid}));
+      setSuccessMsg('Ownership transferred'); setTimeout(()=>setSuccessMsg(''),2000);
+    } catch { setError('Failed to transfer'); }
+  };
+
   // ─── STAKES ───
   const saveStake = async () => {
     if (!newStake.description.trim()) return;
@@ -636,7 +671,7 @@ export default function TraxApp() {
       setShowStakes(false);
     } catch (err) { setError('Failed to save stakes'); }
   };
-  const clearStake = async () => { if (!confirm('Remove stake?')) return; try { await deleteDoc(doc(db, 'stakes', currentRoom.id)); } catch {} };
+  const clearStake = async () => { if (!isRoomCreator && roomStakes?.createdBy !== currentUser?.id) return; if (!confirm('Remove stake?')) return; try { await deleteDoc(doc(db, 'stakes', currentRoom.id)); } catch {} };
 
   // ─── HABITS (CREATE, EDIT, DELETE) ───
   const addHabit = async () => {
@@ -785,7 +820,7 @@ export default function TraxApp() {
       return cr;
     }
     allCatNames.forEach(cat => {
-      let mx=-1, w=null;
+      let mx=0, w=null;
       roomMembers.forEach(m=>{ const p=getCatPts(m.id,cat); if(p>mx){mx=p;w=m;}else if(p===mx&&p>0)w=null; });
       if(w&&w.id===uid) cr[cat]=true;
     });
@@ -797,7 +832,7 @@ export default function TraxApp() {
     let t=0; const ws=getWeekStart(), td=getToday();
     const dates=[...new Set(allCompletions.filter(c=>c.date>=ws&&c.date<=td).map(c=>c.date))];
     dates.forEach(date=>{ allCatNames.forEach(cat=>{
-      let mx=-1, w=null;
+      let mx=0, w=null;
       roomMembers.forEach(m=>{ const p=allCompletions.filter(c=>c.userId===m.id&&c.date===date).reduce((s,c)=>{const h=habits.find(x=>x.id===c.habitId);if(h&&h.category===cat)return s+(h.points*(c.count||1));return s;},0); if(p>mx){mx=p;w=m;}else if(p===mx&&p>0)w=null; });
       if(w&&w.id===uid) t++;
     }); });
@@ -1060,6 +1095,7 @@ export default function TraxApp() {
               <span className={`text-[8px] ${T.textDim}`}>v9</span>
               <div className="flex gap-1"><div className="w-1.5 h-1.5 rounded-full bg-blue-500"/><div className="w-1.5 h-1.5 rounded-full bg-orange-500"/><div className="w-1.5 h-1.5 rounded-full bg-emerald-500"/></div>
               <button onClick={()=>setShowSwitchRoom(true)} className={`ml-2 flex items-center gap-1 px-2 py-1 ${T.bgCard} border ${T.border} rounded-lg text-[10px] ${T.textMuted} hover:${T.text} transition-all`}><span className="font-mono tracking-wider">{currentRoom?.code}</span>{userRooms.length>1&&<ArrowLeftRight size={10}/>}</button>
+              {isRoomCreator&&<button onClick={()=>setShowRoomSettings(true)} className={`p-1.5 ${T.textDim} hover:text-amber-400 transition-colors`} title="Room Settings"><Crown size={13}/></button>}
             </div>
             <div className="flex items-center gap-1.5">
               <button onClick={()=>setShowLeaderboard(true)} className="flex items-center gap-1 px-2.5 py-1.5 bg-gradient-to-r from-amber-500/20 to-orange-500/20 border border-amber-500/20 text-amber-400 rounded-lg hover:border-amber-500/40 transition-all text-xs font-semibold"><Trophy size={12}/></button>
@@ -1386,7 +1422,7 @@ export default function TraxApp() {
               <p className="text-white font-medium">{roomStakes.description}</p>
               <p className="text-[11px] text-gray-600 mt-2">Set by {roomMembers.find(m=>m.id===roomStakes.createdBy)?.username||'unknown'}</p>
             </div>
-            {roomStakes.createdBy===currentUser.id&&<button onClick={clearStake} className="w-full px-4 py-2.5 border border-red-500/20 text-red-400 rounded-xl hover:bg-red-500/10 text-sm transition-all">Remove Stake</button>}
+            {(isRoomCreator||roomStakes.createdBy===currentUser.id)&&<button onClick={clearStake} className="w-full px-4 py-2.5 border border-red-500/20 text-red-400 rounded-xl hover:bg-red-500/10 text-sm transition-all">Remove Stake</button>}
           </div>
         ) : (
           <div>
@@ -1697,6 +1733,60 @@ export default function TraxApp() {
         {successMsg&&<p className="text-emerald-400 text-xs text-center mb-2">{successMsg}</p>}
         <button onClick={()=>proposeCustomBoard(customBoardHabits)} disabled={customBoardHabits.length===0} className="w-full px-4 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-xl text-sm font-bold shadow-lg shadow-indigo-500/20 active:scale-[0.98] disabled:opacity-40">{roomMembers.filter(m=>m.id!==currentUser?.id).length>0?'Submit for Approval':'Apply Board'}</button>
         {roomMembers.filter(m=>m.id!==currentUser?.id).length>0&&<p className={`text-[10px] ${T.textDim} text-center mt-2`}>Needs majority approval from room members</p>}
+      </Modal>
+
+      {/* Room Settings (Creator only) */}
+      <Modal show={showRoomSettings} onClose={()=>setShowRoomSettings(false)} wide dark={darkMode}>
+        <ModalHeader title="Room Settings" onClose={()=>setShowRoomSettings(false)} icon={<Crown size={16} className="text-amber-400"/>}/>
+        <div className={`text-[10px] ${T.textDim} mb-4 flex items-center gap-2`}>
+          <span className="font-mono tracking-wider bg-white/[0.06] px-2 py-1 rounded">{currentRoom?.code}</span>
+          <span>·</span>
+          <span>You are the room creator</span>
+        </div>
+
+        {/* Members */}
+        <div className="mb-5">
+          <h3 className={`text-xs font-bold ${T.textMuted} tracking-wider uppercase mb-3`}>Members ({roomMembers.length})</h3>
+          <div className="space-y-2">
+            {roomMembers.map(m => {
+              const isMe = m.id === currentUser.id;
+              const isCreator = m.id === currentRoom?.createdBy;
+              return (
+                <div key={m.id} className={`flex items-center justify-between p-3 rounded-xl border ${darkMode?'border-white/[0.06] bg-white/[0.02]':'border-gray-200 bg-gray-50'}`}>
+                  <div className="flex items-center gap-3">
+                    <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-black ${isCreator?'bg-amber-500/20 text-amber-400':'bg-blue-500/20 text-blue-400'}`}>{m.username?.charAt(0)?.toUpperCase()}</div>
+                    <div>
+                      <div className="flex items-center gap-1.5">
+                        <span className={`text-sm font-medium ${darkMode?'text-gray-200':'text-gray-800'}`}>{m.username}</span>
+                        {isCreator&&<span className="text-[9px] bg-amber-500/20 text-amber-400 px-1.5 py-0.5 rounded-full font-bold">Creator</span>}
+                        {isMe&&<span className={`text-[9px] ${T.textDim}`}>(you)</span>}
+                      </div>
+                      <div className={`text-[10px] ${T.textDim}`}>{m.email}</div>
+                    </div>
+                  </div>
+                  {!isMe && (
+                    <div className="flex items-center gap-1.5">
+                      <button onClick={()=>transferOwnership(m.id)} className={`text-[9px] px-2 py-1 rounded-lg font-medium transition-all ${darkMode?'text-gray-600 hover:text-amber-400 hover:bg-amber-500/10':'text-gray-400 hover:text-amber-600 hover:bg-amber-50'}`}>Transfer</button>
+                      <button onClick={()=>kickMember(m.id)} className={`text-[9px] px-2 py-1 rounded-lg font-medium transition-all ${darkMode?'text-gray-600 hover:text-red-400 hover:bg-red-500/10':'text-gray-400 hover:text-red-600 hover:bg-red-50'}`}>Remove</button>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Room Actions */}
+        <div>
+          <h3 className={`text-xs font-bold ${T.textMuted} tracking-wider uppercase mb-3`}>Room Actions</h3>
+          <div className="space-y-2">
+            {roomStakes&&<button onClick={clearStake} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border transition-all text-left ${darkMode?'border-white/[0.06] bg-white/[0.02] hover:bg-white/[0.04] text-gray-300':'border-gray-200 bg-gray-50 hover:bg-gray-100 text-gray-700'}`}><Zap size={15} className="text-red-400 shrink-0"/><div><span className="text-sm">Remove Stake</span><div className={`text-[10px] ${T.textDim}`}>Clear the current room stake</div></div></button>}
+            <button onClick={clearAllHabits} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border transition-all text-left ${darkMode?'border-white/[0.06] bg-white/[0.02] hover:bg-red-500/5 text-gray-300':'border-gray-200 bg-gray-50 hover:bg-red-50 text-gray-700'}`}><X size={15} className="text-red-400 shrink-0"/><div><span className="text-sm">Clear All Habits</span><div className={`text-[10px] ${T.textDim}`}>Delete every habit in this room</div></div></button>
+          </div>
+        </div>
+
+        {error&&<p className="text-red-400 text-xs text-center mt-3">{error}</p>}
+        {successMsg&&<p className="text-emerald-400 text-xs text-center mt-3">{successMsg}</p>}
       </Modal>
 
     </div>
