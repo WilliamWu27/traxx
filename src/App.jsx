@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Clock, Plus, X, LogOut, Copy, Check, UserPlus, HelpCircle, Trophy, User, Flame, Zap, Star, TrendingUp, ArrowLeftRight, Edit3, Calendar, ChevronLeft, ChevronRight, Crown, Target, ArrowUp, ArrowDown, Minus as MinusIcon, GripVertical, BarChart3, Sun, Moon, ChevronDown } from 'lucide-react';
-import { auth, db, googleProvider } from './firebase';
+import { auth, db } from './firebase';
 import {
-  createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, sendPasswordResetEmail, signInWithPopup
+  createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, sendPasswordResetEmail, signInWithPopup, GoogleAuthProvider
 } from 'firebase/auth';
 import {
   collection, doc, setDoc, getDoc, onSnapshot, deleteDoc, updateDoc, query, where, getDocs, arrayUnion, arrayRemove, orderBy, limit
@@ -159,10 +159,10 @@ export default function TraxApp() {
 
   // ─── HELPERS ───
   const genCode = () => { const c = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; let r = ''; for (let i=0;i<6;i++) r+=c[Math.floor(Math.random()*c.length)]; return r; };
-  const getWeekStart = () => { const n = new Date(), d = n.getDay(), diff = n.getDate()-d+(d===0?-6:1); const m = new Date(n); m.setDate(diff); m.setHours(0,0,0,0); return formatDateStr(m); };
+  const getWeekStart = () => { const n = new Date(), d = n.getDay(); const m = new Date(n); m.setDate(m.getDate()-d); m.setHours(0,0,0,0); return formatDateStr(m); };
   const getWeekEnd = () => { const ws = getWeekStart(); const d = new Date(ws+'T12:00:00'); d.setDate(d.getDate()+6); return formatDateStr(d); };
   const formatDate = (ds) => { const d = new Date(ds+'T12:00:00'); return d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }); };
-  const getDaysUntilSunday = () => { const d = new Date(); const day = d.getDay(); return day === 0 ? 0 : 7 - day; };
+  const getDaysUntilReset = () => { const d = new Date(); const day = d.getDay(); return 6 - day; }; // Saturday = 0 days left, Sunday = 6
   const getLastWeekStart = () => { const d = new Date(getWeekStart()+'T12:00:00'); d.setDate(d.getDate()-7); return formatDateStr(d); };
   const getLastWeekEnd = () => { const d = new Date(getWeekStart()+'T12:00:00'); d.setDate(d.getDate()-1); return formatDateStr(d); };
   const toggleTheme = () => { const next = !darkMode; setDarkMode(next); try { localStorage.setItem('trax-theme', next ? 'dark' : 'light'); } catch {} };
@@ -385,7 +385,7 @@ export default function TraxApp() {
     })).sort((a,b)=>b.pts-a.pts);
     if (scores.length > 0 && scores[0].pts > 0) {
       const isTied = scores.length > 1 && scores[0].pts === scores[1].pts;
-      setWeeklyWinner(isTied ? null : { ...scores[0], daysLeft: getDaysUntilSunday() });
+      setWeeklyWinner(isTied ? null : { ...scores[0], daysLeft: getDaysUntilReset() });
     } else setWeeklyWinner(null);
   }, [roomMembers, allCompletions, habits, currentRoom]);
 
@@ -574,7 +574,7 @@ export default function TraxApp() {
   const handleGoogleSignIn = async () => {
     setError(''); setLoading(true);
     try {
-      const cred = await signInWithPopup(auth, googleProvider);
+      const cred = await signInWithPopup(auth, new GoogleAuthProvider());
       // Check if user doc exists
       const userDoc = await getDoc(doc(db, 'users', cred.user.uid));
       if (!userDoc.exists()) {
@@ -1086,7 +1086,7 @@ export default function TraxApp() {
           {weeklyWinner && (
             <div className="mb-3 p-3 bg-gradient-to-r from-amber-500/10 to-yellow-500/10 border border-amber-500/15 rounded-xl flex items-center justify-between">
               <div className="flex items-center gap-2"><Crown size={14} className="text-amber-400"/><span className="text-sm text-amber-300 font-medium">{weeklyWinner.member.username}</span>{getRoomRole(weeklyWinner.member.id)&&<span className={`text-[9px] font-bold ${getRoomRole(weeklyWinner.member.id).color}`}>{getRoomRole(weeklyWinner.member.id).icon} {getRoomRole(weeklyWinner.member.id).role}</span>}<span className={`text-xs ${T.textDim}`}>leads this week</span></div>
-              <span className={`text-[10px] ${T.textDim}`}>{weeklyWinner.daysLeft}d left</span>
+              <span className={`text-[10px] ${T.textDim}`}>{weeklyWinner.daysLeft > 0 ? weeklyWinner.daysLeft+'d left' : timeDisplay+' left'}</span>
             </div>
           )}
 
@@ -1182,10 +1182,9 @@ export default function TraxApp() {
         {/* ─── WEEKLY DRAMA COUNTDOWN (Sunday) ─── */}
         {weeklyWinner && weeklyWinner.daysLeft <= 1 && roomMembers.length > 1 && (
           <div className="mb-4 p-4 bg-gradient-to-r from-amber-500/10 via-red-500/10 to-purple-500/10 border border-amber-500/20 rounded-2xl text-center">
-            <div className="text-2xl mb-1">{weeklyWinner.daysLeft === 0 ? '🏆' : '⏰'}</div>
-            <div className="text-sm font-bold text-amber-300">{weeklyWinner.daysLeft === 0 ? 'Winner Takes the Week' : 'Final Day — Tomorrow Decides'}</div>
+            <div className="text-2xl mb-1">{weeklyWinner.daysLeft === 0 ? '⏰' : '⚡'}</div>
+            <div className="text-sm font-bold text-amber-300">{weeklyWinner.daysLeft === 0 ? 'Final Hours — '+timeDisplay+' to go' : 'Final Day — Last Chance'}</div>
             <div className={`text-xs ${T.textDim} mt-1`}>{weeklyWinner.member.username} leads with {weeklyWinner.pts} pts</div>
-            <div className={`text-[10px] ${T.textDim} mt-0.5`}>{timeDisplay} until reset</div>
           </div>
         )}
 
