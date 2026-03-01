@@ -99,6 +99,8 @@ export default function TraxApp() {
   const [showRoomSettings, setShowRoomSettings] = useState(false);
   const [roomKicked, setRoomKicked] = useState([]);
   const [roomCreatedBy, setRoomCreatedBy] = useState(null);
+  const [onboardingStep, setOnboardingStep] = useState(0);
+  const [showOnboardingTour, setShowOnboardingTour] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
   const [showEditHabit, setShowEditHabit] = useState(null);
   const [copied, setCopied] = useState(false);
@@ -405,7 +407,7 @@ export default function TraxApp() {
       const isTied = scores.length > 1 && scores[0].pts === scores[1].pts;
       setWeeklyWinner(isTied ? null : { ...scores[0], daysLeft: getDaysUntilReset() });
     } else setWeeklyWinner(null);
-  }, [roomMembers, allCompletions, habits, currentRoom]);
+  }, [roomMembers, roomKicked, allCompletions, habits, currentRoom]);
 
   // ─── RIVAL STATUS (what your competition is doing today) ───
   useEffect(() => {
@@ -419,7 +421,7 @@ export default function TraxApp() {
       return { member: m, pts, habitCount, weekPts };
     }).sort((a,b)=>b.pts-a.pts);
     setRivalStatus(rivals);
-  }, [currentUser, currentRoom, roomMembers, completions, allCompletions, habits]);
+  }, [currentUser, currentRoom, roomMembers, roomKicked, completions, allCompletions, habits]);
 
   // ─── HEAT MAP (load on demand) ───
   const loadHeatMap = async () => {
@@ -1086,14 +1088,80 @@ export default function TraxApp() {
 
   // ═══ ROOM SELECT ═══
   if (showRoomModal) return (
-    <div className="min-h-screen bg-[#0a0a0f] flex items-center justify-center p-4 relative overflow-hidden">
-      <div className="absolute top-20 -left-32 w-64 h-64 bg-blue-600/8 rounded-full blur-[100px]"></div>
-      <div className="absolute bottom-20 -right-32 w-64 h-64 bg-emerald-600/8 rounded-full blur-[100px]"></div>
-      <div className="w-full max-w-sm space-y-4 relative z-10">
-        <div className="text-center mb-6"><h1 className="text-2xl font-bold tracking-wider text-white mb-2">Welcome, <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-emerald-400">{currentUser.username}</span></h1><p className="text-gray-600 text-xs tracking-wider uppercase">Create or join a room</p></div>
-        <div className="bg-white/[0.03] backdrop-blur-xl rounded-2xl border border-white/[0.06] p-6"><h2 className="text-sm font-semibold text-gray-300 mb-4">Create Room</h2><button onClick={createRoom} disabled={loading} className={btnPrimary+' bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-lg shadow-blue-500/20'}>{loading?'Creating...':'Create New Room'}</button></div>
-        <div className="bg-white/[0.03] backdrop-blur-xl rounded-2xl border border-white/[0.06] p-6"><h2 className="text-sm font-semibold text-gray-300 mb-4">Join Room</h2><div className="flex gap-2"><input type="text" placeholder="CODE" value={roomCode} onChange={e=>setRoomCode(e.target.value.toUpperCase())} className="flex-1 px-4 py-3.5 bg-white/[0.04] border border-white/[0.08] rounded-xl focus:outline-none focus:border-orange-500/50 text-white placeholder-gray-600 text-sm font-mono tracking-[0.3em] text-center" maxLength={6} /><button onClick={joinRoom} disabled={loading} className="px-6 py-3.5 rounded-xl text-sm font-bold bg-gradient-to-r from-orange-500 to-red-500 text-white shadow-lg shadow-orange-500/20 active:scale-[0.98] disabled:opacity-50">{loading?'...':'Join'}</button></div>{error&&<p className="text-red-400 text-xs mt-3 text-center">{error}</p>}</div>
-        <button onClick={()=>signOut(auth)} className="w-full text-gray-700 py-2 hover:text-gray-400 text-xs transition-colors">Sign out</button>
+    <div className="min-h-screen bg-[#07070c] flex items-center justify-center p-4 relative overflow-hidden">
+      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[600px] h-[600px] bg-gradient-to-b from-blue-600/8 via-purple-600/5 to-transparent rounded-full blur-[120px] -translate-y-1/3"/>
+      <div className="absolute bottom-0 right-0 w-72 h-72 bg-emerald-500/5 rounded-full blur-[100px] translate-y-1/3"/>
+      <div className="w-full max-w-sm relative z-10">
+
+        {/* Step 0: Welcome */}
+        {onboardingStep === 0 && (
+          <div className="text-center space-y-6">
+            <div>
+              <div className="text-5xl mb-4">👋</div>
+              <h1 className="text-2xl font-bold text-white mb-2">Welcome, <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-emerald-400">{currentUser.username}</span></h1>
+              <p className="text-gray-500 text-sm leading-relaxed">TRAX turns your daily habits into a competition.<br/>Let's get you set up in 30 seconds.</p>
+            </div>
+            <div className="space-y-3">
+              {[
+                { icon: '🏠', title: 'Create a room', desc: 'Start fresh and invite friends', action: () => setOnboardingStep(1) },
+                { icon: '🔗', title: 'Join a room', desc: 'Got a code from a friend?', action: () => setOnboardingStep(2) },
+              ].map((opt, i) => (
+                <button key={i} onClick={opt.action} className="w-full flex items-center gap-4 p-4 bg-white/[0.03] border border-white/[0.06] rounded-2xl text-left hover:bg-white/[0.06] transition-all active:scale-[0.98]">
+                  <span className="text-2xl">{opt.icon}</span>
+                  <div><p className="text-white font-semibold text-sm">{opt.title}</p><p className="text-gray-500 text-[11px]">{opt.desc}</p></div>
+                  <ChevronRight size={16} className="text-gray-600 ml-auto"/>
+                </button>
+              ))}
+            </div>
+            <button onClick={()=>signOut(auth)} className="text-gray-700 text-xs hover:text-gray-400 transition-colors">Sign out</button>
+          </div>
+        )}
+
+        {/* Step 1: Create Room */}
+        {onboardingStep === 1 && (
+          <div className="space-y-6">
+            <div className="text-center">
+              <div className="text-4xl mb-3">🏠</div>
+              <h2 className="text-xl font-bold text-white mb-1">Create your room</h2>
+              <p className="text-gray-500 text-sm">A room is where you and your friends track habits and compete. You'll get a code to share.</p>
+            </div>
+            <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl p-5 space-y-4">
+              <div className="flex items-center gap-3 text-gray-400 text-xs">
+                <div className="w-6 h-6 rounded-full bg-blue-500/20 flex items-center justify-center text-blue-400 text-[10px] font-bold">1</div>
+                <span>We'll create a room with a unique invite code</span>
+              </div>
+              <div className="flex items-center gap-3 text-gray-400 text-xs">
+                <div className="w-6 h-6 rounded-full bg-blue-500/20 flex items-center justify-center text-blue-400 text-[10px] font-bold">2</div>
+                <span>Default habits are loaded automatically</span>
+              </div>
+              <div className="flex items-center gap-3 text-gray-400 text-xs">
+                <div className="w-6 h-6 rounded-full bg-blue-500/20 flex items-center justify-center text-blue-400 text-[10px] font-bold">3</div>
+                <span>Share the code with friends to start competing</span>
+              </div>
+            </div>
+            <button onClick={async()=>{await createRoom(); setShowInviteModal(false); setOnboardingStep(0); setShowOnboardingTour(true);}} disabled={loading} className={btnPrimary+' bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-lg shadow-blue-500/20 rounded-2xl'}>{loading?'Creating...':'Create Room'}</button>
+            <button onClick={()=>setOnboardingStep(0)} className="w-full text-gray-600 text-xs hover:text-gray-400 transition-colors text-center">← Back</button>
+            {error&&<p className="text-red-400 text-xs text-center">{error}</p>}
+          </div>
+        )}
+
+        {/* Step 2: Join Room */}
+        {onboardingStep === 2 && (
+          <div className="space-y-6">
+            <div className="text-center">
+              <div className="text-4xl mb-3">🔗</div>
+              <h2 className="text-xl font-bold text-white mb-1">Join a room</h2>
+              <p className="text-gray-500 text-sm">Enter the 6-letter code your friend shared with you.</p>
+            </div>
+            <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl p-5">
+              <input type="text" placeholder="ABCDEF" value={roomCode} onChange={e=>setRoomCode(e.target.value.toUpperCase())} className="w-full px-4 py-4 bg-white/[0.04] border border-white/[0.08] rounded-xl focus:outline-none focus:border-blue-500/50 text-white placeholder-gray-600 text-lg font-mono tracking-[0.4em] text-center" maxLength={6} autoFocus/>
+            </div>
+            <button onClick={async()=>{await joinRoom(); setOnboardingStep(0); setShowOnboardingTour(true);}} disabled={loading||roomCode.length<4} className={btnPrimary+' bg-gradient-to-r from-orange-500 to-red-500 text-white shadow-lg shadow-orange-500/20 rounded-2xl disabled:opacity-40'}>{loading?'Joining...':'Join Room'}</button>
+            <button onClick={()=>setOnboardingStep(0)} className="w-full text-gray-600 text-xs hover:text-gray-400 transition-colors text-center">← Back</button>
+            {error&&<p className="text-red-400 text-xs text-center">{error}</p>}
+          </div>
+        )}
+
       </div>
     </div>
   );
@@ -1101,9 +1169,56 @@ export default function TraxApp() {
   // ═══════════════════════════════════════
   // MAIN DASHBOARD
   // ═══════════════════════════════════════
+  const tourSteps = [
+    { icon: '🎯', title: 'Track your habits', desc: 'Tap the + button on any habit to log it. Each completion earns you points. Try it now!' },
+    { icon: '🔥', title: 'Build your streak', desc: 'Complete at least one habit every day. The longer your streak, the higher your point multiplier — up to 2× at 60 days.' },
+    { icon: '💎', title: 'Win crystals', desc: 'Score the most points in any category (Mind, Body, Spirit) to earn a glowing crystal for the day.' },
+    { icon: '🏆', title: 'Dominate the leaderboard', desc: 'Your weekly points determine the leaderboard rank. Set stakes to make losing hurt.' },
+    { icon: '👥', title: 'Invite your friends', desc: 'Share your room code and start competing. The more rivals, the better.' },
+  ];
+
   return (
     <div className={`min-h-screen ${T.bg} ${T.text} transition-colors duration-300`}>
       <ConfettiCanvas trigger={confettiTrigger} />
+
+      {/* Onboarding Tour Overlay */}
+      {showOnboardingTour && (
+        <div className="fixed inset-0 z-[200] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="w-full max-w-sm">
+            <div className="bg-[#0d0d14] rounded-3xl border border-white/[0.08] p-6 shadow-2xl">
+              {/* Progress dots */}
+              <div className="flex justify-center gap-1.5 mb-5">
+                {tourSteps.map((_, i) => (
+                  <div key={i} className={`h-1 rounded-full transition-all ${i === onboardingStep ? 'w-6 bg-blue-500' : i < onboardingStep ? 'w-2 bg-blue-500/40' : 'w-2 bg-white/10'}`}/>
+                ))}
+              </div>
+
+              {/* Content */}
+              <div className="text-center mb-6">
+                <div className="text-4xl mb-3">{tourSteps[onboardingStep]?.icon}</div>
+                <h3 className="text-lg font-bold text-white mb-2">{tourSteps[onboardingStep]?.title}</h3>
+                <p className="text-gray-400 text-sm leading-relaxed">{tourSteps[onboardingStep]?.desc}</p>
+              </div>
+
+              {/* Actions */}
+              <div className="flex gap-3">
+                <button onClick={()=>{setShowOnboardingTour(false); setOnboardingStep(0);}} className="flex-1 py-3 rounded-xl text-sm font-medium text-gray-500 hover:text-gray-300 transition-colors">Skip</button>
+                <button onClick={()=>{
+                  if (onboardingStep < tourSteps.length - 1) {
+                    setOnboardingStep(onboardingStep + 1);
+                  } else {
+                    setShowOnboardingTour(false);
+                    setOnboardingStep(0);
+                    setShowInviteModal(true);
+                  }
+                }} className="flex-1 py-3 rounded-xl text-sm font-bold bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-lg shadow-blue-500/20 active:scale-[0.98]">
+                  {onboardingStep < tourSteps.length - 1 ? 'Next' : 'Start Tracking'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
       {/* Maxout screen flash */}
       {maxedHabit && <div className="fixed inset-0 z-[99] pointer-events-none animate-pulse" style={{background:'radial-gradient(circle at center, rgba(255,255,255,0.1) 0%, transparent 70%)'}}/>}
       {/* Mystery Bonus popup */}
@@ -1785,36 +1900,48 @@ export default function TraxApp() {
         <div className="mb-5">
           <h3 className={`text-xs font-bold ${T.textMuted} tracking-wider uppercase mb-3`}>Members ({activeMembers.length})</h3>
           <div className="space-y-2">
-            {roomMembers.map(m => {
+            {activeMembers.map(m => {
               const isMe = m.id === currentUser.id;
               const isCreator = m.id === (roomCreatedBy || currentRoom?.createdBy);
-              const isKicked = kickedIds.includes(m.id);
               return (
-                <div key={m.id} className={`flex items-center justify-between p-3 rounded-xl border ${isKicked?'opacity-50 ':''} ${darkMode?'border-white/[0.06] bg-white/[0.02]':'border-gray-200 bg-gray-50'}`}>
+                <div key={m.id} className={`flex items-center justify-between p-3 rounded-xl border ${darkMode?'border-white/[0.06] bg-white/[0.02]':'border-gray-200 bg-gray-50'}`}>
                   <div className="flex items-center gap-3">
-                    <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-black ${isCreator?'bg-amber-500/20 text-amber-400':isKicked?'bg-red-500/20 text-red-400':'bg-blue-500/20 text-blue-400'}`}>{m.username?.charAt(0)?.toUpperCase()}</div>
+                    <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-black ${isCreator?'bg-amber-500/20 text-amber-400':'bg-blue-500/20 text-blue-400'}`}>{m.username?.charAt(0)?.toUpperCase()}</div>
                     <div>
                       <div className="flex items-center gap-1.5">
                         <span className={`text-sm font-medium ${darkMode?'text-gray-200':'text-gray-800'}`}>{m.username}</span>
                         {isCreator&&<span className="text-[9px] bg-amber-500/20 text-amber-400 px-1.5 py-0.5 rounded-full font-bold">Creator</span>}
-                        {isKicked&&<span className="text-[9px] bg-red-500/20 text-red-400 px-1.5 py-0.5 rounded-full font-bold">Removed</span>}
                         {isMe&&<span className={`text-[9px] ${T.textDim}`}>(you)</span>}
                       </div>
                       <div className={`text-[10px] ${T.textDim}`}>{m.email}</div>
                     </div>
                   </div>
-                  {!isMe && !isKicked && (
+                  {!isMe && (
                     <div className="flex items-center gap-1.5">
                       <button onClick={()=>transferOwnership(m.id)} className={`text-[9px] px-2 py-1 rounded-lg font-medium transition-all ${darkMode?'text-gray-600 hover:text-amber-400 hover:bg-amber-500/10':'text-gray-400 hover:text-amber-600 hover:bg-amber-50'}`}>Transfer</button>
                       <button onClick={()=>kickMember(m.id)} className={`text-[9px] px-2 py-1 rounded-lg font-medium transition-all ${darkMode?'text-gray-600 hover:text-red-400 hover:bg-red-500/10':'text-gray-400 hover:text-red-600 hover:bg-red-50'}`}>Remove</button>
                     </div>
                   )}
-                  {isKicked && (
-                    <button onClick={async()=>{try{await updateDoc(doc(db,'rooms',currentRoom.id),{kicked:arrayRemove(m.id)});setRoomKicked(prev=>prev.filter(x=>x!==m.id));}catch{}}} className={`text-[9px] px-2 py-1 rounded-lg font-medium transition-all ${darkMode?'text-gray-600 hover:text-emerald-400 hover:bg-emerald-500/10':'text-gray-400 hover:text-emerald-600 hover:bg-emerald-50'}`}>Restore</button>
-                  )}
                 </div>
               );
             })}
+          </div>
+          {roomMembers.filter(m=>kickedIds.includes(m.id)).length > 0 && (
+            <div className="mt-4">
+              <h3 className={`text-xs font-bold ${T.textDim} tracking-wider uppercase mb-2`}>Removed</h3>
+              <div className="space-y-2">
+                {roomMembers.filter(m=>kickedIds.includes(m.id)).map(m => (
+                  <div key={m.id} className={`flex items-center justify-between p-3 rounded-xl border opacity-50 ${darkMode?'border-white/[0.06] bg-white/[0.02]':'border-gray-200 bg-gray-50'}`}>
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-black bg-red-500/20 text-red-400">{m.username?.charAt(0)?.toUpperCase()}</div>
+                      <span className={`text-sm font-medium ${darkMode?'text-gray-400':'text-gray-500'}`}>{m.username}</span>
+                    </div>
+                    <button onClick={async()=>{try{await updateDoc(doc(db,'rooms',currentRoom.id),{kicked:arrayRemove(m.id)});setRoomKicked(prev=>prev.filter(x=>x!==m.id));}catch{}}} className={`text-[9px] px-2 py-1 rounded-lg font-medium transition-all ${darkMode?'text-gray-600 hover:text-emerald-400 hover:bg-emerald-500/10':'text-gray-400 hover:text-emerald-600 hover:bg-emerald-50'}`}>Restore</button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
           </div>
         </div>
 
