@@ -278,11 +278,17 @@ export default function TraxApp() {
     const u6b = onSnapshot(doc(db, 'rooms', currentRoom.id), s => {
       if (s.exists()) {
         const data = s.data();
-        setCurrentRoom(prev => ({...prev, ...data, id: s.id}));
-        // If current user is kicked, leave the room
-        if ((data.kicked||[]).includes(currentUser.id)) {
-          leaveRoom(currentRoom.id);
-        }
+        setCurrentRoom(prev => {
+          const newKicked = JSON.stringify(data.kicked||[]);
+          const oldKicked = JSON.stringify(prev?.kicked||[]);
+          const newCreatedBy = data.createdBy;
+          const oldCreatedBy = prev?.createdBy;
+          // Only update if something relevant changed
+          if (newKicked !== oldKicked || newCreatedBy !== oldCreatedBy) {
+            return {...prev, kicked: data.kicked||[], createdBy: data.createdBy, id: s.id};
+          }
+          return prev;
+        });
       }
     });
     // Habit order listener
@@ -399,7 +405,7 @@ export default function TraxApp() {
       const isTied = scores.length > 1 && scores[0].pts === scores[1].pts;
       setWeeklyWinner(isTied ? null : { ...scores[0], daysLeft: getDaysUntilReset() });
     } else setWeeklyWinner(null);
-  }, [activeMembers, allCompletions, habits, currentRoom]);
+  }, [roomMembers, allCompletions, habits, currentRoom]);
 
   // ─── RIVAL STATUS (what your competition is doing today) ───
   useEffect(() => {
@@ -413,7 +419,7 @@ export default function TraxApp() {
       return { member: m, pts, habitCount, weekPts };
     }).sort((a,b)=>b.pts-a.pts);
     setRivalStatus(rivals);
-  }, [currentUser, currentRoom, activeMembers, completions, allCompletions, habits]);
+  }, [currentUser, currentRoom, roomMembers, completions, allCompletions, habits]);
 
   // ─── HEAT MAP (load on demand) ───
   const loadHeatMap = async () => {
@@ -1057,6 +1063,26 @@ export default function TraxApp() {
       </div>
     );
   }
+
+  // ═══ KICKED CHECK ═══
+  const isKicked = currentRoom && (currentRoom.kicked||[]).includes(currentUser?.id);
+
+  if (isKicked) return (
+    <div className="min-h-screen bg-[#07070c] flex items-center justify-center p-4">
+      <div className="text-center max-w-sm">
+        <div className="text-4xl mb-4">🚫</div>
+        <h2 className="text-lg font-bold text-white mb-2">You've been removed from this room</h2>
+        <p className="text-gray-500 text-sm mb-6">The room creator has removed you from <span className="font-mono text-gray-400">{currentRoom.code}</span>.</p>
+        <div className="space-y-3">
+          {userRooms.filter(r=>r!==currentRoom.id).length > 0 ? (
+            <button onClick={()=>switchRoom(userRooms.find(r=>r!==currentRoom.id))} className="w-full py-3 rounded-xl text-sm font-bold bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-lg shadow-blue-500/20 active:scale-[0.98]">Switch to Another Room</button>
+          ) : (
+            <button onClick={()=>{leaveRoom(currentRoom.id);}} className="w-full py-3 rounded-xl text-sm font-bold bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-lg shadow-blue-500/20 active:scale-[0.98]">Create or Join a Room</button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
 
   // ═══ ROOM SELECT ═══
   if (showRoomModal) return (
