@@ -97,6 +97,8 @@ export default function TraxApp() {
   const [showStakes, setShowStakes] = useState(false);
   const [showSwitchRoom, setShowSwitchRoom] = useState(false);
   const [showRoomSettings, setShowRoomSettings] = useState(false);
+  const [roomKicked, setRoomKicked] = useState([]);
+  const [roomCreatedBy, setRoomCreatedBy] = useState(null);
   const [showHistory, setShowHistory] = useState(false);
   const [showEditHabit, setShowEditHabit] = useState(null);
   const [copied, setCopied] = useState(false);
@@ -274,23 +276,6 @@ export default function TraxApp() {
       setRoomMembers(prev => { const ids = new Set(prev.map(m=>m.id)); const nw = s.docs.map(d=>({id:d.id,...d.data()})).filter(m=>!ids.has(m.id)); return [...prev,...nw]; });
     });
     const u6 = onSnapshot(doc(db, 'stakes', currentRoom.id), s => { if(s.exists()) setRoomStakes({id:s.id,...s.data()}); else setRoomStakes(null); });
-    // Listen to room doc for kicked list and metadata
-    const u6b = onSnapshot(doc(db, 'rooms', currentRoom.id), s => {
-      if (s.exists()) {
-        const data = s.data();
-        setCurrentRoom(prev => {
-          const newKicked = JSON.stringify(data.kicked||[]);
-          const oldKicked = JSON.stringify(prev?.kicked||[]);
-          const newCreatedBy = data.createdBy;
-          const oldCreatedBy = prev?.createdBy;
-          // Only update if something relevant changed
-          if (newKicked !== oldKicked || newCreatedBy !== oldCreatedBy) {
-            return {...prev, kicked: data.kicked||[], createdBy: data.createdBy, id: s.id};
-          }
-          return prev;
-        });
-      }
-    });
     // Habit order listener
     const u7 = onSnapshot(doc(db, 'habitOrder', currentUser.id+'_'+currentRoom.id), s => { if(s.exists()) setHabitOrder(s.data().order||[]); else setHabitOrder([]); });
     // Room categories listener
@@ -318,8 +303,23 @@ export default function TraxApp() {
         setBoardRequests(boards.filter(b=>b.status==='pending'&&b.userId!==currentUser.id&&!(b.approvals||[]).includes(currentUser.id)&&!(b.rejections||[]).includes(currentUser.id)));
       }, err => console.warn('Custom boards:', err));
     } catch(e) { console.warn('Board proposals listener failed:', e); }
-    return () => { cancelled = true; u1(); u2(); u4(); u5(); u6(); u6b(); u7(); u8(); u9(); u10(); u11(); weekUnsubs.forEach(u=>u()); };
+    return () => { cancelled = true; u1(); u2(); u4(); u5(); u6(); u7(); u8(); u9(); u10(); u11(); weekUnsubs.forEach(u=>u()); };
   }, [currentUser, currentRoom, dateKey]);
+
+  // ─── LOAD ROOM KICKED LIST ───
+  useEffect(() => {
+    if (!currentRoom) { setRoomKicked([]); setRoomCreatedBy(null); return; }
+    const load = async () => {
+      try {
+        const rd = await getDoc(doc(db, 'rooms', currentRoom.id));
+        if (rd.exists()) {
+          setRoomKicked(rd.data().kicked || []);
+          setRoomCreatedBy(rd.data().createdBy || null);
+        }
+      } catch {}
+    };
+    load();
+  }, [currentRoom?.id]);
 
   // ─── LAST WEEK DATA (for recap) ───
   useEffect(() => {
@@ -437,7 +437,7 @@ export default function TraxApp() {
   // ─── ROOM ROLES (computed from performance) ───
   const getRoomRole = (uid) => {
     if (!currentRoom) return null;
-    if (currentRoom.createdBy === uid) {
+    if ((roomCreatedBy || currentRoom.createdBy) === uid) {
       if (weeklyWinner?.member?.id === uid) return { role: 'Champion', icon: '👑', color: 'text-amber-400' };
       return { role: 'Creator', icon: '⚡', color: 'text-blue-400' };
     }
@@ -633,7 +633,7 @@ export default function TraxApp() {
     setLoading(true);
     try {
       const rd = await getDoc(doc(db, 'rooms', rid));
-      if (rd.exists()) { await updateDoc(doc(db, 'users', currentUser.id), { activeRoom: rid, roomId: rid }); setCurrentRoom({id:rd.id,...rd.data()}); setShowSwitchRoom(false); }
+      if (rd.exists()) { await updateDoc(doc(db, 'users', currentUser.id), { activeRoom: rid, roomId: rid }); setCurrentRoom({id:rd.id,...rd.data()}); setRoomKicked(rd.data().kicked||[]); setRoomCreatedBy(rd.data().createdBy||null); setShowSwitchRoom(false); }
     } catch { setError('Failed to switch'); } finally { setLoading(false); }
   };
   const leaveRoom = async (rid) => {
@@ -647,16 +647,16 @@ export default function TraxApp() {
   const copyCode = () => { navigator.clipboard.writeText(currentRoom.code); setCopied(true); setTimeout(()=>setCopied(false),2000); };
 
   // ─── ROOM CREATOR PERMISSIONS ───
-  const isRoomCreator = currentRoom?.createdBy === currentUser?.id;
-  const kickedIds = currentRoom?.kicked || [];
+  const isRoomCreator = (roomCreatedBy || currentRoom?.createdBy) === currentUser?.id;
+  const kickedIds = roomKicked;
   const activeMembers = roomMembers.filter(m => !kickedIds.includes(m.id));
   const kickMember = async (uid) => {
     if (!isRoomCreator || uid === currentUser.id) return;
     const m = activeMembers.find(x=>x.id===uid);
     if (!confirm(`Remove ${m?.username||'this member'} from the room?`)) return;
     try {
-      // Add to kicked list on the room doc (we own this doc as creator)
       await updateDoc(doc(db, 'rooms', currentRoom.id), { kicked: arrayUnion(uid) });
+      setRoomKicked(prev => [...prev, uid]);
       setSuccessMsg(`${m?.username||'Member'} removed`); setTimeout(()=>setSuccessMsg(''),2000);
     } catch (err) { console.error(err); setError('Failed to remove member'); }
   };
@@ -675,7 +675,7 @@ export default function TraxApp() {
     if (!confirm(`Transfer room ownership to ${m?.username||'this member'}? You will lose creator permissions.`)) return;
     try {
       await updateDoc(doc(db, 'rooms', currentRoom.id), { createdBy: uid });
-      setCurrentRoom(prev => ({...prev, createdBy: uid}));
+      setRoomCreatedBy(uid);
       setSuccessMsg('Ownership transferred'); setTimeout(()=>setSuccessMsg(''),2000);
     } catch { setError('Failed to transfer'); }
   };
@@ -1065,7 +1065,7 @@ export default function TraxApp() {
   }
 
   // ═══ KICKED CHECK ═══
-  const isKicked = currentRoom && (currentRoom.kicked||[]).includes(currentUser?.id);
+  const isKicked = currentRoom && roomKicked.includes(currentUser?.id);
 
   if (isKicked) return (
     <div className="min-h-screen bg-[#07070c] flex items-center justify-center p-4">
@@ -1787,7 +1787,7 @@ export default function TraxApp() {
           <div className="space-y-2">
             {roomMembers.map(m => {
               const isMe = m.id === currentUser.id;
-              const isCreator = m.id === currentRoom?.createdBy;
+              const isCreator = m.id === (roomCreatedBy || currentRoom?.createdBy);
               const isKicked = kickedIds.includes(m.id);
               return (
                 <div key={m.id} className={`flex items-center justify-between p-3 rounded-xl border ${isKicked?'opacity-50 ':''} ${darkMode?'border-white/[0.06] bg-white/[0.02]':'border-gray-200 bg-gray-50'}`}>
@@ -1810,7 +1810,7 @@ export default function TraxApp() {
                     </div>
                   )}
                   {isKicked && (
-                    <button onClick={async()=>{try{await updateDoc(doc(db,'rooms',currentRoom.id),{kicked:arrayRemove(m.id)});}catch{}}} className={`text-[9px] px-2 py-1 rounded-lg font-medium transition-all ${darkMode?'text-gray-600 hover:text-emerald-400 hover:bg-emerald-500/10':'text-gray-400 hover:text-emerald-600 hover:bg-emerald-50'}`}>Restore</button>
+                    <button onClick={async()=>{try{await updateDoc(doc(db,'rooms',currentRoom.id),{kicked:arrayRemove(m.id)});setRoomKicked(prev=>prev.filter(x=>x!==m.id));}catch{}}} className={`text-[9px] px-2 py-1 rounded-lg font-medium transition-all ${darkMode?'text-gray-600 hover:text-emerald-400 hover:bg-emerald-500/10':'text-gray-400 hover:text-emerald-600 hover:bg-emerald-50'}`}>Restore</button>
                   )}
                 </div>
               );
