@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Clock, Plus, X, LogOut, Copy, Check, UserPlus, HelpCircle, Trophy, User, Flame, Zap, Star, TrendingUp, ArrowLeftRight, Edit3, Calendar, ChevronLeft, ChevronRight, Crown, Target, ArrowUp, ArrowDown, Minus as MinusIcon, GripVertical, BarChart3, Sun, Moon } from 'lucide-react';
-import { auth, db } from './firebase';
+import { Clock, Plus, X, LogOut, Copy, Check, UserPlus, HelpCircle, Trophy, User, Flame, Zap, Star, TrendingUp, ArrowLeftRight, Edit3, Calendar, ChevronLeft, ChevronRight, Crown, Target, ArrowUp, ArrowDown, Minus as MinusIcon, GripVertical, BarChart3, Sun, Moon, ChevronDown } from 'lucide-react';
+import { auth, db, googleProvider } from './firebase';
 import {
-  createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, sendPasswordResetEmail
+  createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, sendPasswordResetEmail, signInWithPopup
 } from 'firebase/auth';
 import {
   collection, doc, setDoc, getDoc, onSnapshot, deleteDoc, updateDoc, query, where, getDocs, arrayUnion, arrayRemove, orderBy, limit
@@ -140,6 +140,7 @@ export default function TraxApp() {
   const [rivalStatus, setRivalStatus] = useState([]);
   const [showInsights, setShowInsights] = useState(false);
   const [insightsData, setInsightsData] = useState(null);
+  const [streakMilestone, setStreakMilestone] = useState(null);
   const [myBoardIds, setMyBoardIds] = useState(null); // null = show all, array = custom selection
   const [showCustomBoard, setShowCustomBoard] = useState(false);
   const [customBoardHabits, setCustomBoardHabits] = useState([]);
@@ -250,16 +251,21 @@ export default function TraxApp() {
     const u2 = onSnapshot(query(collection(db, 'completions'), where('roomId', '==', currentRoom.id), where('date', '==', today)), s => setCompletions(s.docs.map(d => ({id:d.id,...d.data()}))));
     // Weekly: fetch each day individually to avoid needing a composite index
     const ws = getWeekStart();
+    const we = getWeekEnd();
     const weekDays = [];
     { const d = new Date(ws+'T12:00:00'); const end = new Date(today+'T12:00:00'); while (d <= end) { weekDays.push(formatDateStr(d)); d.setDate(d.getDate()+1); } }
-    // Use a ref-like approach: accumulate all days into a map, then set state
+    // Stale-proof: capture the weekStart this effect was created for
+    const effectWeekStart = ws;
+    let cancelled = false;
     const weekData = {};
-    setAllCompletions([]); // clear on re-subscribe
+    setAllCompletions([]); // clear immediately
     const weekUnsubs = weekDays.map(day =>
       onSnapshot(query(collection(db, 'completions'), where('roomId', '==', currentRoom.id), where('date', '==', day)), s => {
+        if (cancelled) return; // reject callbacks from stale effect
         weekData[day] = s.docs.map(d => ({id:d.id,...d.data()}));
-        // Flatten all days into one array
-        setAllCompletions(Object.values(weekData).flat());
+        // Flatten + strict date filter: only this week's data
+        const all = Object.values(weekData).flat();
+        setAllCompletions(all.filter(c => c.date >= effectWeekStart && c.date <= today));
       })
     );    // Members: support both new rooms array and old roomId
     const u4 = onSnapshot(query(collection(db, 'users'), where('rooms', 'array-contains', currentRoom.id)), s => setRoomMembers(s.docs.map(d => ({id:d.id,...d.data()}))));
@@ -294,7 +300,7 @@ export default function TraxApp() {
         setBoardRequests(boards.filter(b=>b.status==='pending'&&b.userId!==currentUser.id&&!(b.approvals||[]).includes(currentUser.id)&&!(b.rejections||[]).includes(currentUser.id)));
       }, err => console.warn('Custom boards:', err));
     } catch(e) { console.warn('Board proposals listener failed:', e); }
-    return () => { u1(); u2(); u4(); u5(); u6(); u7(); u8(); u9(); u10(); u11(); weekUnsubs.forEach(u=>u()); };
+    return () => { cancelled = true; u1(); u2(); u4(); u5(); u6(); u7(); u8(); u9(); u10(); u11(); weekUnsubs.forEach(u=>u()); };
   }, [currentUser, currentRoom, dateKey]);
 
   // ─── LAST WEEK DATA (for recap) ───
@@ -344,6 +350,18 @@ export default function TraxApp() {
           yPts += pts * (data.count || 1);
         });
         setYesterdayPoints(yPts);
+        // Check for streak milestone (tier thresholds)
+        const milestones = [60, 30, 14, 7, 3];
+        const prevStreak = streakData.streak || 0;
+        if (streak > prevStreak) {
+          const crossed = milestones.find(m => streak >= m && prevStreak < m);
+          if (crossed) {
+            const tierNames = {3:'Building 1.1×',7:'Consistent 1.25×',14:'Dedicated 1.5×',30:'Warrior 1.75×',60:'Legend 2×'};
+            setStreakMilestone({ days: crossed, tier: tierNames[crossed] });
+            setConfettiTrigger(v=>v+1);
+            setTimeout(() => setStreakMilestone(null), 4000);
+          }
+        }
         setStreakData({ streak, activeDays: dates.length, totalCompletions: snap.docs.reduce((s,d)=>s+(d.data().count||1),0) });
       } catch (err) { console.error(err); setStreakData({streak:0,activeDays:0,totalCompletions:0}); }
     };
@@ -379,7 +397,7 @@ export default function TraxApp() {
       const todayComps = completions.filter(c=>c.userId===m.id&&c.date===today);
       const pts = todayComps.reduce((s,c)=>{const h=habits.find(x=>x.id===c.habitId);return s+((h?.points||c.habitPoints||0)*(c.count||1));},0);
       const habitCount = todayComps.length;
-      const weekPts = allCompletions.filter(c=>c.userId===m.id).reduce((s,c)=>{const h=habits.find(x=>x.id===c.habitId);return s+((h?.points||c.habitPoints||0)*(c.count||1));},0);
+      const weekPts = allCompletions.filter(c=>c.userId===m.id&&c.date>=getWeekStart()&&c.date<=getWeekEnd()).reduce((s,c)=>{const h=habits.find(x=>x.id===c.habitId);return s+((h?.points||c.habitPoints||0)*(c.count||1));},0);
       return { member: m, pts, habitCount, weekPts };
     }).sort((a,b)=>b.pts-a.pts);
     setRivalStatus(rivals);
@@ -410,7 +428,7 @@ export default function TraxApp() {
       const lastIdx = lastWeekData.scores.findIndex(s=>s.member.id===uid);
       if (lastIdx === lastWeekData.scores.length - 1 && lastWeekData.scores.length > 1) return { role: 'Underdog', icon: '🔥', color: 'text-red-400' };
     }
-    const myWeekPts = allCompletions.filter(c=>c.userId===uid).reduce((s,c)=>{const h=habits.find(x=>x.id===c.habitId);return s+((h?.points||c.habitPoints||0)*(c.count||1));},0);
+    const myWeekPts = allCompletions.filter(c=>c.userId===uid&&c.date>=getWeekStart()&&c.date<=getWeekEnd()).reduce((s,c)=>{const h=habits.find(x=>x.id===c.habitId);return s+((h?.points||c.habitPoints||0)*(c.count||1));},0);
     if (weeklyWinner && myWeekPts > 0 && myWeekPts >= (weeklyWinner.pts * 0.8)) return { role: 'Challenger', icon: '⚔️', color: 'text-purple-400' };
     return null;
   };
@@ -553,6 +571,24 @@ export default function TraxApp() {
     try { await sendPasswordResetEmail(auth, email); setSuccessMsg('Reset link sent! Check your email.'); }
     catch { setError('Could not send reset email. Check the address.'); } finally { setLoading(false); }
   };
+  const handleGoogleSignIn = async () => {
+    setError(''); setLoading(true);
+    try {
+      const cred = await signInWithPopup(auth, googleProvider);
+      // Check if user doc exists
+      const userDoc = await getDoc(doc(db, 'users', cred.user.uid));
+      if (!userDoc.exists()) {
+        // New Google user — create their profile
+        const displayName = cred.user.displayName || cred.user.email.split('@')[0];
+        await setDoc(doc(db, 'users', cred.user.uid), {
+          username: displayName, email: cred.user.email, photoURL: cred.user.photoURL || null,
+          rooms: [], createdAt: new Date().toISOString()
+        });
+      }
+    } catch (err) {
+      if (err.code !== 'auth/popup-closed-by-user') setError(err.message);
+    } finally { setLoading(false); }
+  };
 
   // ─── ROOM ───
   const createRoom = async () => {
@@ -645,6 +681,17 @@ export default function TraxApp() {
     return null;
   };
 
+  // ─── STREAK MULTIPLIER (balanced tiers) ───
+  const getStreakMultiplier = (streak) => {
+    if (streak >= 60) return { multi: 2.0, label: '2×', tier: 'Legend', color: 'text-red-400', bg: 'bg-red-500/20' };
+    if (streak >= 30) return { multi: 1.75, label: '1.75×', tier: 'Warrior', color: 'text-amber-400', bg: 'bg-amber-500/20' };
+    if (streak >= 14) return { multi: 1.5, label: '1.5×', tier: 'Dedicated', color: 'text-purple-400', bg: 'bg-purple-500/20' };
+    if (streak >= 7) return { multi: 1.25, label: '1.25×', tier: 'Consistent', color: 'text-blue-400', bg: 'bg-blue-500/20' };
+    if (streak >= 3) return { multi: 1.1, label: '1.1×', tier: 'Building', color: 'text-emerald-400', bg: 'bg-emerald-500/20' };
+    return { multi: 1.0, label: '1×', tier: null, color: 'text-gray-500', bg: '' };
+  };
+  const streakMulti = getStreakMultiplier(streakData.streak || 0);
+
   const postActivity = async (text, bonus) => {
     try {
       const aid = Date.now()+'_'+Math.random().toString(36).slice(2,6);
@@ -663,14 +710,18 @@ export default function TraxApp() {
 
     // Roll for mystery bonus
     const bonus = rollBonus();
-    const bonusPts = bonus ? h.points * bonus.multi : h.points;
+    // Apply streak multiplier to base points, then bonus on top
+    const baseWithStreak = Math.round(h.points * streakMulti.multi);
+    const finalPts = bonus ? baseWithStreak * bonus.multi : baseWithStreak;
 
     try {
       if (ex) {
         if (ex.count < max) {
           await updateDoc(doc(db, 'completions', ex.id), {
             count: ex.count+1,
-            ...(bonus ? { bonusPoints: (ex.bonusPoints||0) + (bonusPts - h.points) } : {})
+            habitPoints: baseWithStreak,
+            ...(bonus ? { bonusPoints: (ex.bonusPoints||0) + (finalPts - baseWithStreak) } : {}),
+            streakMultiplier: streakMulti.multi
           });
           if(ex.count+1>=max) triggerMaxed();
         }
@@ -678,8 +729,9 @@ export default function TraxApp() {
         const cid = currentUser.id+'_'+hid+'_'+t;
         await setDoc(doc(db, 'completions', cid), {
           userId: currentUser.id, habitId: hid, roomId: currentRoom.id, date: t, count: 1,
-          habitName: h.name, habitPoints: h.points, habitCategory: h.category,
-          ...(bonus ? { bonusPoints: bonusPts - h.points } : {})
+          habitName: h.name, habitPoints: baseWithStreak, habitCategory: h.category,
+          streakMultiplier: streakMulti.multi,
+          ...(bonus ? { bonusPoints: finalPts - baseWithStreak } : {})
         });
         if (max===1) triggerMaxed();
       }
@@ -691,13 +743,13 @@ export default function TraxApp() {
       }
       // Post to activity feed
       const newCount = ex ? ex.count + 1 : 1;
+      const streakTag = streakMulti.multi > 1 ? ` 🔥${streakMulti.label}` : '';
       const feedText = bonus
-        ? `${h.name} (+${bonusPts}) ${bonus.label}`
-        : `${h.name} (+${h.points})`;
+        ? `${h.name} (+${finalPts}) ${bonus.label}${streakTag}`
+        : `${h.name} (+${baseWithStreak})${streakTag}`;
       if (newCount >= max) {
-        postActivity(`Maxed out ${h.name}! 💎`, bonus);
+        postActivity(`Maxed out ${h.name}! 💎${streakTag}`, bonus);
       } else if (newCount === 1 || Math.random() < 0.3) {
-        // Post first completion always, others 30% of the time to avoid spam
         postActivity(feedText, bonus);
       }
     } catch (err) { console.error(err); }
@@ -740,7 +792,7 @@ export default function TraxApp() {
     return cr;
   };
   const getTodayPts = (uid) => completions.filter(c=>c.userId===uid&&c.date===getToday()).reduce((s,c)=>{ const h=habits.find(x=>x.id===c.habitId); return s+((h?.points||c.habitPoints||0)*(c.count||1)); },0);
-  const getWeeklyPts = (uid) => { const ws=getWeekStart(); return allCompletions.filter(c=>c.userId===uid&&c.date>=ws).reduce((s,c)=>{ const h=habits.find(x=>x.id===c.habitId); return s+((h?.points||c.habitPoints||0)*(c.count||1)); },0); };
+  const getWeeklyPts = (uid) => { const ws=getWeekStart(),we=getWeekEnd(); return allCompletions.filter(c=>c.userId===uid&&c.date>=ws&&c.date<=we).reduce((s,c)=>{ const h=habits.find(x=>x.id===c.habitId); return s+((h?.points||c.habitPoints||0)*(c.count||1)); },0); };
   const getWeeklyCrystals = (uid) => {
     let t=0; const ws=getWeekStart(), td=getToday();
     const dates=[...new Set(allCompletions.filter(c=>c.date>=ws&&c.date<=td).map(c=>c.date))];
@@ -808,10 +860,10 @@ export default function TraxApp() {
 
   // ─── THEME CLASSES ───
   const T = darkMode ? {
-    bg: 'bg-[#0a0a0f]', bgCard: 'bg-white/[0.03]', bgCardHover: 'hover:bg-white/[0.04]', bgInput: 'bg-white/[0.04]',
+    bg: 'bg-[#07070c]', bgCard: 'bg-white/[0.03]', bgCardHover: 'hover:bg-white/[0.04]', bgInput: 'bg-white/[0.04]',
     border: 'border-white/[0.06]', borderInput: 'border-white/[0.08]', text: 'text-white', textMuted: 'text-gray-500',
-    textDim: 'text-gray-600', textFaint: 'text-gray-700', headerBg: 'bg-[#0a0a0f]/80', modalBg: 'bg-[#12121a]',
-    selectBg: 'bg-[#12121a]', glowOrb: '/8', blurBg: 'backdrop-blur-xl'
+    textDim: 'text-gray-600', textFaint: 'text-gray-700', headerBg: 'bg-[#07070c]/90', modalBg: 'bg-[#0d0d14]',
+    selectBg: 'bg-[#0d0d14]', glowOrb: '/8', blurBg: 'backdrop-blur-xl'
   } : {
     bg: 'bg-gray-50', bgCard: 'bg-white', bgCardHover: 'hover:bg-gray-50', bgInput: 'bg-gray-100',
     border: 'border-gray-200', borderInput: 'border-gray-300', text: 'text-gray-900', textMuted: 'text-gray-500',
@@ -823,9 +875,12 @@ export default function TraxApp() {
 
   // ─── LOADING ───
   if (authLoading) return (
-    <div className="min-h-screen bg-[#0a0a0f] flex items-center justify-center">
-      <div className="text-center"><h1 className="text-4xl font-black tracking-[0.4em] text-white relative">TRAX<div className="absolute -inset-4 bg-gradient-to-r from-blue-500/20 via-purple-500/20 to-emerald-500/20 blur-xl rounded-full"></div></h1>
-        <div className="mt-4 flex justify-center gap-1.5">{['bg-blue-500','bg-orange-500','bg-emerald-500'].map((c,i)=><div key={i} className={`w-2 h-2 rounded-full ${c} animate-bounce`} style={{animationDelay:i*150+'ms'}} />)}</div></div>
+    <div className="min-h-screen bg-[#07070c] flex items-center justify-center relative overflow-hidden">
+      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[400px] h-[400px] bg-blue-600/8 rounded-full blur-[100px] -translate-y-1/2"/>
+      <div className="text-center">
+        <h1 className="text-4xl font-black tracking-[0.4em] text-white mb-5">TRAX</h1>
+        <div className="flex justify-center gap-2">{['bg-blue-500','bg-orange-500','bg-emerald-500'].map((c,i)=><div key={i} className={`w-1.5 h-1.5 rounded-full ${c} animate-pulse`} style={{animationDelay:i*200+'ms'}} />)}</div>
+      </div>
     </div>
   );
 
@@ -845,24 +900,45 @@ export default function TraxApp() {
   // ═══════════════════════════════════════
   if (!currentUser && view === 'onboarding') {
     return (
-      <div className="min-h-screen bg-[#0a0a0f] flex items-center justify-center p-4 relative overflow-hidden">
-        <div className="absolute top-1/4 -left-20 w-72 h-72 bg-blue-600/8 rounded-full blur-[100px]"></div>
-        <div className="absolute bottom-1/4 -right-20 w-72 h-72 bg-emerald-600/8 rounded-full blur-[100px]"></div>
-        <div className="w-full max-w-sm relative z-10 space-y-6">
-          <div className="text-center"><h1 className="text-4xl font-black tracking-[0.3em] text-white mb-2">TRAX</h1><p className="text-gray-600 text-xs tracking-widest uppercase">Habit Competition Platform</p></div>
-          {[
-            { icon: '\u{1F3AF}', title: 'Track Daily Habits', desc: 'Log Mind, Body & Spirit habits. Earn points for every completion.' },
-            { icon: '\u{1F48E}', title: 'Win Crystals', desc: 'Beat your competitors in each category to earn daily crystals.' },
-            { icon: '\u{1F525}', title: 'Build Streaks', desc: 'Complete habits every day to build an unstoppable streak.' },
-            { icon: '\u26A1', title: 'Set Stakes', desc: 'Put something on the line. Loser buys lunch, does a dare, or worse.' },
-          ].map((item,i) => (
-            <div key={i} className="flex items-start gap-4 bg-white/[0.03] border border-white/[0.06] rounded-xl p-4" style={{animationDelay:i*100+'ms'}}>
-              <span className="text-2xl">{item.icon}</span>
-              <div><p className="text-white font-semibold text-sm">{item.title}</p><p className="text-gray-500 text-xs mt-0.5">{item.desc}</p></div>
+      <div className="min-h-screen bg-[#07070c] flex flex-col items-center justify-center p-6 relative overflow-hidden">
+        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[600px] h-[600px] bg-gradient-to-b from-blue-600/10 via-purple-600/8 to-transparent rounded-full blur-[120px] -translate-y-1/2"/>
+        <div className="absolute bottom-0 right-0 w-80 h-80 bg-emerald-500/6 rounded-full blur-[100px] translate-y-1/3"/>
+        
+        <div className="w-full max-w-sm relative z-10">
+          {/* Logo */}
+          <div className="text-center mb-10">
+            <div className="inline-flex items-center gap-3 mb-3">
+              <div className="flex gap-1"><div className="w-2 h-2 rounded-full bg-blue-500 animate-pulse"/><div className="w-2 h-2 rounded-full bg-orange-500 animate-pulse" style={{animationDelay:'150ms'}}/><div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" style={{animationDelay:'300ms'}}/></div>
             </div>
-          ))}
-          <button onClick={()=>setView('signup')} className={btnPrimary + ' bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-lg shadow-blue-500/25'}>Get Started</button>
-          <button onClick={()=>setView('login')} className="w-full text-gray-500 py-2 hover:text-white text-sm transition-colors text-center">Already have an account? Sign in</button>
+            <h1 className="text-5xl font-black tracking-[0.35em] text-white mb-2">TRAX</h1>
+            <p className="text-gray-600 text-[11px] tracking-[0.25em] uppercase font-medium">Compete · Track · Dominate</p>
+          </div>
+
+          {/* Feature cards */}
+          <div className="space-y-3 mb-8">
+            {[
+              { icon: '🎯', title: 'Track Daily Habits', desc: 'Mind, Body & Spirit. Earn points for every completion.', color: 'from-blue-500/10 to-blue-600/5' },
+              { icon: '🔥', title: 'Streak Multipliers', desc: 'Stay consistent → earn up to 2× points.', color: 'from-orange-500/10 to-red-600/5' },
+              { icon: '🏆', title: 'Compete with Friends', desc: 'Real-time leaderboards. Set stakes. Win bragging rights.', color: 'from-amber-500/10 to-yellow-600/5' },
+              { icon: '💎', title: 'Win Crystals', desc: 'Dominate a category to earn glowing crystal rewards.', color: 'from-purple-500/10 to-indigo-600/5' },
+            ].map((item,i) => (
+              <div key={i} className={`bg-gradient-to-r ${item.color} backdrop-blur-sm border border-white/[0.06] rounded-2xl p-4 flex items-center gap-4`}>
+                <span className="text-2xl">{item.icon}</span>
+                <div><p className="text-white font-semibold text-[13px]">{item.title}</p><p className="text-gray-500 text-[11px] mt-0.5 leading-relaxed">{item.desc}</p></div>
+              </div>
+            ))}
+          </div>
+
+          {/* CTA */}
+          <div className="space-y-3">
+            <button onClick={handleGoogleSignIn} disabled={loading} className="w-full py-3.5 rounded-2xl text-sm font-bold tracking-wide transition-all active:scale-[0.98] bg-white text-gray-900 shadow-lg shadow-white/10 flex items-center justify-center gap-3 hover:bg-gray-100 disabled:opacity-50">
+              <svg className="w-5 h-5" viewBox="0 0 24 24"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 01-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" fill="#4285F4"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/></svg>
+              Continue with Google
+            </button>
+            <div className="flex items-center gap-3"><div className="flex-1 h-px bg-white/[0.06]"/><span className="text-gray-600 text-[10px] tracking-wider uppercase">or</span><div className="flex-1 h-px bg-white/[0.06]"/></div>
+            <button onClick={()=>setView('signup')} className={btnPrimary + ' bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-lg shadow-blue-500/20 rounded-2xl'}>Create Account with Email</button>
+            <button onClick={()=>setView('login')} className="w-full text-gray-500 py-2 hover:text-white text-sm transition-colors text-center">Already have an account? <span className="text-blue-400">Sign in</span></button>
+          </div>
         </div>
       </div>
     );
@@ -873,46 +949,62 @@ export default function TraxApp() {
   // ═══════════════════════════════════════
   if (!currentUser) {
     return (
-      <div className="min-h-screen bg-[#0a0a0f] flex items-center justify-center p-4 relative overflow-hidden">
-        <div className="absolute top-1/4 -left-20 w-72 h-72 bg-blue-600/8 rounded-full blur-[100px]"></div>
-        <div className="absolute bottom-1/4 -right-20 w-72 h-72 bg-emerald-600/8 rounded-full blur-[100px]"></div>
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] bg-purple-600/5 rounded-full blur-[120px]"></div>
+      <div className="min-h-screen bg-[#07070c] flex items-center justify-center p-4 relative overflow-hidden">
+        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[500px] h-[500px] bg-gradient-to-b from-blue-600/8 via-purple-600/5 to-transparent rounded-full blur-[120px] -translate-y-1/3"/>
         <div className="w-full max-w-sm relative z-10">
           <div className="text-center mb-8">
-            <h1 className="text-5xl font-black tracking-[0.3em] text-transparent bg-clip-text bg-gradient-to-b from-white to-gray-400 relative inline-block">TRAX<div className="absolute -inset-4 bg-gradient-to-r from-blue-500/10 via-purple-500/10 to-emerald-500/10 blur-2xl rounded-full -z-10"></div></h1>
-            <div className="flex justify-center gap-3 mt-4"><div className="w-8 h-1 rounded-full bg-blue-500"></div><div className="w-8 h-1 rounded-full bg-orange-500"></div><div className="w-8 h-1 rounded-full bg-emerald-500"></div></div>
+            <h1 className="text-4xl font-black tracking-[0.3em] text-white mb-1">TRAX</h1>
+            <div className="flex justify-center gap-2 mt-3"><div className="w-6 h-0.5 rounded-full bg-blue-500"/><div className="w-6 h-0.5 rounded-full bg-orange-500"/><div className="w-6 h-0.5 rounded-full bg-emerald-500"/></div>
           </div>
-          <div className="bg-white/[0.03] backdrop-blur-xl rounded-2xl border border-white/[0.06] p-8">
+          <div className="bg-white/[0.03] backdrop-blur-xl rounded-3xl border border-white/[0.06] p-7">
             {view === 'forgot' ? (
               <form onSubmit={handleForgotPassword} className="space-y-4">
-                <h2 className="text-lg font-bold text-white text-center mb-2">Reset Password</h2>
+                <h2 className="text-lg font-bold text-white text-center mb-1">Reset Password</h2>
                 <p className="text-gray-500 text-xs text-center mb-4">Enter your email and we'll send a reset link.</p>
-                <input type="email" placeholder="Email" value={email} onChange={e=>setEmail(e.target.value)} className={inputCls} required disabled={loading} />
+                <input type="email" placeholder="Email" value={email} onChange={e=>setEmail(e.target.value)} className={inputCls+' !rounded-xl'} required disabled={loading} />
                 {error && <p className="text-red-400 text-xs text-center">{error}</p>}
                 {successMsg && <p className="text-emerald-400 text-xs text-center">{successMsg}</p>}
-                <button type="submit" disabled={loading} className={btnPrimary+' bg-gradient-to-r from-blue-600 to-blue-500 text-white shadow-lg shadow-blue-500/25'}>{loading?'Sending...':'Send Reset Link'}</button>
-                <button type="button" onClick={()=>{setView('login');setError('');setSuccessMsg('');}} className="w-full text-gray-500 py-2 hover:text-white text-sm transition-colors">Back to Login</button>
+                <button type="submit" disabled={loading} className={btnPrimary+' bg-gradient-to-r from-blue-600 to-blue-500 text-white shadow-lg shadow-blue-500/20 !rounded-xl'}>{loading?'Sending...':'Send Reset Link'}</button>
+                <button type="button" onClick={()=>{setView('login');setError('');setSuccessMsg('');}} className="w-full text-gray-500 py-2 hover:text-white text-sm transition-colors">← Back to Sign In</button>
               </form>
             ) : view === 'login' ? (
-              <form onSubmit={handleLogin} className="space-y-4">
-                <input type="email" placeholder="Email" value={email} onChange={e=>setEmail(e.target.value)} className={inputCls} required disabled={loading} />
-                <input type="password" placeholder="Password" value={password} onChange={e=>setPassword(e.target.value)} className={inputCls} required disabled={loading} />
-                {error && <p className="text-red-400 text-xs text-center">{error}</p>}
-                <button type="submit" disabled={loading} className={btnPrimary+' bg-gradient-to-r from-blue-600 to-blue-500 text-white shadow-lg shadow-blue-500/25'}>{loading?'Signing in...':'Sign In'}</button>
-                <div className="flex justify-between">
-                  <button type="button" onClick={()=>{setView('onboarding');setError('');}} className="text-gray-500 text-sm hover:text-white transition-colors">Create Account</button>
-                  <button type="button" onClick={()=>{setView('forgot');setError('');}} className="text-gray-500 text-sm hover:text-blue-400 transition-colors">Forgot password?</button>
+              <div className="space-y-4">
+                <h2 className="text-lg font-bold text-white text-center mb-1">Welcome back</h2>
+                {/* Google button */}
+                <button onClick={handleGoogleSignIn} disabled={loading} className="w-full py-3 rounded-xl text-sm font-semibold transition-all active:scale-[0.98] bg-white text-gray-900 flex items-center justify-center gap-2.5 hover:bg-gray-100 disabled:opacity-50">
+                  <svg className="w-4 h-4" viewBox="0 0 24 24"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 01-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" fill="#4285F4"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/></svg>
+                  Continue with Google
+                </button>
+                <div className="flex items-center gap-3"><div className="flex-1 h-px bg-white/[0.06]"/><span className="text-gray-600 text-[10px] tracking-wider uppercase">or</span><div className="flex-1 h-px bg-white/[0.06]"/></div>
+                <form onSubmit={handleLogin} className="space-y-3">
+                  <input type="email" placeholder="Email" value={email} onChange={e=>setEmail(e.target.value)} className={inputCls+' !rounded-xl'} required disabled={loading} />
+                  <input type="password" placeholder="Password" value={password} onChange={e=>setPassword(e.target.value)} className={inputCls+' !rounded-xl'} required disabled={loading} />
+                  {error && <p className="text-red-400 text-xs text-center">{error}</p>}
+                  <button type="submit" disabled={loading} className={btnPrimary+' bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-lg shadow-blue-500/20 !rounded-xl'}>{loading?'Signing in...':'Sign In'}</button>
+                </form>
+                <div className="flex justify-between pt-1">
+                  <button type="button" onClick={()=>{setView('onboarding');setError('');}} className="text-gray-500 text-xs hover:text-white transition-colors">← Create Account</button>
+                  <button type="button" onClick={()=>{setView('forgot');setError('');}} className="text-gray-500 text-xs hover:text-blue-400 transition-colors">Forgot password?</button>
                 </div>
-              </form>
+              </div>
             ) : (
-              <form onSubmit={handleSignup} className="space-y-4">
-                <input type="text" placeholder="Username" value={username} onChange={e=>setUsername(e.target.value)} className={inputCls} required disabled={loading} />
-                <input type="email" placeholder="Email" value={email} onChange={e=>setEmail(e.target.value)} className={inputCls} required disabled={loading} />
-                <input type="password" placeholder="Password (min 6)" value={password} onChange={e=>setPassword(e.target.value)} className={inputCls} required minLength={6} disabled={loading} />
-                {error && <p className="text-red-400 text-xs text-center">{error}</p>}
-                <button type="submit" disabled={loading} className={btnPrimary+' bg-gradient-to-r from-emerald-600 to-emerald-500 text-white shadow-lg shadow-emerald-500/25'}>{loading?'Creating...':'Sign Up'}</button>
-                <button type="button" onClick={()=>{setView('login');setError('');}} className="w-full text-gray-500 py-2 hover:text-white text-sm transition-colors">Back to Login</button>
-              </form>
+              <div className="space-y-4">
+                <h2 className="text-lg font-bold text-white text-center mb-1">Create your account</h2>
+                {/* Google button */}
+                <button onClick={handleGoogleSignIn} disabled={loading} className="w-full py-3 rounded-xl text-sm font-semibold transition-all active:scale-[0.98] bg-white text-gray-900 flex items-center justify-center gap-2.5 hover:bg-gray-100 disabled:opacity-50">
+                  <svg className="w-4 h-4" viewBox="0 0 24 24"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 01-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" fill="#4285F4"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/></svg>
+                  Sign up with Google
+                </button>
+                <div className="flex items-center gap-3"><div className="flex-1 h-px bg-white/[0.06]"/><span className="text-gray-600 text-[10px] tracking-wider uppercase">or</span><div className="flex-1 h-px bg-white/[0.06]"/></div>
+                <form onSubmit={handleSignup} className="space-y-3">
+                  <input type="text" placeholder="Username" value={username} onChange={e=>setUsername(e.target.value)} className={inputCls+' !rounded-xl'} required disabled={loading} />
+                  <input type="email" placeholder="Email" value={email} onChange={e=>setEmail(e.target.value)} className={inputCls+' !rounded-xl'} required disabled={loading} />
+                  <input type="password" placeholder="Password (min 6)" value={password} onChange={e=>setPassword(e.target.value)} className={inputCls+' !rounded-xl'} required minLength={6} disabled={loading} />
+                  {error && <p className="text-red-400 text-xs text-center">{error}</p>}
+                  <button type="submit" disabled={loading} className={btnPrimary+' bg-gradient-to-r from-emerald-600 to-emerald-500 text-white shadow-lg shadow-emerald-500/20 !rounded-xl'}>{loading?'Creating...':'Create Account'}</button>
+                </form>
+                <button type="button" onClick={()=>{setView('login');setError('');}} className="w-full text-gray-500 py-1 hover:text-white text-xs transition-colors text-center">Already have an account? <span className="text-blue-400">Sign in</span></button>
+              </div>
             )}
           </div>
         </div>
@@ -950,13 +1042,22 @@ export default function TraxApp() {
           </div>
         </div>
       )}
+      {/* Streak milestone popup */}
+      {streakMilestone && (
+        <div className="fixed top-20 left-1/2 -translate-x-1/2 z-[101] animate-bounce">
+          <div className="px-6 py-3 rounded-2xl shadow-2xl text-center bg-gradient-to-r from-orange-500 to-red-500 text-white">
+            <div className="text-lg font-black">🔥 {streakMilestone.days}-Day Streak!</div>
+            <div className="text-xs font-bold opacity-90">Unlocked: {streakMilestone.tier}</div>
+          </div>
+        </div>
+      )}
       {/* Header */}
       <div className={`${T.headerBg} ${T.blurBg} border-b ${T.border} sticky top-0 z-40`}>
         <div className="max-w-2xl mx-auto px-4 py-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <h1 className="text-lg font-black tracking-[0.2em]">TRAX</h1>
-              <span className={`text-[8px] ${T.textDim}`}>v7</span>
+              <span className={`text-[8px] ${T.textDim}`}>v9</span>
               <div className="flex gap-1"><div className="w-1.5 h-1.5 rounded-full bg-blue-500"/><div className="w-1.5 h-1.5 rounded-full bg-orange-500"/><div className="w-1.5 h-1.5 rounded-full bg-emerald-500"/></div>
               <button onClick={()=>setShowSwitchRoom(true)} className={`ml-2 flex items-center gap-1 px-2 py-1 ${T.bgCard} border ${T.border} rounded-lg text-[10px] ${T.textMuted} hover:${T.text} transition-all`}><span className="font-mono tracking-wider">{currentRoom?.code}</span>{userRooms.length>1&&<ArrowLeftRight size={10}/>}</button>
             </div>
@@ -978,7 +1079,7 @@ export default function TraxApp() {
         <div className="mb-5">
           <div className="flex items-center justify-between mb-2">
             <div><h2 className="text-lg font-bold">{getGreeting()}, <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 via-purple-400 to-emerald-400">{currentUser.username}</span></h2><p className="text-gray-600 text-xs mt-0.5 italic">{getMotivation()}</p></div>
-            {streakData.streak>0&&<div className="flex items-center gap-1.5 px-3 py-1.5 bg-orange-500/10 border border-orange-500/20 rounded-full"><Flame size={14} className="text-orange-400"/><span className="text-orange-400 text-sm font-bold">{streakData.streak}</span></div>}
+            {streakData.streak>0&&<div className="flex items-center gap-1.5 px-3 py-1.5 bg-orange-500/10 border border-orange-500/20 rounded-full"><Flame size={14} className="text-orange-400"/><span className="text-orange-400 text-sm font-bold">{streakData.streak}</span>{streakMulti.multi>1&&<span className={`text-[9px] font-bold ${streakMulti.color} ml-0.5`}>{streakMulti.label}</span>}</div>}
           </div>
 
           {/* Weekly winner / countdown banner */}
@@ -1008,7 +1109,7 @@ export default function TraxApp() {
         {/* Stats */}
         <div className="grid grid-cols-3 gap-3 mb-6">
           <div className={`relative ${T.bgCard} rounded-2xl border ${T.border} p-4 overflow-hidden`}><div className="absolute top-0 right-0 w-16 h-16 bg-blue-500/5 rounded-full blur-xl -translate-y-4 translate-x-4"/><div className={`${T.textMuted} text-[10px] tracking-wider uppercase mb-1 flex items-center gap-1`}><Zap size={9}/>Points</div><div className={`text-2xl font-black ${darkMode?'text-transparent bg-clip-text bg-gradient-to-b from-white to-gray-400':''}`}>{myPts}</div></div>
-          <div className={`relative ${T.bgCard} rounded-2xl border ${T.border} p-4 overflow-hidden`}><div className="absolute top-0 right-0 w-16 h-16 bg-orange-500/5 rounded-full blur-xl -translate-y-4 translate-x-4"/><div className={`${T.textMuted} text-[10px] tracking-wider uppercase mb-1 flex items-center gap-1`}><Flame size={9}/>Streak</div><div className="text-2xl font-black text-transparent bg-clip-text bg-gradient-to-b from-orange-300 to-orange-600">{streakData.streak||0}<span className={`text-sm font-medium ${T.textDim} ml-1`}>d</span></div></div>
+          <div className={`relative ${T.bgCard} rounded-2xl border ${T.border} p-4 overflow-hidden`}><div className="absolute top-0 right-0 w-16 h-16 bg-orange-500/5 rounded-full blur-xl -translate-y-4 translate-x-4"/><div className={`${T.textMuted} text-[10px] tracking-wider uppercase mb-1 flex items-center gap-1`}><Flame size={9}/>Streak</div><div className="flex items-baseline gap-1.5"><span className="text-2xl font-black text-transparent bg-clip-text bg-gradient-to-b from-orange-300 to-orange-600">{streakData.streak||0}<span className={`text-sm font-medium ${T.textDim} ml-1`}>d</span></span>{streakMulti.multi>1&&<span className={`text-[9px] font-bold ${streakMulti.color} ${streakMulti.bg} px-1.5 py-0.5 rounded-full`}>{streakMulti.label}</span>}</div>{(()=>{const s=streakData.streak||0;const tiers=[3,7,14,30,60];const next=tiers.find(t=>t>s);if(!next)return null;const prev=tiers[tiers.indexOf(next)-1]||0;const pct=((s-prev)/(next-prev))*100;return<div className="mt-1.5"><div className={`h-1 rounded-full overflow-hidden ${darkMode?'bg-white/[0.06]':'bg-gray-200'}`}><div className="h-full rounded-full bg-gradient-to-r from-orange-400 to-red-400 transition-all" style={{width:pct+'%'}}/></div><div className={`text-[8px] ${T.textDim} mt-0.5`}>{next-s}d to next tier</div></div>;})()}</div>
           <div className={`relative ${T.bgCard} rounded-2xl border ${T.border} p-4 overflow-hidden`}><div className="absolute top-0 right-0 w-16 h-16 bg-purple-500/5 rounded-full blur-xl -translate-y-4 translate-x-4"/><div className={`${T.textMuted} text-[10px] tracking-wider uppercase mb-2`}>Crystals{isPerfect&&<span className="text-amber-400 ml-1">&#9830;</span>}</div><div className="flex items-center gap-2.5">{allCatNames.map(c=><div key={c} className={'w-5 h-5 rounded-full transition-all duration-500 '+(myCr[c]?getCT(c).bg+' shadow-md '+getCT(c).glow:darkMode?'bg-white/[0.06] border border-white/[0.08]':'bg-gray-200 border border-gray-300')}/>)}</div></div>
         </div>
 
@@ -1340,23 +1441,6 @@ export default function TraxApp() {
         <div className="grid grid-cols-2 gap-3 mb-4"><div className="text-center p-3 bg-white/[0.03] rounded-xl border border-white/[0.04]"><div className="text-lg font-black text-purple-400">{streakData.activeDays||0}</div><div className="text-[9px] text-gray-600 tracking-wider uppercase mt-0.5">Active Days</div></div><div className="text-center p-3 bg-white/[0.03] rounded-xl border border-white/[0.04]"><div className="text-lg font-black text-cyan-400">{streakData.totalCompletions||0}</div><div className="text-[9px] text-gray-600 tracking-wider uppercase mt-0.5">Completions</div></div></div>
         <div className="p-3 bg-white/[0.03] rounded-xl border border-white/[0.04]"><div className="text-[9px] text-gray-600 tracking-wider uppercase mb-2">Crystals</div><div className="flex justify-center gap-4">{allCatNames.map(c=><div key={c} className="text-center"><div className={'w-6 h-6 rounded-full mx-auto mb-1 transition-all '+(myCr[c]?getCT(c).bg+' shadow-md '+getCT(c).glow:'bg-white/[0.06]')}/><span className="text-[9px] text-gray-600">{c}</span></div>)}</div></div>
         <div className="mt-4 p-3 bg-white/[0.03] rounded-xl border border-white/[0.04] flex items-center justify-between"><div><div className="text-sm text-gray-300 font-medium">Email Reminders</div><div className="text-[10px] text-gray-600">Daily nudges at 12pm & 6pm</div></div><button onClick={async()=>{const newVal=currentUser.emailReminders===false?true:false;try{await updateDoc(doc(db,'users',currentUser.id),{emailReminders:!newVal});setCurrentUser(p=>({...p,emailReminders:!newVal}));}catch{}}} className={'relative w-11 h-6 rounded-full transition-all '+(currentUser.emailReminders!==false?'bg-blue-500':'bg-white/[0.08]')}><div className={'absolute top-1 w-4 h-4 rounded-full bg-white transition-all shadow-sm '+(currentUser.emailReminders!==false?'left-6':'left-1')}/></button></div>
-        <button onClick={async()=>{
-          if(!confirm('Fix old completions with wrong dates? This scans and corrects UTC-stamped data.'))return;
-          setLoading(true);
-          try{
-            const snap=await getDocs(query(collection(db,'completions'),where('userId','==',currentUser.id)));
-            let fixed=0;
-            const today=getToday();
-            for(const d of snap.docs){
-              const data=d.data();
-              if(data.date>today){
-                await deleteDoc(doc(db,'completions',d.id));
-                fixed++;
-              }
-            }
-            alert(fixed>0?'Fixed '+fixed+' completion(s) with future dates.':'All completions look correct!');
-          }catch(err){alert('Error: '+err.message);}finally{setLoading(false);}
-        }} disabled={loading} className={`mt-3 w-full px-4 py-2.5 border rounded-xl text-xs transition-all disabled:opacity-50 ${darkMode?'border-white/[0.06] text-gray-500 hover:text-white hover:bg-white/[0.04]':'border-gray-200 text-gray-400 hover:text-gray-700 hover:bg-gray-50'}`}>{loading?'Scanning...':'Fix Old Data (UTC cleanup)'}</button>
         {/* Quick actions */}
         <div className="mt-5 space-y-2">
           <button onClick={()=>{setShowProfile(false);setShowInviteModal(true);}} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border transition-all ${darkMode?'border-white/[0.06] bg-white/[0.02] hover:bg-white/[0.04] text-gray-300':'border-gray-200 bg-gray-50 hover:bg-gray-100 text-gray-700'}`}><UserPlus size={16} className="text-blue-400"/><span className="text-sm">Invite to Room</span></button>
@@ -1371,7 +1455,7 @@ export default function TraxApp() {
       <Modal show={showHelp} onClose={()=>setShowHelp(false)}>
         <ModalHeader title="How TRAX Works" onClose={()=>setShowHelp(false)}/>
         <div className="space-y-3 text-sm text-gray-400">
-          {[{i:'&#x1F3AF;',t:'Track & Earn',d:'Use + and \u2212 to track habits. Max them out for neon glow.'},{i:'&#x1F525;',t:'Streaks',d:'Complete at least one habit daily to keep your streak.'},{i:'&#x1F3C6;',t:'Compete',d:'Invite friends and dominate the leaderboard.'},{i:'&#x26A1;',t:'Stakes',d:'Set real consequences for the weekly loser.'},{i:'&#x1F465;',t:'Solo Mode',d:'No friends yet? Compete against your own yesterday.'}].map((s,i)=>(
+          {[{i:'&#x1F3AF;',t:'Track & Earn',d:'Use + and \u2212 to track habits. Max them out for neon glow.'},{i:'&#x1F525;',t:'Streak Multipliers',d:'Keep your streak alive for bonus points: 3d→1.1× · 7d→1.25× · 14d→1.5× · 30d→1.75× · 60d→2× (max). Break your streak and you reset to 1×.'},{i:'&#x1F3C6;',t:'Compete',d:'Invite friends and dominate the leaderboard.'},{i:'&#x26A1;',t:'Stakes',d:'Set real consequences for the weekly loser.'},{i:'&#x1F465;',t:'Solo Mode',d:'No friends yet? Compete against your own yesterday.'}].map((s,i)=>(
             <div key={i} className="bg-white/[0.03] rounded-xl p-4 border border-white/[0.04]"><p className="font-bold text-white mb-1" dangerouslySetInnerHTML={{__html:s.i+' '+s.t}}/><p>{s.d}</p></div>
           ))}
           <div className="bg-white/[0.03] rounded-xl p-4 border border-white/[0.04]"><p className="font-bold text-white mb-2">Categories</p><div className="space-y-1.5">{allCatNames.map(c=>{const ct=getCT(c);return(<div key={c} className="flex items-center gap-2"><div className={'w-3 h-3 rounded-full '+ct.bg+' shadow-sm '+ct.glow}/><span><strong className={ct.txt}>{c}</strong></span></div>);})}</div></div>
