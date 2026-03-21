@@ -50,7 +50,29 @@ function ProgressRing({ progress, size = 56, stroke = 4, color = '#3b82f6' }) {
   );
 }
 
-// ─── MODAL WRAPPER ───
+// ─── AVATAR (with photo support) ───
+function Avatar({ user, size = 28, className = '' }) {
+  const s = { width: size, height: size, minWidth: size };
+  if (user?.photoURL) return <img src={user.photoURL} className={`rounded-full object-cover ${className}`} style={s} referrerPolicy="no-referrer"/>;
+  const letter = user?.username?.charAt(0)?.toUpperCase() || '?';
+  return <div className={`rounded-full flex items-center justify-center font-black ${className}`} style={{...s, fontSize: size * 0.4}}>{letter}</div>;
+}
+
+// ─── PUNISHMENT WHEEL ───
+const PUNISHMENTS = [
+  '☕ Buy winner coffee',
+  '📸 Embarrassing post',
+  '💪 50 pushups on camera',
+  '🧺 Do winner\'s laundry',
+  '🎤 Sing in public',
+  '🍳 Cook winner a meal',
+  '📱 No phone for 2hrs',
+  '🏃 Run a mile on camera',
+  '🤡 Wear a silly outfit to class',
+  '📝 Write winner a compliment essay',
+  '🧹 Clean winner\'s room',
+  '🎬 Embarrassing TikTok',
+];
 function Modal({ show, onClose, children, wide, dark = true }) {
   if (!show) return null;
   const mbg = dark ? 'bg-[#12121a] border-white/[0.06]' : 'bg-white border-gray-200';
@@ -72,7 +94,7 @@ function ModalHeader({ title, onClose, icon }) {
   );
 }
 
-export default function TraxApp() {
+export default function VersaApp() {
   // ─── DATE HELPERS (must be before state that uses them) ───
   const formatDateStr = (d) => d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
   const getToday = () => { const d = new Date(); return formatDateStr(d); };
@@ -101,6 +123,9 @@ export default function TraxApp() {
   const [roomCreatedBy, setRoomCreatedBy] = useState(null);
   const [onboardingStep, setOnboardingStep] = useState(0);
   const [showOnboardingTour, setShowOnboardingTour] = useState(false);
+  const [showPunishmentWheel, setShowPunishmentWheel] = useState(false);
+  const [wheelSpinning, setWheelSpinning] = useState(false);
+  const [wheelResult, setWheelResult] = useState(null);
   const [showHistory, setShowHistory] = useState(false);
   const [showEditHabit, setShowEditHabit] = useState(null);
   const [copied, setCopied] = useState(false);
@@ -119,7 +144,7 @@ export default function TraxApp() {
   const [userRooms, setUserRooms] = useState([]);
   const [roomStakes, setRoomStakes] = useState(null);
   const [newStake, setNewStake] = useState({ type: 'custom', description: '', duration: 'weekly' });
-  const [newHabit, setNewHabit] = useState({ name: '', category: 'Mind', points: 10, isRepeatable: false, maxCompletions: 1 });
+  const [newHabit, setNewHabit] = useState({ name: '', category: 'Grind', points: 10, isRepeatable: false, maxCompletions: 1 });
   const [historyDate, setHistoryDate] = useState(null);
   const [editHabitData, setEditHabitData] = useState({});
   const [weeklyWinner, setWeeklyWinner] = useState(null);
@@ -130,7 +155,7 @@ export default function TraxApp() {
   const [showWeeklyRecap, setShowWeeklyRecap] = useState(false);
   const [lastWeekData, setLastWeekData] = useState(null);
   const [darkMode, setDarkMode] = useState(() => {
-    try { const stored = localStorage.getItem('trax-theme'); return stored ? stored === 'dark' : true; } catch { return true; }
+    try { const stored = localStorage.getItem('versa-theme'); return stored ? stored === 'dark' : true; } catch { return true; }
   });
   const [roomCategories, setRoomCategories] = useState([]);
   const [showAddCategory, setShowAddCategory] = useState(false);
@@ -170,7 +195,7 @@ export default function TraxApp() {
   const getDaysUntilReset = () => { const d = new Date(); const day = d.getDay(); return 6 - day; }; // Saturday = 0 days left, Sunday = 6
   const getLastWeekStart = () => { const d = new Date(getWeekStart()+'T12:00:00'); d.setDate(d.getDate()-7); return formatDateStr(d); };
   const getLastWeekEnd = () => { const d = new Date(getWeekStart()+'T12:00:00'); d.setDate(d.getDate()-1); return formatDateStr(d); };
-  const toggleTheme = () => { const next = !darkMode; setDarkMode(next); try { localStorage.setItem('trax-theme', next ? 'dark' : 'light'); } catch {} };
+  const toggleTheme = () => { const next = !darkMode; setDarkMode(next); try { localStorage.setItem('versa-theme', next ? 'dark' : 'light'); } catch {} };
   const getOrderedHabits = (cat) => {
     const pool = (myBoardIds && !editMode) ? habits.filter(h => myBoardIds.includes(h.id)) : habits;
     const ch = pool.filter(h=>h.category===cat);
@@ -195,22 +220,19 @@ export default function TraxApp() {
   // ─── DEFAULT HABITS ───
   const loadDefaultHabits = async () => {
     const defaultHabits = [
-      { name: 'Study / homework', category: 'Mind', points: 10, isRepeatable: true, maxCompletions: 12, unit: 'per hour' },
-      { name: 'Read', category: 'Mind', points: 8, isRepeatable: true, maxCompletions: 6, unit: 'per 30 min' },
-      { name: 'Practice a new skill', category: 'Mind', points: 12, isRepeatable: true, maxCompletions: 4, unit: 'per 30 min' },
-      { name: 'Work on side project', category: 'Mind', points: 15, isRepeatable: true, maxCompletions: 8, unit: 'per 30 min' },
-      { name: 'Workout / exercise', category: 'Body', points: 10, isRepeatable: true, maxCompletions: 8, unit: 'per 30 min' },
-      { name: 'Drink water', category: 'Body', points: 2, isRepeatable: true, maxCompletions: 8, unit: 'per glass' },
-      { name: 'No junk food', category: 'Body', points: 20, isRepeatable: false, maxCompletions: 1 },
-      { name: 'Sleep 7+ hours', category: 'Body', points: 25, isRepeatable: false, maxCompletions: 1 },
-      { name: 'Stretch / mobility', category: 'Body', points: 8, isRepeatable: false, maxCompletions: 1 },
-      { name: 'Skincare routine', category: 'Body', points: 5, isRepeatable: true, maxCompletions: 2, unit: 'AM/PM' },
-      { name: 'Meditate', category: 'Spirit', points: 5, isRepeatable: true, maxCompletions: 6, unit: 'per 5 min' },
-      { name: 'Journal', category: 'Spirit', points: 5, isRepeatable: true, maxCompletions: 3, unit: 'per 5 min' },
-      { name: 'No social media', category: 'Spirit', points: 20, isRepeatable: false, maxCompletions: 1 },
-      { name: 'Maintain organized space', category: 'Spirit', points: 8, isRepeatable: false, maxCompletions: 1 },
-      { name: 'Compliment or help someone', category: 'Spirit', points: 8, isRepeatable: true, maxCompletions: 3 },
-      { name: 'No vaping / substances', category: 'Spirit', points: 15, isRepeatable: false, maxCompletions: 1 },
+      // GRIND — academics, productivity, getting ahead
+      { name: 'Study session', category: 'Grind', points: 5, isRepeatable: true, maxCompletions: 20, unit: 'per 30 min' },
+      { name: 'Read', category: 'Grind', points: 8, isRepeatable: true, maxCompletions: 6, unit: 'per 30 min' },
+      { name: 'Side project', category: 'Grind', points: 5, isRepeatable: true, maxCompletions: 12, unit: 'per 30 min' },
+      // HEALTH — gym, sleep, nutrition
+      { name: 'Hit the gym', category: 'Health', points: 15, isRepeatable: true, maxCompletions: 4, unit: 'per 30 min' },
+      { name: 'Slept 7+ hours', category: 'Health', points: 15, isRepeatable: false, maxCompletions: 1 },
+      { name: 'Woke up before 7', category: 'Health', points: 15, isRepeatable: false, maxCompletions: 1 },
+      { name: 'Clean eating', category: 'Health', points: 8, isRepeatable: true, maxCompletions: 3, unit: 'per meal' },
+      // DISCIPLINE — screen time, substances, mindset
+      { name: 'Screen time under 2.5hrs', category: 'Discipline', points: 15, isRepeatable: false, maxCompletions: 1 },
+      { name: 'No vaping / substances', category: 'Discipline', points: 15, isRepeatable: false, maxCompletions: 1 },
+      { name: 'Journaled', category: 'Discipline', points: 8, isRepeatable: true, maxCompletions: 3, unit: 'per 5 min' },
     ];
     try {
       setLoading(true);
@@ -225,6 +247,11 @@ export default function TraxApp() {
 
   // ─── AUTH LISTENER ───
   useEffect(() => {
+    // Deep link: check URL for ?join=CODE
+    const params = new URLSearchParams(window.location.search);
+    const joinCode = params.get('join');
+    if (joinCode) { setRoomCode(joinCode.toUpperCase()); window.history.replaceState({}, '', window.location.pathname); }
+
     const unsub = onAuthStateChanged(auth, async (user) => {
       if (user) {
         try {
@@ -336,7 +363,7 @@ export default function TraxApp() {
           const mc = comps.filter(c=>c.userId===m.id);
           const pts = mc.reduce((s,c)=>{const h=habits.find(x=>x.id===c.habitId);return s+((h?.points||c.habitPoints||0)*(c.count||1));},0);
           const catPts = {}; allCatNames.forEach(c => catPts[c] = 0);
-          mc.forEach(c=>{const h=habits.find(x=>x.id===c.habitId);const cat=h?.category||c.habitCategory||'Mind';catPts[cat]+=(h?.points||c.habitPoints||0)*(c.count||1);});
+          mc.forEach(c=>{const h=habits.find(x=>x.id===c.habitId);const cat=h?.category||c.habitCategory||'Grind';catPts[cat]+=(h?.points||c.habitPoints||0)*(c.count||1);});
           const activeDays = [...new Set(mc.map(c=>c.date))].length;
           return {member:m, pts, catPts, activeDays, completions:mc.length};
         }).sort((a,b)=>b.pts-a.pts);
@@ -707,7 +734,7 @@ export default function TraxApp() {
         const boardDocId = currentUser.id+'_'+currentRoom.id;
         await setDoc(doc(db, 'myBoard', boardDocId), { habitIds: [...myBoardIds, hid], userId: currentUser.id, roomId: currentRoom.id });
       }
-      setNewHabit({ name:'', category:'Mind', points:10, isRepeatable:false, maxCompletions:1 }); setShowAddHabit(false);
+      setNewHabit({ name:'', category:'Grind', points:10, isRepeatable:false, maxCompletions:1 }); setShowAddHabit(false);
     } catch { setError('Failed to add'); }
   };
   const saveEditHabit = async () => {
@@ -874,9 +901,9 @@ export default function TraxApp() {
   ];
   const ICON_OPTIONS = ['🧠','💪','✨','⭐','📚','🎨','💼','🏃','🧘','💰','🎯','❤️','🌱','🔬','🎮','🍎'];
   const DEFAULT_CATEGORIES = [
-    { name:'Mind', colorIdx:0, icon:'🧠' },
-    { name:'Body', colorIdx:1, icon:'💪' },
-    { name:'Spirit', colorIdx:2, icon:'✨' },
+    { name:'Grind', colorIdx:0, icon:'📚' },
+    { name:'Health', colorIdx:1, icon:'💪' },
+    { name:'Discipline', colorIdx:2, icon:'🎯' },
   ];
   const activeCategories = roomCategories.length > 0 ? roomCategories : DEFAULT_CATEGORIES;
   const getCT = (catName) => {
@@ -901,7 +928,7 @@ export default function TraxApp() {
   const deleteCategory = async (catName) => {
     const catHabits = habits.filter(h=>h.category===catName);
     if (catHabits.length > 0) { setError('Delete habits in this category first'); setTimeout(()=>setError(''),2000); return; }
-    if (['Mind','Body','Spirit'].includes(catName)) { setError("Can't delete default categories"); setTimeout(()=>setError(''),2000); return; }
+    if (['Grind','Health','Discipline'].includes(catName)) { setError("Can't delete default categories"); setTimeout(()=>setError(''),2000); return; }
     const updated = activeCategories.filter(c=>c.name!==catName);
     try { await setDoc(doc(db, 'roomCategories', currentRoom.id), { categories: updated }); } catch {}
   };
@@ -932,7 +959,7 @@ export default function TraxApp() {
     <div className="min-h-screen bg-[#07070c] flex items-center justify-center relative overflow-hidden">
       <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[400px] h-[400px] bg-blue-600/8 rounded-full blur-[100px] -translate-y-1/2"/>
       <div className="text-center">
-        <h1 className="text-4xl font-black tracking-[0.4em] text-white mb-5">TRAX</h1>
+        <h1 className="text-4xl font-black tracking-[0.4em] text-white mb-5">VERSA</h1>
         <div className="flex justify-center gap-2">{['bg-blue-500','bg-orange-500','bg-emerald-500'].map((c,i)=><div key={i} className={`w-1.5 h-1.5 rounded-full ${c} animate-pulse`} style={{animationDelay:i*200+'ms'}} />)}</div>
       </div>
     </div>
@@ -964,17 +991,17 @@ export default function TraxApp() {
             <div className="inline-flex items-center gap-3 mb-3">
               <div className="flex gap-1"><div className="w-2 h-2 rounded-full bg-blue-500 animate-pulse"/><div className="w-2 h-2 rounded-full bg-orange-500 animate-pulse" style={{animationDelay:'150ms'}}/><div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" style={{animationDelay:'300ms'}}/></div>
             </div>
-            <h1 className="text-5xl font-black tracking-[0.35em] text-white mb-2">TRAX</h1>
-            <p className="text-gray-600 text-[11px] tracking-[0.25em] uppercase font-medium">Compete · Track · Dominate</p>
+            <h1 className="text-5xl font-black tracking-[0.35em] text-white mb-2">VERSA</h1>
+            <p className="text-gray-600 text-[11px] tracking-[0.25em] uppercase font-medium">Outwork · Outgrind · Outlast</p>
           </div>
 
           {/* Feature cards */}
           <div className="space-y-3 mb-8">
             {[
-              { icon: '🎯', title: 'Track Daily Habits', desc: 'Mind, Body & Spirit. Earn points for every completion.', color: 'from-blue-500/10 to-blue-600/5' },
-              { icon: '🔥', title: 'Streak Multipliers', desc: 'Stay consistent → earn up to 2× points.', color: 'from-orange-500/10 to-red-600/5' },
-              { icon: '🏆', title: 'Compete with Friends', desc: 'Real-time leaderboards. Set stakes. Win bragging rights.', color: 'from-amber-500/10 to-yellow-600/5' },
-              { icon: '💎', title: 'Win Crystals', desc: 'Dominate a category to earn glowing crystal rewards.', color: 'from-purple-500/10 to-indigo-600/5' },
+              { icon: '📚', title: 'Track What Matters', desc: 'Studying, gym, screen time, sleep. Earn points for everything.', color: 'from-blue-500/10 to-blue-600/5' },
+              { icon: '🔥', title: 'Streak Multipliers', desc: 'Don\'t break the chain → earn up to 2× points.', color: 'from-orange-500/10 to-red-600/5' },
+              { icon: '🏆', title: 'Compete with Friends', desc: 'Real-time leaderboards. Set stakes. Loser pays.', color: 'from-amber-500/10 to-yellow-600/5' },
+              { icon: '💎', title: 'Win Crystals', desc: 'Top scorer in Grind, Health, or Discipline earns the crystal.', color: 'from-purple-500/10 to-indigo-600/5' },
             ].map((item,i) => (
               <div key={i} className={`bg-gradient-to-r ${item.color} backdrop-blur-sm border border-white/[0.06] rounded-2xl p-4 flex items-center gap-4`}>
                 <span className="text-2xl">{item.icon}</span>
@@ -1007,7 +1034,7 @@ export default function TraxApp() {
         <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[500px] h-[500px] bg-gradient-to-b from-blue-600/8 via-purple-600/5 to-transparent rounded-full blur-[120px] -translate-y-1/3"/>
         <div className="w-full max-w-sm relative z-10">
           <div className="text-center mb-8">
-            <h1 className="text-4xl font-black tracking-[0.3em] text-white mb-1">TRAX</h1>
+            <h1 className="text-4xl font-black tracking-[0.3em] text-white mb-1">VERSA</h1>
             <div className="flex justify-center gap-2 mt-3"><div className="w-6 h-0.5 rounded-full bg-blue-500"/><div className="w-6 h-0.5 rounded-full bg-orange-500"/><div className="w-6 h-0.5 rounded-full bg-emerald-500"/></div>
           </div>
           <div className="bg-white/[0.03] backdrop-blur-xl rounded-3xl border border-white/[0.06] p-7">
@@ -1099,7 +1126,7 @@ export default function TraxApp() {
             <div>
               <div className="text-5xl mb-4">👋</div>
               <h1 className="text-2xl font-bold text-white mb-2">Welcome, <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-emerald-400">{currentUser.username}</span></h1>
-              <p className="text-gray-500 text-sm leading-relaxed">TRAX turns your daily habits into a competition.<br/>Let's get you set up in 30 seconds.</p>
+              <p className="text-gray-500 text-sm leading-relaxed">Versa turns your daily habits into a competition.<br/>Let's get you set up in 30 seconds.</p>
             </div>
             <div className="space-y-3">
               {[
@@ -1172,7 +1199,7 @@ export default function TraxApp() {
   const tourSteps = [
     { icon: '🎯', title: 'Track your habits', desc: 'Tap the + button on any habit to log it. Each completion earns you points. Try it now!' },
     { icon: '🔥', title: 'Build your streak', desc: 'Complete at least one habit every day. The longer your streak, the higher your point multiplier — up to 2× at 60 days.' },
-    { icon: '💎', title: 'Win crystals', desc: 'Score the most points in any category (Mind, Body, Spirit) to earn a glowing crystal for the day.' },
+    { icon: '💎', title: 'Win crystals', desc: 'Score the most points in any category (Grind, Health, Discipline) to earn a crystal for the day.' },
     { icon: '🏆', title: 'Dominate the leaderboard', desc: 'Your weekly points determine the leaderboard rank. Set stakes to make losing hurt.' },
     { icon: '👥', title: 'Invite your friends', desc: 'Share your room code and start competing. The more rivals, the better.' },
   ];
@@ -1243,7 +1270,7 @@ export default function TraxApp() {
         <div className="max-w-2xl mx-auto px-4 py-2.5">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <h1 className="text-base font-black tracking-[0.15em]">TRAX</h1>
+              <h1 className="text-base font-black tracking-[0.15em]">VERSA</h1>
               <div className="flex gap-0.5"><div className="w-1 h-1 rounded-full bg-blue-500"/><div className="w-1 h-1 rounded-full bg-orange-500"/><div className="w-1 h-1 rounded-full bg-emerald-500"/></div>
               {streakData.streak>0&&<div className="flex items-center gap-1 ml-1"><Flame size={11} className="text-orange-400"/><span className="text-orange-400 text-xs font-bold">{streakData.streak}</span>{streakMulti.multi>1&&<span className={`text-[8px] font-bold ${streakMulti.color}`}>{streakMulti.label}</span>}</div>}
             </div>
@@ -1279,7 +1306,7 @@ export default function TraxApp() {
               const ahead = r.pts > myPts;
               return (
                 <div key={r.member.id} className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border shrink-0 ${ahead?'border-red-500/15 bg-red-500/5':'border-emerald-500/15 bg-emerald-500/5'}`}>
-                  <div className={`w-5 h-5 rounded-full flex items-center justify-center text-[9px] font-black ${ahead?'bg-red-500/20 text-red-400':'bg-emerald-500/20 text-emerald-400'}`}>{r.member.username?.charAt(0)?.toUpperCase()}</div>
+                  <Avatar user={r.member} size={20} className={ahead?'bg-red-500/20 text-red-400':'bg-emerald-500/20 text-emerald-400'}/>
                   <span className={`text-[10px] font-medium ${darkMode?'text-gray-400':'text-gray-600'}`}>{r.member.username}</span>
                   <span className={`text-[10px] font-bold ${ahead?'text-red-400':'text-emerald-400'}`}>{r.pts}</span>
                 </div>
@@ -1418,9 +1445,10 @@ export default function TraxApp() {
               const ts = a.ts ? new Date(a.ts) : null;
               const timeAgo = ts ? (Math.floor((Date.now()-ts.getTime())/60000)<60 ? Math.floor((Date.now()-ts.getTime())/60000)+'m' : Math.floor((Date.now()-ts.getTime())/3600000)+'h') : '';
               return (
-                <div key={a.id} className="px-3 py-1.5 flex items-center justify-between">
+                <div key={a.id} className="px-3 py-1.5 flex items-center gap-2">
+                  <Avatar user={activeMembers.find(m=>m.id===a.userId)||{username:a.username}} size={16} className={isMe?'bg-blue-500/20 text-blue-400':'bg-white/[0.06] text-gray-500'}/>
                   <div className="flex-1 min-w-0 truncate"><span className={`text-[10px] ${isMe?'text-blue-400':'text-gray-500'} font-medium`}>{isMe?'You':a.username}</span><span className={`text-[10px] ${T.textDim} ml-1`}>{a.text}</span>{a.bonus==='jackpot'&&<span className="ml-1 text-[9px] text-amber-300 font-bold">JACKPOT</span>}</div>
-                  <span className={`text-[8px] ${T.textFaint} shrink-0 ml-2`}>{timeAgo}</span>
+                  <span className={`text-[8px] ${T.textFaint} shrink-0 ml-1`}>{timeAgo}</span>
                 </div>
               );
             })}</div>
@@ -1444,7 +1472,7 @@ export default function TraxApp() {
       {/* Add Habit */}
       <Modal show={showAddHabit} onClose={()=>setShowAddHabit(false)}>
         <ModalHeader title="Add Habit" onClose={()=>setShowAddHabit(false)}/>
-        <button onClick={loadDefaultHabits} disabled={loading} className="w-full mb-5 px-4 py-3 bg-gradient-to-r from-violet-600 to-purple-600 text-white rounded-xl shadow-lg shadow-violet-500/20 text-sm font-bold active:scale-[0.98] disabled:opacity-50">{loading?'Loading...':'⚡ Load Defaults (16 habits)'}</button>
+        <button onClick={loadDefaultHabits} disabled={loading} className="w-full mb-5 px-4 py-3 bg-gradient-to-r from-violet-600 to-purple-600 text-white rounded-xl shadow-lg shadow-violet-500/20 text-sm font-bold active:scale-[0.98] disabled:opacity-50">{loading?'Loading...':'⚡ Load Student Preset (10 habits)'}</button>
         <div className="space-y-3">
           <input type="text" placeholder="Habit name" value={newHabit.name} onChange={e=>setNewHabit({...newHabit,name:e.target.value})} className={inputCls}/>
           <div className="grid grid-cols-2 gap-3">
@@ -1576,7 +1604,7 @@ export default function TraxApp() {
           const medals=['\u{1F947}','\u{1F948}','\u{1F949}'];
           return (
             <div key={item.member.id} className={'rounded-xl p-4 border transition-all '+(isMe?'bg-gradient-to-r from-blue-600/20 to-indigo-600/20 border-blue-500/30 shadow-lg shadow-blue-500/10':i===0?'bg-amber-500/5 border-amber-500/20':'bg-white/[0.02] border-white/[0.04] hover:bg-white/[0.04]')}>
-              <div className="flex items-center justify-between"><div className="flex items-center gap-3"><div className="text-lg w-8 text-center">{i<3?medals[i]:<span className="text-sm text-gray-600">{i+1}</span>}</div><div><div className={'text-sm font-semibold flex items-center gap-1.5 '+(isMe?'text-blue-300':'text-gray-300')}>{item.member.username}{isMe&&<span className="text-[10px] text-gray-600">(you)</span>}{getRoomRole(item.member.id)&&<span className={`text-[9px] font-bold ${getRoomRole(item.member.id).color}`}>{getRoomRole(item.member.id).icon}</span>}</div><div className="text-xs text-gray-600">{pts} pts{leaderboardTab==='week'?' \u00b7 '+item.weeklyCrystals+' crystals':''}</div></div></div>
+              <div className="flex items-center justify-between"><div className="flex items-center gap-3"><div className="text-lg w-8 text-center">{i<3?medals[i]:<span className="text-sm text-gray-600">{i+1}</span>}</div><Avatar user={item.member} size={28} className={isMe?'bg-blue-500/20 text-blue-400':'bg-white/[0.06] text-gray-400'}/><div><div className={'text-sm font-semibold flex items-center gap-1.5 '+(isMe?'text-blue-300':'text-gray-300')}>{item.member.username}{isMe&&<span className="text-[10px] text-gray-600">(you)</span>}{getRoomRole(item.member.id)&&<span className={`text-[9px] font-bold ${getRoomRole(item.member.id).color}`}>{getRoomRole(item.member.id).icon}</span>}</div><div className="text-xs text-gray-600">{pts} pts{leaderboardTab==='week'?' \u00b7 '+item.weeklyCrystals+' crystals':''}</div></div></div>
                 <div className="flex items-center gap-3">{leaderboardTab==='today'&&<div className="flex items-center gap-1.5">{allCatNames.map(c=><div key={c} className={'w-2.5 h-2.5 rounded-full '+(item.crystals[c]?getCT(c).bg.replace('bg-','bg-').replace('500','400')+' shadow-sm shadow-'+getCT(c).neon.replace('#','')+'/50':isMe?'bg-white/10':'bg-white/[0.06]')}/>)}</div>}{!isMe&&<button onClick={()=>{setShowLeaderboard(false);setShowCompetitor(item.member);}} className="text-[10px] text-gray-600 hover:text-white uppercase tracking-wider font-medium">View</button>}</div>
               </div>
             </div>
@@ -1588,7 +1616,7 @@ export default function TraxApp() {
       {/* Profile */}
       <Modal show={showProfile} onClose={()=>setShowProfile(false)}>
         <ModalHeader title="Profile" onClose={()=>setShowProfile(false)}/>
-        <div className="text-center mb-6"><div className="relative inline-block"><ProgressRing progress={dailyProg} size={80} stroke={4} color={dailyProg>=1?'#10b981':'#3b82f6'}/><div className="absolute inset-0 flex items-center justify-center"><span className="text-xl font-black">{Math.round(dailyProg*100)}%</span></div></div><h3 className="text-xl font-bold mt-3">{currentUser.username}</h3><p className="text-gray-600 text-xs">{currentUser.email}</p></div>
+        <div className="text-center mb-6"><div className="relative inline-block">{currentUser.photoURL?<img src={currentUser.photoURL} className="w-20 h-20 rounded-full object-cover border-2 border-blue-500/30" referrerPolicy="no-referrer"/>:<><ProgressRing progress={dailyProg} size={80} stroke={4} color={dailyProg>=1?'#10b981':'#3b82f6'}/><div className="absolute inset-0 flex items-center justify-center"><span className="text-xl font-black">{Math.round(dailyProg*100)}%</span></div></>}</div><h3 className="text-xl font-bold mt-3">{currentUser.username}</h3><p className="text-gray-600 text-xs">{currentUser.email}</p></div>
         <div className="grid grid-cols-3 gap-3 mb-4">{[{v:streakData.streak||0,l:'Streak',c:'text-orange-400',i:<Flame size={16} className="text-orange-400 mx-auto mb-1"/>},{v:myPts,l:'Today',c:'text-blue-400',i:<Star size={16} className="text-blue-400 mx-auto mb-1"/>},{v:getWeeklyPts(currentUser.id),l:'Week',c:'text-emerald-400',i:<TrendingUp size={16} className="text-emerald-400 mx-auto mb-1"/>}].map((s,i)=><div key={i} className="text-center p-3 bg-white/[0.03] rounded-xl border border-white/[0.04]">{s.i}<div className={'text-xl font-black '+s.c}>{s.v}</div><div className="text-[9px] text-gray-600 tracking-wider uppercase mt-0.5">{s.l}</div></div>)}</div>
         <div className="grid grid-cols-2 gap-3 mb-4"><div className="text-center p-3 bg-white/[0.03] rounded-xl border border-white/[0.04]"><div className="text-lg font-black text-purple-400">{streakData.activeDays||0}</div><div className="text-[9px] text-gray-600 tracking-wider uppercase mt-0.5">Active Days</div></div><div className="text-center p-3 bg-white/[0.03] rounded-xl border border-white/[0.04]"><div className="text-lg font-black text-cyan-400">{streakData.totalCompletions||0}</div><div className="text-[9px] text-gray-600 tracking-wider uppercase mt-0.5">Completions</div></div></div>
         <div className="p-3 bg-white/[0.03] rounded-xl border border-white/[0.04]"><div className="text-[9px] text-gray-600 tracking-wider uppercase mb-2">Crystals</div><div className="flex justify-center gap-4">{allCatNames.map(c=><div key={c} className="text-center"><div className={'w-6 h-6 rounded-full mx-auto mb-1 transition-all '+(myCr[c]?getCT(c).bg+' shadow-md '+getCT(c).glow:'bg-white/[0.06]')}/><span className="text-[9px] text-gray-600">{c}</span></div>)}</div></div>
@@ -1598,16 +1626,16 @@ export default function TraxApp() {
           <button onClick={()=>{setShowProfile(false);setShowInviteModal(true);}} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border transition-all ${darkMode?'border-white/[0.06] bg-white/[0.02] hover:bg-white/[0.04] text-gray-300':'border-gray-200 bg-gray-50 hover:bg-gray-100 text-gray-700'}`}><UserPlus size={16} className="text-blue-400"/><span className="text-sm">Invite to Room</span></button>
           <button onClick={()=>{setShowProfile(false);setShowStakes(true);}} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border transition-all ${darkMode?'border-white/[0.06] bg-white/[0.02] hover:bg-white/[0.04] text-gray-300':'border-gray-200 bg-gray-50 hover:bg-gray-100 text-gray-700'}`}><Zap size={16} className="text-red-400"/><span className="text-sm">Stakes</span></button>
           {lastWeekData&&<button onClick={()=>{setShowProfile(false);setShowWeeklyRecap(true);}} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border transition-all ${darkMode?'border-white/[0.06] bg-white/[0.02] hover:bg-white/[0.04] text-gray-300':'border-gray-200 bg-gray-50 hover:bg-gray-100 text-gray-700'}`}><BarChart3 size={16} className="text-purple-400"/><span className="text-sm">Weekly Recap</span></button>}
-          <button onClick={()=>{setShowProfile(false);setShowHelp(true);}} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border transition-all ${darkMode?'border-white/[0.06] bg-white/[0.02] hover:bg-white/[0.04] text-gray-300':'border-gray-200 bg-gray-50 hover:bg-gray-100 text-gray-700'}`}><HelpCircle size={16} className="text-gray-400"/><span className="text-sm">How TRAX Works</span></button>
+          <button onClick={()=>{setShowProfile(false);setShowHelp(true);}} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border transition-all ${darkMode?'border-white/[0.06] bg-white/[0.02] hover:bg-white/[0.04] text-gray-300':'border-gray-200 bg-gray-50 hover:bg-gray-100 text-gray-700'}`}><HelpCircle size={16} className="text-gray-400"/><span className="text-sm">How Versa Works</span></button>
           <button onClick={()=>signOut(auth)} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border transition-all ${darkMode?'border-white/[0.06] bg-white/[0.02] hover:bg-red-500/5 text-red-400':'border-gray-200 bg-gray-50 hover:bg-red-50 text-red-500'}`}><LogOut size={16}/><span className="text-sm">Sign Out</span></button>
         </div>
       </Modal>
 
       {/* Help */}
       <Modal show={showHelp} onClose={()=>setShowHelp(false)}>
-        <ModalHeader title="How TRAX Works" onClose={()=>setShowHelp(false)}/>
+        <ModalHeader title="How Versa Works" onClose={()=>setShowHelp(false)}/>
         <div className="space-y-3 text-sm text-gray-400">
-          {[{i:'&#x1F3AF;',t:'Track & Earn',d:'Use + and \u2212 to track habits. Max them out for neon glow.'},{i:'&#x1F525;',t:'Streak Multipliers',d:'Keep your streak alive for bonus points: 3d→1.1× · 7d→1.25× · 14d→1.5× · 30d→1.75× · 60d→2× (max). Break your streak and you reset to 1×.'},{i:'&#x1F3C6;',t:'Compete',d:'Invite friends and dominate the leaderboard.'},{i:'&#x26A1;',t:'Stakes',d:'Set real consequences for the weekly loser.'},{i:'&#x1F465;',t:'Solo Mode',d:'No friends yet? Compete against your own yesterday.'}].map((s,i)=>(
+          {[{i:'&#x1F3AF;',t:'Track & Earn',d:'Use + and \u2212 to track habits. Max them out for neon glow.'},{i:'&#x1F525;',t:'Streak Multipliers',d:'Keep your streak alive for bonus points: 3d→1.1× · 7d→1.25× · 14d→1.5× · 30d→1.75× · 60d→2× (max). Break your streak and you reset to 1×.'},{i:'&#x1F3C6;',t:'Compete',d:'Invite friends and dominate the leaderboard.'},{i:'&#x26A1;',t:'Stakes',d:'Set real consequences for the weekly loser.'},{i:'&#x1F465;',t:'Solo Mode',d:'No friends yet? Compete against yesterday.'}].map((s,i)=>(
             <div key={i} className="bg-white/[0.03] rounded-xl p-4 border border-white/[0.04]"><p className="font-bold text-white mb-1" dangerouslySetInnerHTML={{__html:s.i+' '+s.t}}/><p>{s.d}</p></div>
           ))}
           <div className="bg-white/[0.03] rounded-xl p-4 border border-white/[0.04]"><p className="font-bold text-white mb-2">Categories</p><div className="space-y-1.5">{allCatNames.map(c=>{const ct=getCT(c);return(<div key={c} className="flex items-center gap-2"><div className={'w-3 h-3 rounded-full '+ct.bg+' shadow-sm '+ct.glow}/><span><strong className={ct.txt}>{c}</strong></span></div>);})}</div></div>
@@ -1616,7 +1644,10 @@ export default function TraxApp() {
 
       {/* Invite */}
       <Modal show={showInviteModal} onClose={()=>setShowInviteModal(false)}>
-        <div className="text-center"><h2 className="text-xl font-bold mb-2">Invite Friends</h2><p className="text-xs text-gray-600 mb-6 tracking-wider uppercase">Share this room code</p><div className="mb-6 relative inline-block"><code className="inline-block px-8 py-4 bg-gradient-to-b from-white/[0.08] to-white/[0.03] border border-white/[0.1] text-3xl font-mono rounded-xl tracking-[0.4em] shadow-2xl">{currentRoom?.code}</code><div className="absolute -inset-3 bg-gradient-to-r from-blue-500/10 via-purple-500/10 to-emerald-500/10 blur-xl rounded-xl -z-10"/></div><button onClick={copyCode} className="w-full mb-3 px-6 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl shadow-lg shadow-blue-500/20 flex items-center justify-center gap-2 text-sm font-bold active:scale-[0.98]">{copied?<Check size={16}/>:<Copy size={16}/>}{copied?'Copied!':'Copy Code'}</button><button onClick={()=>setShowInviteModal(false)} className="w-full text-gray-600 py-2 hover:text-white text-sm transition-colors">Close</button></div>
+        <div className="text-center"><h2 className="text-xl font-bold mb-2">Invite Friends</h2><p className="text-xs text-gray-600 mb-6 tracking-wider uppercase">Share this room code</p><div className="mb-6 relative inline-block"><code className="inline-block px-8 py-4 bg-gradient-to-b from-white/[0.08] to-white/[0.03] border border-white/[0.1] text-3xl font-mono rounded-xl tracking-[0.4em] shadow-2xl">{currentRoom?.code}</code><div className="absolute -inset-3 bg-gradient-to-r from-blue-500/10 via-purple-500/10 to-emerald-500/10 blur-xl rounded-xl -z-10"/></div>
+        <button onClick={copyCode} className="w-full mb-2 px-6 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl shadow-lg shadow-blue-500/20 flex items-center justify-center gap-2 text-sm font-bold active:scale-[0.98]">{copied?<Check size={16}/>:<Copy size={16}/>}{copied?'Copied!':'Copy Code'}</button>
+        {navigator.share && <button onClick={async()=>{try{await navigator.share({title:'Join me on Versa',text:`Join my room on Versa! Code: ${currentRoom?.code}`,url:`${window.location.origin}?join=${currentRoom?.code}`});}catch{}}} className="w-full mb-2 px-6 py-3 border border-white/[0.08] text-white rounded-xl flex items-center justify-center gap-2 text-sm font-medium hover:bg-white/[0.04] active:scale-[0.98]"><UserPlus size={14}/>Share Link</button>}
+        <button onClick={()=>setShowInviteModal(false)} className="w-full text-gray-600 py-2 hover:text-white text-sm transition-colors">Close</button></div>
       </Modal>
 
       {/* Competitor */}
@@ -1643,7 +1674,7 @@ export default function TraxApp() {
               return (
                 <div key={s.member.id} className={'rounded-xl p-3 border transition-all '+(isMe?'bg-blue-600/10 border-blue-500/20':darkMode?'bg-white/[0.02] border-white/[0.04]':'bg-gray-50 border-gray-200')}>
                   <div className="flex items-center justify-between mb-2">
-                    <div className="flex items-center gap-2"><span className="text-sm">{i<3?medals[i]:(i+1)+'.'}</span><span className={'text-sm font-semibold '+(isMe?'text-blue-300':darkMode?'text-gray-300':'text-gray-700')}>{s.member.username}</span></div>
+                    <div className="flex items-center gap-2"><span className="text-sm">{i<3?medals[i]:(i+1)+'.'}</span><Avatar user={s.member} size={22} className={isMe?'bg-blue-500/20 text-blue-400':'bg-white/[0.06] text-gray-400'}/><span className={'text-sm font-semibold '+(isMe?'text-blue-300':darkMode?'text-gray-300':'text-gray-700')}>{s.member.username}</span></div>
                     <span className={`text-sm font-bold ${T.text}`}>{s.pts} pts</span>
                   </div>
                   <div className="flex flex-wrap gap-2">{allCatNames.map(c=>(
@@ -1656,9 +1687,85 @@ export default function TraxApp() {
                 </div>
               );
             })}</div>
+            {/* Share + Punishment */}
+            <div className="flex gap-2">
+              <button onClick={async()=>{
+                const text = `🏆 Versa Weekly Recap\n${lastWeekData.dateRange}\n\n${lastWeekData.scores.map((s,i)=>((['🥇','🥈','🥉'][i]||`${i+1}.`)+' '+s.member.username+' — '+s.pts+'pts')).join('\n')}\n\nJoin us: ${window.location.origin}?join=${currentRoom?.code}`;
+                if(navigator.share){try{await navigator.share({title:'Versa Weekly Recap',text});}catch{}}else{navigator.clipboard.writeText(text);setCopied(true);setTimeout(()=>setCopied(false),2000);}
+              }} className="flex-1 px-4 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl text-sm font-bold flex items-center justify-center gap-2 active:scale-[0.98]"><Copy size={14}/>{copied?'Copied!':'Share Recap'}</button>
+              {lastWeekData.scores.length>1&&<button onClick={()=>{setShowWeeklyRecap(false);setShowPunishmentWheel(true);setWheelResult(null);}} className="flex-1 px-4 py-3 bg-gradient-to-r from-red-600 to-pink-600 text-white rounded-xl text-sm font-bold flex items-center justify-center gap-2 active:scale-[0.98]">🎰 Spin the Wheel</button>}
+            </div>
           </div>
         ) : (
           <p className={`${T.textDim} text-sm text-center py-8`}>No data from last week yet.</p>
+        )}
+      </Modal>
+
+      {/* Punishment Wheel */}
+      <Modal show={showPunishmentWheel} onClose={()=>{setShowPunishmentWheel(false);setWheelResult(null);setWheelSpinning(false);}} wide dark={darkMode}>
+        <ModalHeader title="🎰 Punishment Wheel" onClose={()=>{setShowPunishmentWheel(false);setWheelResult(null);setWheelSpinning(false);}}/>
+        {lastWeekData && lastWeekData.scores.length > 1 && (
+          <div className="text-center">
+            <div className="mb-4">
+              <p className={`text-sm ${T.textMuted}`}>Loser this week:</p>
+              <div className="flex items-center justify-center gap-2 mt-2">
+                <Avatar user={lastWeekData.scores[lastWeekData.scores.length-1].member} size={32} className="bg-red-500/20 text-red-400"/>
+                <span className="text-lg font-bold text-red-400">{lastWeekData.scores[lastWeekData.scores.length-1].member.username}</span>
+              </div>
+              <p className={`text-xs ${T.textDim} mt-1`}>{lastWeekData.scores[lastWeekData.scores.length-1].pts} pts</p>
+            </div>
+
+            {/* Wheel display */}
+            <div className="relative mx-auto mb-6" style={{width:280,height:280}}>
+              <div className={`w-full h-full rounded-full border-4 border-white/[0.1] overflow-hidden relative`} style={{transform:`rotate(${wheelSpinning?3600+Math.random()*360:0}deg)`,transition:wheelSpinning?'transform 4s cubic-bezier(0.17,0.67,0.12,0.99)':'none'}}>
+                {PUNISHMENTS.map((p,i)=>{
+                  const angle = (360/PUNISHMENTS.length)*i;
+                  const colors = ['#3b82f6','#ef4444','#10b981','#f59e0b','#8b5cf6','#ec4899','#06b6d4','#f97316','#6366f1','#14b8a6','#e11d48','#a855f7'];
+                  return <div key={i} className="absolute text-[7px] font-bold text-white" style={{
+                    width:'50%',height:'50%',
+                    transformOrigin:'100% 100%',
+                    transform:`rotate(${angle}deg) skewY(${90-360/PUNISHMENTS.length}deg)`,
+                    left:0,top:0,
+                    background:colors[i%colors.length],
+                    display:'flex',alignItems:'center',justifyContent:'center',
+                  }}/>;
+                })}
+              </div>
+              {/* Pointer */}
+              <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-2 w-0 h-0 border-l-[10px] border-r-[10px] border-t-[16px] border-l-transparent border-r-transparent border-t-white z-10"/>
+            </div>
+
+            {/* Result */}
+            {wheelResult && (
+              <div className="mb-4 p-4 bg-gradient-to-r from-red-500/10 to-pink-500/10 border border-red-500/20 rounded-xl animate-bounce">
+                <p className="text-lg font-black text-white">{wheelResult}</p>
+                <p className={`text-xs ${T.textDim} mt-1`}>{lastWeekData.scores[lastWeekData.scores.length-1].member.username} has to do this!</p>
+              </div>
+            )}
+
+            {/* Spin button */}
+            {!wheelResult ? (
+              <button onClick={()=>{
+                if(wheelSpinning) return;
+                setWheelSpinning(true);
+                setTimeout(()=>{
+                  const result = PUNISHMENTS[Math.floor(Math.random()*PUNISHMENTS.length)];
+                  setWheelResult(result);
+                  setWheelSpinning(false);
+                },4200);
+              }} disabled={wheelSpinning} className="w-full px-6 py-3 bg-gradient-to-r from-red-600 to-pink-600 text-white rounded-xl text-sm font-bold active:scale-[0.98] disabled:opacity-60">
+                {wheelSpinning?'Spinning...':'Spin the Wheel'}
+              </button>
+            ) : (
+              <div className="flex gap-2">
+                <button onClick={()=>{setWheelResult(null);}} className="flex-1 px-4 py-3 border border-white/[0.08] text-gray-400 rounded-xl text-sm font-medium hover:bg-white/[0.04]">Spin Again</button>
+                <button onClick={async()=>{
+                  const text = `🎰 Versa Punishment Wheel\n\n${lastWeekData.scores[lastWeekData.scores.length-1].member.username} lost and has to:\n${wheelResult}\n\nJoin us: ${window.location.origin}?join=${currentRoom?.code}`;
+                  if(navigator.share){try{await navigator.share({title:'Versa Punishment',text});}catch{}}else{navigator.clipboard.writeText(text);setCopied(true);setTimeout(()=>setCopied(false),2000);}
+                }} className="flex-1 px-4 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl text-sm font-bold active:scale-[0.98]">{copied?'Copied!':'Share'}</button>
+              </div>
+            )}
+          </div>
         )}
       </Modal>
 
@@ -1871,7 +1978,7 @@ export default function TraxApp() {
               return (
                 <div key={m.id} className={`flex items-center justify-between p-3 rounded-xl border ${darkMode?'border-white/[0.06] bg-white/[0.02]':'border-gray-200 bg-gray-50'}`}>
                   <div className="flex items-center gap-3">
-                    <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-black ${isCreator?'bg-amber-500/20 text-amber-400':'bg-blue-500/20 text-blue-400'}`}>{m.username?.charAt(0)?.toUpperCase()}</div>
+                    <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-black ${isCreator?'bg-amber-500/20 text-amber-400':'bg-blue-500/20 text-blue-400'}`}>{m.photoURL?<img src={m.photoURL} className="w-8 h-8 rounded-full object-cover" referrerPolicy="no-referrer"/>:m.username?.charAt(0)?.toUpperCase()}</div>
                     <div>
                       <div className="flex items-center gap-1.5">
                         <span className={`text-sm font-medium ${darkMode?'text-gray-200':'text-gray-800'}`}>{m.username}</span>
