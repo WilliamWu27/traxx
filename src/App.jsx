@@ -1692,7 +1692,7 @@ export default function VersaApp() {
 
       {/* Weekly Recap */}
       <Modal show={showWeeklyRecap} onClose={()=>setShowWeeklyRecap(false)} wide dark={darkMode}>
-        <ModalHeader title="Weekly Recap" onClose={()=>setShowWeeklyRecap(false)} icon={<BarChart3 size={18} className="text-purple-400" dark={darkMode}/>} dark={darkMode}/>
+        <ModalHeader title="Weekly Recap" onClose={()=>setShowWeeklyRecap(false)} icon={<BarChart3 size={18} className="text-purple-400"/>} dark={darkMode}/>
         {lastWeekData ? (
           <div>
             <p className={`text-xs ${T.textDim} mb-4`}>{lastWeekData.dateRange}</p>
@@ -1805,7 +1805,7 @@ export default function VersaApp() {
 
       {/* Heat Map Calendar */}
       <Modal show={showHeatMap} onClose={()=>setShowHeatMap(false)} wide dark={darkMode}>
-        <ModalHeader title="90-Day Heat Map" onClose={()=>setShowHeatMap(false)} icon={<Calendar size={18} className="text-emerald-400" dark={darkMode}/>} dark={darkMode}/>
+        <ModalHeader title="90-Day Heat Map" onClose={()=>setShowHeatMap(false)} icon={<Calendar size={18} className="text-emerald-400"/>} dark={darkMode}/>
         <div className="mb-3"><p className={`text-xs ${T.textDim}`}>Points per day · darker = more active</p></div>
         <div className="flex flex-wrap gap-[3px]">{(() => {
           const cells = [];
@@ -1851,7 +1851,7 @@ export default function VersaApp() {
 
       {/* Personal Insights */}
       <Modal show={showInsights} onClose={()=>setShowInsights(false)} wide dark={darkMode}>
-        <ModalHeader title="Your Insights" onClose={()=>setShowInsights(false)} icon={<TrendingUp size={18} className="text-blue-400" dark={darkMode}/>} dark={darkMode}/>
+        <ModalHeader title="Your Insights" onClose={()=>setShowInsights(false)} icon={<TrendingUp size={18} className="text-blue-400"/>} dark={darkMode}/>
         {insightsData?.empty ? (
           <p className={`text-sm ${T.textDim} text-center py-8`}>Not enough data yet. Keep tracking!</p>
         ) : insightsData ? (
@@ -1995,7 +1995,7 @@ export default function VersaApp() {
 
       {/* Room Settings (Creator only) */}
       <Modal show={showRoomSettings} onClose={()=>setShowRoomSettings(false)} wide dark={darkMode}>
-        <ModalHeader title="Room Settings" onClose={()=>setShowRoomSettings(false)} icon={<Crown size={16} className="text-amber-400" dark={darkMode}/>} dark={darkMode}/>
+        <ModalHeader title="Room Settings" onClose={()=>setShowRoomSettings(false)} icon={<Crown size={16} className="text-amber-400"/>} dark={darkMode}/>
         <div className={`text-[10px] ${T.textDim} mb-4 flex items-center gap-2`}>
           <span className="font-mono tracking-wider bg-white/[0.06] px-2 py-1 rounded">{currentRoom?.code}</span>
           <span>·</span>
