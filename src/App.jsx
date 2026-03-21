@@ -718,10 +718,14 @@ export default function VersaApp() {
   // ─── STAKES ───
   const saveStake = async () => {
     if (!newStake.description.trim()) return;
+    if (!currentRoom?.id || !currentUser?.id) { setError('No room selected'); return; }
+    setLoading(true); setError('');
     try {
       await setDoc(doc(db, 'stakes', currentRoom.id), { type: newStake.type, description: newStake.description.trim(), duration: newStake.duration, createdBy: currentUser.id, createdAt: new Date().toISOString(), roomId: currentRoom.id, active: true });
+      setNewStake({ type: 'custom', description: '', duration: 'weekly' });
       setShowStakes(false);
-    } catch (err) { setError('Failed to save stakes'); }
+    } catch (err) { console.error('Stakes error:', err); setError(err.message || 'Failed to save'); }
+    finally { setLoading(false); }
   };
   const clearStake = async () => { if (!isRoomCreator && roomStakes?.createdBy !== currentUser?.id) return; if (!confirm('Remove stake?')) return; try { await deleteDoc(doc(db, 'stakes', currentRoom.id)); } catch {} };
 
@@ -1618,7 +1622,8 @@ export default function VersaApp() {
             ))}</div>
             <input type="text" placeholder={stakePresets.find(s=>s.type===newStake.type)?.ph||'Describe the stake...'} value={newStake.description} onChange={e=>setNewStake({...newStake,description:e.target.value})} className={inputCls+' mb-3'} maxLength={60}/>
             <div className="flex gap-2 mb-4">{['weekly','monthly'].map(d=><button key={d} onClick={()=>setNewStake({...newStake,duration:d})} className={'flex-1 py-2.5 text-xs font-bold rounded-xl transition-all uppercase tracking-wider '+(newStake.duration===d?(darkMode?'bg-white/[0.1] text-white':'bg-gray-200 text-gray-900'):(darkMode?'bg-white/[0.02] text-gray-600':'bg-gray-50 text-gray-400'))}>{d}</button>)}</div>
-            <button onClick={saveStake} disabled={!newStake.description.trim()} className="w-full px-4 py-4 bg-gradient-to-r from-red-600 to-pink-600 text-white rounded-xl text-base font-bold shadow-lg shadow-red-500/20 active:scale-[0.98] disabled:opacity-30 transition-all">{!newStake.description.trim()?'Type a stake above':'⚡ Set Stakes'}</button>
+            <button onClick={saveStake} disabled={!newStake.description.trim()||loading} className="w-full px-4 py-4 bg-gradient-to-r from-red-600 to-pink-600 text-white rounded-xl text-base font-bold shadow-lg shadow-red-500/20 active:scale-[0.98] disabled:opacity-30 transition-all">{loading?'Saving...':!newStake.description.trim()?'Type a stake above':'⚡ Set Stakes'}</button>
+            {error&&<p className="text-red-400 text-xs text-center mt-2">{error}</p>}
           </div>
         )}
       </Modal>
