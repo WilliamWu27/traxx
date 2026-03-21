@@ -1304,8 +1304,8 @@ export default function VersaApp() {
           <div className="flex items-center justify-between mb-1.5">
             <p className={`text-xs ${T.textDim} italic flex-1 min-w-0 truncate`}>{dailyProg>=1?'🎉 All done — nice work.':getMotivation()}</p>
             <div className="flex items-center gap-2 shrink-0 ml-2">
+              <span className={`text-[10px] font-bold ${T.text}`}>{myPts} pts</span>
               <span className={`text-[10px] font-bold ${dailyProg>=1?'text-emerald-400':'text-blue-400'}`}>{Math.round(dailyProg*100)}%</span>
-              <span className={`text-[10px] ${T.textDim}`}>{timeDisplay}</span>
             </div>
           </div>
           <div className="relative h-1 bg-white/[0.04] rounded-full overflow-hidden"><div className="absolute inset-y-0 left-0 rounded-full transition-all duration-700 ease-out" style={{width:(dailyProg*100)+'%',background:dailyProg>=1?'linear-gradient(90deg,#10b981,#34d399)':'linear-gradient(90deg,#3b82f6,#8b5cf6)'}}/></div>
