@@ -1305,13 +1305,15 @@ export default function VersaApp() {
         {/* Motivational line + progress — compact */}
         <div className="mb-3">
           <div className="flex items-center justify-between mb-1.5">
-            <p className={`text-xs ${T.textDim} italic flex-1 min-w-0 truncate`}>{dailyProg>=1?'🎉 All done — nice work.':getMotivation()}</p>
-            <div className="flex items-center gap-2 shrink-0 ml-2">
+            <div className="flex items-center gap-2 flex-1 min-w-0">
               {roomStakes ? (
-                <button onClick={()=>setShowStakes(true)} className="flex items-center gap-1 px-2 py-0.5 rounded-md bg-red-500/10 border border-red-500/20 hover:bg-red-500/15 transition-all active:scale-[0.98]"><Zap size={9} className="text-red-400"/><span className="text-[9px] text-red-400 font-medium truncate max-w-[100px]">{roomStakes.description}</span></button>
+                <button onClick={()=>setShowStakes(true)} className="flex items-center gap-1 px-2 py-0.5 rounded-md bg-red-500/10 border border-red-500/20 hover:bg-red-500/15 transition-all active:scale-[0.98] shrink-0"><Zap size={9} className="text-red-400"/><span className="text-[9px] text-red-400 font-medium truncate max-w-[100px]">{roomStakes.description}</span></button>
               ) : (
-                <button onClick={()=>setShowStakes(true)} className={`flex items-center gap-1 px-2 py-0.5 rounded-md border transition-all active:scale-[0.98] ${darkMode?'bg-white/[0.03] text-gray-500 border-white/[0.06] hover:text-gray-300':'bg-gray-50 text-gray-400 border-gray-200 hover:text-gray-600'}`}><Zap size={9}/><span className="text-[9px] font-bold">Stakes</span></button>
+                <button onClick={()=>setShowStakes(true)} className={`flex items-center gap-1 px-2 py-0.5 rounded-md border transition-all active:scale-[0.98] shrink-0 ${darkMode?'bg-white/[0.03] text-gray-500 border-white/[0.06] hover:text-gray-300':'bg-gray-50 text-gray-400 border-gray-200 hover:text-gray-600'}`}><Zap size={9}/><span className="text-[9px] font-bold">Stakes</span></button>
               )}
+              <p className={`text-xs ${T.textDim} italic truncate`}>{dailyProg>=1?'🎉 All done — nice work.':getMotivation()}</p>
+            </div>
+            <div className="flex items-center gap-2 shrink-0 ml-2">
               <span className={`text-[10px] font-bold ${T.text}`}>{myPts} pts</span>
               <span className={`text-[10px] font-bold ${dailyProg>=1?'text-emerald-400':'text-blue-400'}`}>{Math.round(dailyProg*100)}%</span>
             </div>
