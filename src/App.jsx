@@ -1296,7 +1296,7 @@ export default function VersaApp() {
           </div>
         </div>
         {/* Week progress bar */}
-        <div className={`h-[2px] ${darkMode?'bg-white/[0.04]':'bg-gray-200'}`}><div className="h-full transition-all duration-700 ease-out" style={{width:((((new Date()).getDay()||7)/7)*100)+'%',background:'linear-gradient(90deg,#3b82f6,#8b5cf6,#10b981)'}}/></div>
+        <div className={`h-[2px] ${darkMode?'bg-white/[0.06]':'bg-gray-200'}`}><div className="h-full transition-all duration-700 ease-out" style={{width:(((new Date()).getDay()+1)/7*100)+'%',background:'linear-gradient(90deg,#3b82f6,#8b5cf6,#10b981)'}}/></div>
       </div>
 
       <div className="max-w-2xl mx-auto px-4 py-4">
