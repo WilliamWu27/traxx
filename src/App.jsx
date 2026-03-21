@@ -126,6 +126,10 @@ export default function VersaApp() {
   const [showPunishmentWheel, setShowPunishmentWheel] = useState(false);
   const [wheelSpinning, setWheelSpinning] = useState(false);
   const [wheelResult, setWheelResult] = useState(null);
+  const [devMode, setDevMode] = useState(() => {
+    try { return localStorage.getItem('versa-devmode') === 'true'; } catch { return false; }
+  });
+  const toggleDevMode = () => { const next = !devMode; setDevMode(next); try { localStorage.setItem('versa-devmode', next ? 'true' : 'false'); } catch {} };
   const [showHistory, setShowHistory] = useState(false);
   const [showEditHabit, setShowEditHabit] = useState(null);
   const [copied, setCopied] = useState(false);
@@ -1327,8 +1331,8 @@ export default function VersaApp() {
         {/* Stakes — tiny banner */}
         {roomStakes && <button onClick={()=>setShowStakes(true)} className="w-full mb-3 px-3 py-1.5 bg-red-500/5 border border-red-500/10 rounded-lg flex items-center gap-2 hover:border-red-500/20 transition-all"><Zap size={10} className="text-red-400 shrink-0"/><span className="text-[10px] text-red-300/70 truncate">{roomStakes.description}</span></button>}
 
-        {/* Board requests */}
-        {boardRequests.length > 0 && boardRequests.map(br => (
+        {/* Board requests — dev mode only */}
+        {devMode && boardRequests.length > 0 && boardRequests.map(br => (
           <div key={br.id} className={`mb-2 p-2.5 rounded-lg border ${darkMode?'bg-purple-500/5 border-purple-500/15':'bg-purple-50 border-purple-200'}`}>
             <div className="flex items-center justify-between">
               <div><span className="text-xs font-medium text-purple-400">{br.username}</span><span className={`text-[10px] ${T.textDim} ml-1`}>wants a custom board</span></div>
@@ -1340,19 +1344,36 @@ export default function VersaApp() {
           </div>
         ))}
 
-        {/* Board indicator */}
-        {boardActive && (
+        {/* Board indicator — dev mode only */}
+        {devMode && boardActive && (
           <div className={`mb-2 p-2 rounded-lg border flex items-center justify-between ${darkMode?'bg-indigo-500/5 border-indigo-500/15':'bg-indigo-50 border-indigo-200'}`}>
             <span className="text-[10px] text-indigo-400 font-medium">🎯 Custom Board — {myBoardIds?.length||0} of {habits.length}</span>
             <button onClick={resetBoard} className="text-[10px] text-gray-500 hover:text-red-400">Show All</button>
           </div>
         )}
 
-        {editMode && (
+        {devMode && editMode && (
           <div className={`mb-2 p-2.5 rounded-lg border ${darkMode?'bg-blue-500/5 border-blue-500/15':'bg-blue-50 border-blue-200'}`}>
             <p className={`text-[10px] ${darkMode?'text-blue-300':'text-blue-600'}`}>Drag to reorder · ✓ show/hide · ✏️ edit · ✕ delete</p>
           </div>
         )}
+
+        {/* ═══ CATEGORY COLUMNS AT TOP ═══ */}
+        <div className="grid grid-cols-3 gap-2 mb-4">
+          {allCatNames.map(cat => {
+            const t = getCT(cat);
+            const catPts = getCatPts(currentUser.id, cat);
+            const hasCrystal = myCr[cat];
+            return (
+              <div key={cat} className={`text-center p-2.5 rounded-xl border ${hasCrystal ? t.bdr+' '+t.bgS+' shadow-sm '+t.glow : darkMode?'border-white/[0.04] bg-white/[0.02]':'border-gray-200 bg-gray-50'}`}>
+                <div className="text-sm mb-0.5">{t.icon}</div>
+                <div className={'text-lg font-black '+t.txt}>{catPts}</div>
+                <div className={`text-[8px] tracking-wider uppercase ${T.textDim}`}>{t.label}</div>
+                {hasCrystal && <div className="text-[9px] mt-0.5">💎</div>}
+              </div>
+            );
+          })}
+        </div>
 
         {/* ═══ HABITS — THE MAIN EVENT ═══ */}
         <div className="space-y-6">
@@ -1361,24 +1382,24 @@ export default function VersaApp() {
             const t = getCT(cat);
             return (
               <div key={cat}>
-                <div className="flex items-center gap-2.5 mb-3 px-1"><span className="text-sm">{t.icon}</span><h2 className={'text-[11px] font-bold tracking-[0.2em] uppercase '+t.txt}>{t.label}</h2><div className={'flex-1 h-px ml-1 '+(darkMode?'bg-white/[0.04]':'bg-gray-200')}/><span className={'text-[10px] font-semibold '+t.txt}>{getCatPts(currentUser.id,cat)} pts</span></div>
+                <div className="flex items-center gap-2.5 mb-3 px-1"><span className="text-sm">{t.icon}</span><h2 className={'text-[11px] font-bold tracking-[0.2em] uppercase '+t.txt}>{t.label}</h2><div className={'flex-1 h-px ml-1 '+(darkMode?'bg-white/[0.04]':'bg-gray-200')}/></div>
                 <div className="space-y-2">{ch.map((h, idx) => {
                   const cnt = getCount(h.id), mx = h.isRepeatable?(h.maxCompletions||1):1, done=cnt>0, maxed=cnt>=mx, pct=mx>0?cnt/mx:0;
                   return (
                     <div key={h.id}
-                      draggable={editMode}
-                      onDragStart={editMode?(e)=>{e.dataTransfer.setData('text/plain',cat+'|'+idx);e.dataTransfer.effectAllowed='move';}:undefined}
-                      onDragOver={editMode?(e)=>{e.preventDefault();}:undefined}
-                      onDrop={editMode?(e)=>{e.preventDefault();const data=e.dataTransfer.getData('text/plain');const [srcCat,srcIdx]=data.split('|');if(srcCat!==cat)return;const ni=parseInt(srcIdx);if(ni===idx)return;const arr=[...ch];const [moved]=arr.splice(ni,1);arr.splice(idx,0,moved);saveHabitOrder(cat,arr);}:undefined}
-                      className={'relative rounded-xl p-3 flex items-center justify-between transition-all border '+(editMode?'cursor-grab active:cursor-grabbing ':'')+
-                        (editMode && !isOnBoard(h.id)?'opacity-40 ':'')+
+                      draggable={devMode&&editMode}
+                      onDragStart={devMode&&editMode?(e)=>{e.dataTransfer.setData('text/plain',cat+'|'+idx);e.dataTransfer.effectAllowed='move';}:undefined}
+                      onDragOver={devMode&&editMode?(e)=>{e.preventDefault();}:undefined}
+                      onDrop={devMode&&editMode?(e)=>{e.preventDefault();const data=e.dataTransfer.getData('text/plain');const [srcCat,srcIdx]=data.split('|');if(srcCat!==cat)return;const ni=parseInt(srcIdx);if(ni===idx)return;const arr=[...ch];const [moved]=arr.splice(ni,1);arr.splice(idx,0,moved);saveHabitOrder(cat,arr);}:undefined}
+                      className={'relative rounded-xl p-3 flex items-center justify-between transition-all border '+(devMode&&editMode?'cursor-grab active:cursor-grabbing ':'')+
+                        (devMode&&editMode && !isOnBoard(h.id)?'opacity-40 ':'')+
                         (maxed?t.bdr+' '+(darkMode?t.bgS:'bg-white')+' shadow-lg '+t.glow:done?t.bdr+' '+(darkMode?t.bgS:'bg-white'):darkMode?'border-white/[0.04] bg-white/[0.02] hover:bg-white/[0.03]':'border-gray-200 bg-white hover:bg-gray-50')+
                         (maxedHabit===h.id?' animate-pulse ring-2 ring-offset-2 ring-offset-transparent':'')}>
                       {/* Maxout flash overlay */}
                       {maxedHabit===h.id&&<div className="absolute inset-0 rounded-xl animate-ping opacity-20" style={{backgroundColor:t.neon}}/>}
                       {mx>1&&<div className={'absolute bottom-0 left-0 right-0 h-0.5 rounded-b-xl overflow-hidden '+(darkMode?'bg-white/[0.03]':'bg-gray-100')}><div className="h-full rounded-full transition-all duration-500" style={{width:(pct*100)+'%',backgroundColor:t.neon}}/></div>}
                       <div className="flex items-center gap-3 flex-1 min-w-0">
-                        {editMode?<div className={darkMode?'text-gray-600':'text-gray-400'}><GripVertical size={16}/></div>:(
+                        {devMode&&editMode?<div className={darkMode?'text-gray-600':'text-gray-400'}><GripVertical size={16}/></div>:(
                         <div className="flex items-center gap-1 shrink-0">
                           <button onClick={()=>handleDecrement(h.id)} disabled={cnt===0} className={'w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold transition-all active:scale-90 '+(cnt===0?'border '+(darkMode?'border-white/[0.06] text-gray-700':'border-gray-200 text-gray-300')+' cursor-not-allowed':'border-2 '+t.bdr+' '+t.txt)}>&minus;</button>
                           <div className={'w-10 h-10 rounded-full border-2 flex items-center justify-center text-sm font-black transition-all duration-300 '+(maxed?t.bg+' border-transparent text-white shadow-lg '+t.glow+' scale-110':done?'border-current '+t.txt+' '+t.bgM:'border-'+(darkMode?'white/[0.08]':'gray-200')+' '+(darkMode?'text-gray-600':'text-gray-400')+' '+(darkMode?'bg-white/[0.02]':'bg-gray-50'))}>{maxed?'✓':cnt}</div>
@@ -1389,7 +1410,7 @@ export default function VersaApp() {
                           <div className={(darkMode?'text-gray-600':'text-gray-400')+' text-[11px] flex items-center gap-1.5 flex-wrap'}><span>{h.points}pts</span><span>&middot;</span><span className={maxed?'font-bold '+t.txtB:''}>{cnt}/{mx}</span>{h.unit&&<span>{h.unit}</span>}{maxed&&<span className={t.pill+' text-[9px] font-bold px-1.5 py-0.5 rounded-full'+(maxedHabit===h.id?' animate-bounce':'')}>✓ MAXED</span>}</div>
                         </div>
                       </div>
-                      {editMode&&<div className="flex items-center gap-0.5 shrink-0 ml-1">
+                      {devMode&&editMode&&<div className="flex items-center gap-0.5 shrink-0 ml-1">
                         <button onClick={()=>toggleHabitOnBoard(h.id)} title={isOnBoard(h.id)?'Hide from board':'Show on board'} className={'p-1.5 transition-colors '+(isOnBoard(h.id)?(darkMode?'text-indigo-400 hover:text-indigo-300':'text-indigo-500 hover:text-indigo-400'):(darkMode?'text-gray-700 hover:text-indigo-400':'text-gray-400 hover:text-indigo-500'))}>{isOnBoard(h.id)?<Check size={11}/>:<MinusIcon size={11}/>}</button>
                         <button onClick={()=>openEditHabit(h)} className={'p-1.5 transition-colors '+(darkMode?'text-gray-700 hover:text-blue-400':'text-gray-400 hover:text-blue-500')}><Edit3 size={11}/></button>
                         <button onClick={()=>deleteHabit(h.id)} className={'p-1.5 transition-colors '+(darkMode?'text-gray-700 hover:text-red-400':'text-gray-400 hover:text-red-500')}><X size={12}/></button>
@@ -1402,12 +1423,12 @@ export default function VersaApp() {
           })}
           {habits.length===0 ? (
             <div className="text-center py-16"><div className="text-5xl mb-4">&#x1F3AF;</div><p className="text-gray-500 text-sm mb-5">No habits yet</p><button onClick={()=>setShowAddHabit(true)} className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl shadow-lg shadow-blue-500/20 text-sm font-bold active:scale-[0.98]"><Plus size={18}/>Add Habits</button></div>
-          ) : (
+          ) : devMode ? (
             <div className="flex gap-2">
               <button onClick={()=>setShowAddHabit(true)} className={'flex-1 border border-dashed rounded-xl p-4 hover:text-blue-400 hover:border-blue-500/30 hover:bg-blue-500/5 flex items-center justify-center gap-2 transition-all '+(darkMode?'border-white/[0.08] text-gray-600':'border-gray-300 text-gray-400')}><Plus size={15}/><span className="text-xs font-medium tracking-wide">Add Habit</span></button>
               <button onClick={()=>setShowAddCategory(true)} className={'border border-dashed rounded-xl p-4 hover:text-purple-400 hover:border-purple-500/30 hover:bg-purple-500/5 flex items-center justify-center gap-2 transition-all '+(darkMode?'border-white/[0.08] text-gray-600':'border-gray-300 text-gray-400')}><span className="text-xs font-medium tracking-wide">+ Category</span></button>
             </div>
-          )}
+          ) : null}
         </div>
 
         {/* ═══ SECONDARY CONTENT (below habits) ═══ */}
@@ -1457,13 +1478,14 @@ export default function VersaApp() {
 
         {/* Tools */}
         <div className="flex items-center justify-center gap-1 flex-wrap mb-4">
-          <button onClick={loadHeatMap} className={`text-[9px] font-medium tracking-wider uppercase px-2.5 py-1 rounded-md transition-all ${T.textDim} hover:text-purple-400`}>📊 Map</button>
+          {devMode&&<><button onClick={loadHeatMap} className={`text-[9px] font-medium tracking-wider uppercase px-2.5 py-1 rounded-md transition-all ${T.textDim} hover:text-purple-400`}>📊 Map</button>
           <button onClick={loadInsights} className={`text-[9px] font-medium tracking-wider uppercase px-2.5 py-1 rounded-md transition-all ${T.textDim} hover:text-blue-400`}>📈 Insights</button>
           <button onClick={()=>{setCustomBoardHabits(myBoardIds||habits.map(h=>h.id));setShowCustomBoard(true);}} className={`text-[9px] font-medium tracking-wider uppercase px-2.5 py-1 rounded-md transition-all ${T.textDim} hover:text-indigo-400`}>🎯 Board</button>
           {habits.length>0&&<button onClick={()=>setEditMode(!editMode)} className={'text-[9px] font-medium tracking-wider uppercase px-2.5 py-1 rounded-md transition-all '+(editMode?'bg-blue-500/20 text-blue-400':T.textDim+' hover:text-gray-400')}>{editMode?'Done':'✏️ Edit'}</button>}
           <button onClick={()=>{setHistoryDate(getYesterday());loadHistoryDate(getYesterday());setShowHistory(true);}} className={`text-[9px] font-medium tracking-wider uppercase px-2.5 py-1 rounded-md transition-all ${T.textDim} hover:text-gray-400`}>📅 History</button>
           {lastWeekData&&<button onClick={()=>setShowWeeklyRecap(true)} className={`text-[9px] font-medium tracking-wider uppercase px-2.5 py-1 rounded-md transition-all ${T.textDim} hover:text-purple-400`}>📊 Recap</button>}
-          <button onClick={toggleTheme} className={`text-[9px] font-medium tracking-wider uppercase px-2.5 py-1 rounded-md transition-all ${T.textDim} hover:text-amber-400`}>{darkMode?'☀️ Light':'🌙 Dark'}</button>
+          <button onClick={toggleTheme} className={`text-[9px] font-medium tracking-wider uppercase px-2.5 py-1 rounded-md transition-all ${T.textDim} hover:text-amber-400`}>{darkMode?'☀️ Light':'🌙 Dark'}</button></>}
+          <button onClick={toggleDevMode} className={`text-[9px] font-medium tracking-wider uppercase px-2.5 py-1 rounded-md transition-all ${devMode?'bg-amber-500/20 text-amber-400 border border-amber-500/30':T.textDim+' hover:text-gray-400'}`}>{devMode?'🔧 Dev Mode':'⚙️ Settings'}</button>
         </div>
       </div>
 
@@ -1474,7 +1496,7 @@ export default function VersaApp() {
         <ModalHeader title="Add Habit" onClose={()=>setShowAddHabit(false)}/>
         <button onClick={loadDefaultHabits} disabled={loading} className="w-full mb-5 px-4 py-3 bg-gradient-to-r from-violet-600 to-purple-600 text-white rounded-xl shadow-lg shadow-violet-500/20 text-sm font-bold active:scale-[0.98] disabled:opacity-50">{loading?'Loading...':'⚡ Load Student Preset (10 habits)'}</button>
         <div className="space-y-3">
-          <input type="text" placeholder="Habit name" value={newHabit.name} onChange={e=>setNewHabit({...newHabit,name:e.target.value})} className={inputCls}/>
+          <input type="text" placeholder="Habit name" value={newHabit.name} onChange={e=>setNewHabit({...newHabit,name:e.target.value})} className={inputCls} maxLength={30}/>
           <div className="grid grid-cols-2 gap-3">
             <select value={newHabit.category} onChange={e=>setNewHabit({...newHabit,category:e.target.value})} className={inputCls}>{allCatNames.map(c=><option key={c} value={c} className={darkMode?'bg-[#12121a]':'bg-white'}>{c}</option>)}</select>
             <input type="number" placeholder="Points" value={newHabit.points} onChange={e=>setNewHabit({...newHabit,points:e.target.value})} className={inputCls}/>
@@ -1490,7 +1512,7 @@ export default function VersaApp() {
       <Modal show={!!showEditHabit} onClose={()=>setShowEditHabit(null)}>
         <ModalHeader title="Edit Habit" onClose={()=>setShowEditHabit(null)} icon={<Edit3 size={18} className="text-blue-400"/>}/>
         <div className="space-y-3">
-          <input type="text" placeholder="Name" value={editHabitData.name||''} onChange={e=>setEditHabitData({...editHabitData,name:e.target.value})} className={inputCls}/>
+          <input type="text" placeholder="Name" value={editHabitData.name||''} onChange={e=>setEditHabitData({...editHabitData,name:e.target.value})} className={inputCls} maxLength={30}/>
           <div className="grid grid-cols-2 gap-3">
             <select value={editHabitData.category||allCatNames[0]} onChange={e=>setEditHabitData({...editHabitData,category:e.target.value})} className={inputCls}>{allCatNames.map(c=><option key={c} value={c} className={darkMode?'bg-[#12121a]':'bg-white'}>{c}</option>)}</select>
             <input type="number" placeholder="Points" value={editHabitData.points||''} onChange={e=>setEditHabitData({...editHabitData,points:e.target.value})} className={inputCls}/>
@@ -1921,7 +1943,7 @@ export default function VersaApp() {
         <details className={`mb-4 rounded-xl border overflow-hidden ${darkMode?'border-white/[0.06] bg-white/[0.02]':'border-gray-200 bg-gray-50'}`}>
           <summary className={`px-4 py-2.5 cursor-pointer text-xs font-medium ${T.textDim} hover:${T.text} transition-colors`}><Plus size={12} className="inline mr-1"/>Add a new habit</summary>
           <div className="px-4 pb-4 pt-2 space-y-3">
-            <input value={newHabit.name} onChange={e=>setNewHabit(p=>({...p,name:e.target.value}))} placeholder="Habit name" className={inputCls} maxLength={40}/>
+            <input value={newHabit.name} onChange={e=>setNewHabit(p=>({...p,name:e.target.value}))} placeholder="Habit name" className={inputCls} maxLength={30}/>
             <div className="grid grid-cols-2 gap-3">
               <select value={newHabit.category} onChange={e=>setNewHabit(p=>({...p,category:e.target.value}))} className={inputCls}>
                 {allCatNames.map(c=><option key={c} value={c}>{c}</option>)}
