@@ -1308,8 +1308,8 @@ export default function VersaApp() {
             </div>
           </div>
           <div className="relative h-1 bg-white/[0.04] rounded-full overflow-hidden"><div className="absolute inset-y-0 left-0 rounded-full transition-all duration-700 ease-out" style={{width:(dailyProg*100)+'%',background:dailyProg>=1?'linear-gradient(90deg,#10b981,#34d399)':'linear-gradient(90deg,#3b82f6,#8b5cf6)'}}/></div>
-          <div className="flex justify-end mt-1.5">
-            <button onClick={()=>setShowStakes(true)} className={`text-[9px] font-medium flex items-center gap-1 transition-colors ${roomStakes?'text-red-400 hover:text-red-300':'text-gray-600 hover:text-gray-400'}`}><Zap size={10}/>Stakes</button>
+          <div className="flex justify-end mt-2">
+            <button onClick={()=>setShowStakes(true)} className={`text-[11px] font-bold flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-all active:scale-[0.98] ${roomStakes?'bg-red-500/10 text-red-400 border border-red-500/20 hover:bg-red-500/15':'bg-white/[0.03] text-gray-500 border border-white/[0.06] hover:text-gray-300'}`}><Zap size={12}/>{roomStakes?'View Stakes':'Set Stakes'}</button>
           </div>
         </div>
 
@@ -1612,13 +1612,13 @@ export default function VersaApp() {
           </div>
         ) : (
           <div>
-            <p className="text-gray-500 text-sm mb-4">Set what's on the line. The weekly loser pays up.</p>
+            <p className={`${T.textMuted} text-sm mb-4`}>Set what's on the line. The weekly loser pays up.</p>
             <div className="grid grid-cols-2 gap-2 mb-4">{stakePresets.map(sp=>(
-              <button key={sp.type} onClick={()=>setNewStake({...newStake,type:sp.type,description:''})} className={'p-3 rounded-xl border text-left transition-all '+(newStake.type===sp.type?'border-red-500/40 bg-red-500/10':'border-white/[0.06] bg-white/[0.02] hover:bg-white/[0.04]')}><div className={'text-xs font-bold mb-0.5 '+(newStake.type===sp.type?'text-red-400':'text-gray-400')}>{sp.label}</div><div className="text-[10px] text-gray-600">{sp.desc}</div></button>
+              <button key={sp.type} onClick={()=>setNewStake({...newStake,type:sp.type,description:sp.ph.replace('e.g. ','')})} className={'p-3 rounded-xl border text-left transition-all '+(newStake.type===sp.type?'border-red-500/40 bg-red-500/10':'border-white/[0.06] bg-white/[0.02] hover:bg-white/[0.04]')}><div className={'text-xs font-bold mb-0.5 '+(newStake.type===sp.type?'text-red-400':'text-gray-400')}>{sp.label}</div><div className="text-[10px] text-gray-600">{sp.desc}</div></button>
             ))}</div>
-            <input type="text" placeholder={stakePresets.find(s=>s.type===newStake.type)?.ph||'Describe...'} value={newStake.description} onChange={e=>setNewStake({...newStake,description:e.target.value})} className={inputCls+' mb-3'}/>
-            <div className="flex gap-2 mb-4">{['weekly','monthly'].map(d=><button key={d} onClick={()=>setNewStake({...newStake,duration:d})} className={'flex-1 py-2 text-xs font-bold rounded-lg transition-all uppercase tracking-wider '+(newStake.duration===d?'bg-white/[0.08] text-white':'bg-white/[0.02] text-gray-600')}>{d}</button>)}</div>
-            <button onClick={saveStake} disabled={!newStake.description.trim()} className="w-full px-4 py-3 bg-gradient-to-r from-red-600 to-pink-600 text-white rounded-xl text-sm font-bold shadow-lg shadow-red-500/20 active:scale-[0.98] disabled:opacity-40">Set Stakes</button>
+            <input type="text" placeholder={stakePresets.find(s=>s.type===newStake.type)?.ph||'Describe the stake...'} value={newStake.description} onChange={e=>setNewStake({...newStake,description:e.target.value})} className={inputCls+' mb-3'} maxLength={60}/>
+            <div className="flex gap-2 mb-4">{['weekly','monthly'].map(d=><button key={d} onClick={()=>setNewStake({...newStake,duration:d})} className={'flex-1 py-2.5 text-xs font-bold rounded-xl transition-all uppercase tracking-wider '+(newStake.duration===d?(darkMode?'bg-white/[0.1] text-white':'bg-gray-200 text-gray-900'):(darkMode?'bg-white/[0.02] text-gray-600':'bg-gray-50 text-gray-400'))}>{d}</button>)}</div>
+            <button onClick={saveStake} disabled={!newStake.description.trim()} className="w-full px-4 py-4 bg-gradient-to-r from-red-600 to-pink-600 text-white rounded-xl text-base font-bold shadow-lg shadow-red-500/20 active:scale-[0.98] disabled:opacity-30 transition-all">{!newStake.description.trim()?'Type a stake above':'⚡ Set Stakes'}</button>
           </div>
         )}
       </Modal>
