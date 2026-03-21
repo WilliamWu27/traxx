@@ -1313,7 +1313,11 @@ export default function VersaApp() {
           </div>
           <div className="relative h-1 bg-white/[0.04] rounded-full overflow-hidden"><div className="absolute inset-y-0 left-0 rounded-full transition-all duration-700 ease-out" style={{width:(dailyProg*100)+'%',background:dailyProg>=1?'linear-gradient(90deg,#10b981,#34d399)':'linear-gradient(90deg,#3b82f6,#8b5cf6)'}}/></div>
           <div className="flex justify-end mt-2">
-            <button onClick={()=>setShowStakes(true)} className={`text-[11px] font-bold flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-all active:scale-[0.98] ${roomStakes?'bg-red-500/10 text-red-400 border border-red-500/20 hover:bg-red-500/15':'bg-white/[0.03] text-gray-500 border border-white/[0.06] hover:text-gray-300'}`}><Zap size={12}/>{roomStakes?'View Stakes':'Set Stakes'}</button>
+            {roomStakes ? (
+              <button onClick={()=>setShowStakes(true)} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-500/10 border border-red-500/20 hover:bg-red-500/15 transition-all active:scale-[0.98]"><Zap size={11} className="text-red-400"/><span className="text-[11px] text-red-400 font-medium truncate max-w-[200px]">{roomStakes.description}</span></button>
+            ) : (
+              <button onClick={()=>setShowStakes(true)} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/[0.03] text-gray-500 border border-white/[0.06] hover:text-gray-300 transition-all active:scale-[0.98]"><Zap size={12}/><span className="text-[11px] font-bold">Set Stakes</span></button>
+            )}
           </div>
         </div>
 
@@ -1341,9 +1345,6 @@ export default function VersaApp() {
             {myPts > yesterdayPoints && myPts > 0 && <span className="text-[10px] text-emerald-400 font-bold">↑ Ahead</span>}
           </div>
         )}
-
-        {/* Stakes — tiny banner */}
-        {roomStakes && <button onClick={()=>setShowStakes(true)} className="w-full mb-3 px-3 py-1.5 bg-red-500/5 border border-red-500/10 rounded-lg flex items-center gap-2 hover:border-red-500/20 transition-all"><Zap size={10} className="text-red-400 shrink-0"/><span className="text-[10px] text-red-300/70 truncate">{roomStakes.description}</span></button>}
 
         {/* Board requests — dev mode only */}
         {devMode && boardRequests.length > 0 && boardRequests.map(br => (
