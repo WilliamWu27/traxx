@@ -1287,7 +1287,6 @@ export default function VersaApp() {
             </div>
             <div className="flex items-center gap-1">
               <button onClick={()=>setShowLeaderboard(true)} className="p-1.5 text-amber-400 hover:text-amber-300 transition-colors"><Trophy size={13}/></button>
-              {roomStakes&&<button onClick={()=>setShowStakes(true)} className="p-1.5 text-red-400"><Zap size={13}/></button>}
               <button onClick={()=>setShowInviteModal(true)} className={`p-1.5 ${T.textDim} hover:${T.text} transition-colors`}><UserPlus size={13}/></button>
               <button onClick={toggleTheme} className={`p-1.5 ${T.textDim} hover:text-amber-400 transition-colors`}>{darkMode?<Sun size={13}/>:<Moon size={13}/>}</button>
               <button onClick={()=>setShowProfile(true)} className={`p-1.5 ${T.textDim} hover:${T.text} transition-colors`}><User size={14}/></button>
@@ -1309,6 +1308,9 @@ export default function VersaApp() {
             </div>
           </div>
           <div className="relative h-1 bg-white/[0.04] rounded-full overflow-hidden"><div className="absolute inset-y-0 left-0 rounded-full transition-all duration-700 ease-out" style={{width:(dailyProg*100)+'%',background:dailyProg>=1?'linear-gradient(90deg,#10b981,#34d399)':'linear-gradient(90deg,#3b82f6,#8b5cf6)'}}/></div>
+          <div className="flex justify-end mt-1.5">
+            <button onClick={()=>setShowStakes(true)} className={`text-[9px] font-medium flex items-center gap-1 transition-colors ${roomStakes?'text-red-400 hover:text-red-300':'text-gray-600 hover:text-gray-400'}`}><Zap size={10}/>Stakes</button>
+          </div>
         </div>
 
         {/* Rival pills — inline, small */}
