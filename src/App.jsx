@@ -1276,13 +1276,14 @@ export default function VersaApp() {
         </div>
       )}
       {/* Header — slim */}
-      <div className={`${T.headerBg} ${T.blurBg} sticky top-0 z-40`}>
+      <div className={`${T.headerBg} ${T.blurBg} border-b ${T.border} sticky top-0 z-40`}>
         <div className="max-w-2xl mx-auto px-4 py-2.5">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <h1 className="text-base font-black tracking-[0.15em]">VERSA</h1>
               <div className="flex gap-0.5"><div className="w-1 h-1 rounded-full bg-blue-500"/><div className="w-1 h-1 rounded-full bg-orange-500"/><div className="w-1 h-1 rounded-full bg-emerald-500"/></div>
               {streakData.streak>0&&<div className="flex items-center gap-1 ml-1"><Flame size={11} className="text-orange-400"/><span className="text-orange-400 text-xs font-bold">{streakData.streak}</span>{streakMulti.multi>1&&<span className={`text-[8px] font-bold ${streakMulti.color}`}>{streakMulti.label}</span>}</div>}
+              <span className={`text-[9px] ${T.textDim} ml-1`}>{timeDisplay} · D{(new Date()).getDay()||7}</span>
             </div>
             <div className="flex items-center gap-1">
               <button onClick={()=>setShowLeaderboard(true)} className="p-1.5 text-amber-400 hover:text-amber-300 transition-colors"><Trophy size={13}/></button>
@@ -1295,8 +1296,6 @@ export default function VersaApp() {
             </div>
           </div>
         </div>
-        {/* Week progress bar */}
-        <div className={`h-[2px] ${darkMode?'bg-white/[0.06]':'bg-gray-200'}`}><div className="h-full transition-all duration-700 ease-out" style={{width:(((new Date()).getDay()+1)/7*100)+'%',background:'linear-gradient(90deg,#3b82f6,#8b5cf6,#10b981)'}}/></div>
       </div>
 
       <div className="max-w-2xl mx-auto px-4 py-4">
