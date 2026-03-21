@@ -88,8 +88,8 @@ function Modal({ show, onClose, children, wide, dark = true }) {
 function ModalHeader({ title, onClose, icon }) {
   return (
     <div className="flex items-center justify-between mb-5">
-      <div className="flex items-center gap-2">{icon}{typeof title === 'string' ? <h2 className="text-lg font-bold text-white">{title}</h2> : title}</div>
-      <button onClick={onClose} className="text-gray-600 hover:text-white transition-colors"><X size={20} /></button>
+      <div className="flex items-center gap-2">{icon}{typeof title === 'string' ? <h2 className={`text-lg font-bold ${dark?'text-white':'text-gray-900'}`}>{title}</h2> : title}</div>
+      <button onClick={onClose} className={`${dark?'text-gray-600 hover:text-white':'text-gray-400 hover:text-gray-900'} transition-colors`}><X size={20} /></button>
     </div>
   );
 }
@@ -224,19 +224,19 @@ export default function VersaApp() {
   // ─── DEFAULT HABITS ───
   const loadDefaultHabits = async () => {
     const defaultHabits = [
-      // GRIND — academics, productivity, getting ahead
-      { name: 'Study session', category: 'Study', points: 5, isRepeatable: true, maxCompletions: 20, unit: 'per 30 min' },
-      { name: 'Read', category: 'Study', points: 8, isRepeatable: true, maxCompletions: 6, unit: 'per 30 min' },
-      { name: 'Side project', category: 'Study', points: 5, isRepeatable: true, maxCompletions: 12, unit: 'per 30 min' },
+      // STUDY — academics, productivity, getting ahead
+      { name: 'Study session', category: 'Study', points: 10, isRepeatable: true, maxCompletions: 20, unit: 'per 30 min' },
+      { name: 'Read', category: 'Study', points: 10, isRepeatable: true, maxCompletions: 6, unit: 'per 30 min' },
+      { name: 'Side project', category: 'Study', points: 10, isRepeatable: true, maxCompletions: 12, unit: 'per 30 min' },
       // HEALTH — gym, sleep, nutrition
-      { name: 'Hit the gym', category: 'Health', points: 15, isRepeatable: true, maxCompletions: 4, unit: 'per 30 min' },
-      { name: 'Slept 7+ hours', category: 'Health', points: 15, isRepeatable: false, maxCompletions: 1 },
-      { name: 'Woke up before 7', category: 'Health', points: 15, isRepeatable: false, maxCompletions: 1 },
-      { name: 'Clean eating', category: 'Health', points: 8, isRepeatable: true, maxCompletions: 3, unit: 'per meal' },
-      // DISCIPLINE — screen time, substances, mindset
-      { name: 'Screen time under 2.5hrs', category: 'Focus', points: 15, isRepeatable: false, maxCompletions: 1 },
-      { name: 'No vaping / substances', category: 'Focus', points: 15, isRepeatable: false, maxCompletions: 1 },
-      { name: 'Journaled', category: 'Focus', points: 8, isRepeatable: true, maxCompletions: 3, unit: 'per 5 min' },
+      { name: 'Hit the gym', category: 'Health', points: 20, isRepeatable: true, maxCompletions: 4, unit: 'per 30 min' },
+      { name: 'Slept 7+ hours', category: 'Health', points: 30, isRepeatable: false, maxCompletions: 1 },
+      { name: 'Woke up before 7', category: 'Health', points: 30, isRepeatable: false, maxCompletions: 1 },
+      { name: 'Clean eating', category: 'Health', points: 10, isRepeatable: true, maxCompletions: 3, unit: 'per meal' },
+      // FOCUS — screen time, substances, mindset
+      { name: 'Screen time under 2.5hrs', category: 'Focus', points: 30, isRepeatable: false, maxCompletions: 1 },
+      { name: 'No vaping / substances', category: 'Focus', points: 30, isRepeatable: false, maxCompletions: 1 },
+      { name: 'Journaled', category: 'Focus', points: 10, isRepeatable: true, maxCompletions: 3, unit: 'per 5 min' },
     ];
     try {
       setLoading(true);
@@ -1623,7 +1623,7 @@ export default function VersaApp() {
             <div className="flex items-center gap-2">{currentRoom?.id!==rid&&<button onClick={()=>switchRoom(rid)} className="text-[10px] text-blue-400 hover:text-blue-300 font-medium uppercase tracking-wider">Switch</button>}<button onClick={()=>leaveRoom(rid)} className="text-[10px] text-gray-600 hover:text-red-400 font-medium uppercase tracking-wider">Leave</button></div>
           </div>
         ))}</div>
-        <div className="border-t border-white/[0.06] pt-4"><p className="text-xs text-gray-500 mb-3">Join another room</p><div className="flex gap-2"><input type="text" placeholder="CODE" value={roomCode} onChange={e=>setRoomCode(e.target.value.toUpperCase())} className="flex-1 px-3 py-2.5 bg-white/[0.04] border border-white/[0.08] rounded-xl text-white placeholder-gray-600 text-sm font-mono tracking-[0.2em] text-center" maxLength={6}/><button onClick={joinRoom} className="px-5 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl text-sm font-bold shadow-lg shadow-blue-500/20 active:scale-[0.98]">Join</button></div>{error&&<p className="text-red-400 text-xs mt-2 text-center">{error}</p>}</div>
+        <div className="border-t border-white/[0.06] pt-4"><p className="text-xs text-gray-500 mb-3">Join another room</p><div className="flex gap-2"><input type="text" placeholder="CODE" value={roomCode} onChange={e=>setRoomCode(e.target.value.toUpperCase())} className={`flex-1 px-3 py-2.5 ${T.bgInput} border ${T.borderInput} rounded-xl ${T.text} placeholder-gray-400 text-sm font-mono tracking-[0.2em] text-center`} maxLength={6}/><button onClick={joinRoom} className="px-5 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl text-sm font-bold shadow-lg shadow-blue-500/20 active:scale-[0.98]">Join</button></div>{error&&<p className="text-red-400 text-xs mt-2 text-center">{error}</p>}</div>
         <button onClick={createRoom} className="w-full mt-3 px-4 py-2.5 border border-white/[0.06] text-gray-400 rounded-xl hover:bg-white/[0.04] text-sm transition-all">+ Create New Room</button>
       </Modal>
 
@@ -1649,10 +1649,10 @@ export default function VersaApp() {
       <Modal show={showProfile} onClose={()=>setShowProfile(false)}>
         <ModalHeader title="Profile" onClose={()=>setShowProfile(false)}/>
         <div className="text-center mb-6"><div className="relative inline-block">{currentUser.photoURL?<img src={currentUser.photoURL} className="w-20 h-20 rounded-full object-cover border-2 border-blue-500/30" referrerPolicy="no-referrer"/>:<><ProgressRing progress={dailyProg} size={80} stroke={4} color={dailyProg>=1?'#10b981':'#3b82f6'}/><div className="absolute inset-0 flex items-center justify-center"><span className="text-xl font-black">{Math.round(dailyProg*100)}%</span></div></>}</div><h3 className="text-xl font-bold mt-3">{currentUser.username}</h3><p className="text-gray-600 text-xs">{currentUser.email}</p></div>
-        <div className="grid grid-cols-3 gap-3 mb-4">{[{v:streakData.streak||0,l:'Streak',c:'text-orange-400',i:<Flame size={16} className="text-orange-400 mx-auto mb-1"/>},{v:myPts,l:'Today',c:'text-blue-400',i:<Star size={16} className="text-blue-400 mx-auto mb-1"/>},{v:getWeeklyPts(currentUser.id),l:'Week',c:'text-emerald-400',i:<TrendingUp size={16} className="text-emerald-400 mx-auto mb-1"/>}].map((s,i)=><div key={i} className="text-center p-3 bg-white/[0.03] rounded-xl border border-white/[0.04]">{s.i}<div className={'text-xl font-black '+s.c}>{s.v}</div><div className="text-[9px] text-gray-600 tracking-wider uppercase mt-0.5">{s.l}</div></div>)}</div>
-        <div className="grid grid-cols-2 gap-3 mb-4"><div className="text-center p-3 bg-white/[0.03] rounded-xl border border-white/[0.04]"><div className="text-lg font-black text-purple-400">{streakData.activeDays||0}</div><div className="text-[9px] text-gray-600 tracking-wider uppercase mt-0.5">Active Days</div></div><div className="text-center p-3 bg-white/[0.03] rounded-xl border border-white/[0.04]"><div className="text-lg font-black text-cyan-400">{streakData.totalCompletions||0}</div><div className="text-[9px] text-gray-600 tracking-wider uppercase mt-0.5">Completions</div></div></div>
-        <div className="p-3 bg-white/[0.03] rounded-xl border border-white/[0.04]"><div className="text-[9px] text-gray-600 tracking-wider uppercase mb-2">Crystals</div><div className="flex justify-center gap-4">{allCatNames.map(c=><div key={c} className="text-center"><div className={'w-6 h-6 rounded-full mx-auto mb-1 transition-all '+(myCr[c]?getCT(c).bg+' shadow-md '+getCT(c).glow:'bg-white/[0.06]')}/><span className="text-[9px] text-gray-600">{c}</span></div>)}</div></div>
-        <div className="mt-4 p-3 bg-white/[0.03] rounded-xl border border-white/[0.04] flex items-center justify-between"><div><div className="text-sm text-gray-300 font-medium">Email Reminders</div><div className="text-[10px] text-gray-600">Daily nudges at 12pm & 6pm</div></div><button onClick={async()=>{const newVal=currentUser.emailReminders===false?true:false;try{await updateDoc(doc(db,'users',currentUser.id),{emailReminders:!newVal});setCurrentUser(p=>({...p,emailReminders:!newVal}));}catch{}}} className={'relative w-11 h-6 rounded-full transition-all '+(currentUser.emailReminders!==false?'bg-blue-500':'bg-white/[0.08]')}><div className={'absolute top-1 w-4 h-4 rounded-full bg-white transition-all shadow-sm '+(currentUser.emailReminders!==false?'left-6':'left-1')}/></button></div>
+        <div className="grid grid-cols-3 gap-3 mb-4">{[{v:streakData.streak||0,l:'Streak',c:'text-orange-400',i:<Flame size={16} className="text-orange-400 mx-auto mb-1"/>},{v:myPts,l:'Today',c:'text-blue-400',i:<Star size={16} className="text-blue-400 mx-auto mb-1"/>},{v:getWeeklyPts(currentUser.id),l:'Week',c:'text-emerald-400',i:<TrendingUp size={16} className="text-emerald-400 mx-auto mb-1"/>}].map((s,i)=><div key={i} className={`text-center p-3 ${T.bgCard} rounded-xl border ${T.border}`}>{s.i}<div className={'text-xl font-black '+s.c}>{s.v}</div><div className="text-[9px] text-gray-600 tracking-wider uppercase mt-0.5">{s.l}</div></div>)}</div>
+        <div className="grid grid-cols-2 gap-3 mb-4"><div className={`text-center p-3 ${T.bgCard} rounded-xl border ${T.border}`}><div className="text-lg font-black text-purple-400">{streakData.activeDays||0}</div><div className="text-[9px] text-gray-600 tracking-wider uppercase mt-0.5">Active Days</div></div><div className={`text-center p-3 ${T.bgCard} rounded-xl border ${T.border}`}><div className="text-lg font-black text-cyan-400">{streakData.totalCompletions||0}</div><div className="text-[9px] text-gray-600 tracking-wider uppercase mt-0.5">Completions</div></div></div>
+        <div className={`p-3 ${T.bgCard} rounded-xl border ${T.border}`}><div className="text-[9px] text-gray-600 tracking-wider uppercase mb-2">Crystals</div><div className="flex justify-center gap-4">{allCatNames.map(c=><div key={c} className="text-center"><div className={'w-6 h-6 rounded-full mx-auto mb-1 transition-all '+(myCr[c]?getCT(c).bg+' shadow-md '+getCT(c).glow:'bg-white/[0.06]')}/><span className="text-[9px] text-gray-600">{c}</span></div>)}</div></div>
+        <div className={`mt-4 p-3 ${T.bgCard} rounded-xl border ${T.border} flex items-center justify-between`}><div><div className={`text-sm font-medium ${T.text}`}>Email Reminders</div><div className="text-[10px] text-gray-500">Daily nudges at 12pm & 6pm</div></div><button onClick={async()=>{const newVal=currentUser.emailReminders===false?true:false;try{await updateDoc(doc(db,'users',currentUser.id),{emailReminders:!newVal});setCurrentUser(p=>({...p,emailReminders:!newVal}));}catch{}}} className={'relative w-11 h-6 rounded-full transition-all '+(currentUser.emailReminders!==false?'bg-blue-500':(darkMode?'bg-white/[0.08]':'bg-gray-200'))}><div className={'absolute top-1 w-4 h-4 rounded-full bg-white transition-all shadow-sm '+(currentUser.emailReminders!==false?'left-6':'left-1')}/></button></div>
         {/* Quick actions */}
         <div className="mt-5 space-y-2">
           <button onClick={()=>{setShowProfile(false);setShowInviteModal(true);}} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border transition-all ${darkMode?'border-white/[0.06] bg-white/[0.02] hover:bg-white/[0.04] text-gray-300':'border-gray-200 bg-gray-50 hover:bg-gray-100 text-gray-700'}`}><UserPlus size={16} className="text-blue-400"/><span className="text-sm">Invite to Room</span></button>
@@ -1668,18 +1668,18 @@ export default function VersaApp() {
         <ModalHeader title="How Versa Works" onClose={()=>setShowHelp(false)}/>
         <div className="space-y-3 text-sm text-gray-400">
           {[{i:'&#x1F3AF;',t:'Track & Earn',d:'Use + and \u2212 to track habits. Max them out for neon glow.'},{i:'&#x1F525;',t:'Streak Multipliers',d:'Keep your streak alive for bonus points: 3d→1.1× · 7d→1.25× · 14d→1.5× · 30d→1.75× · 60d→2× (max). Break your streak and you reset to 1×.'},{i:'&#x1F3C6;',t:'Compete',d:'Invite friends and dominate the leaderboard.'},{i:'&#x26A1;',t:'Stakes',d:'Set real consequences for the weekly loser.'},{i:'&#x1F465;',t:'Solo Mode',d:'No friends yet? Compete against yesterday.'}].map((s,i)=>(
-            <div key={i} className="bg-white/[0.03] rounded-xl p-4 border border-white/[0.04]"><p className="font-bold text-white mb-1" dangerouslySetInnerHTML={{__html:s.i+' '+s.t}}/><p>{s.d}</p></div>
+            <div key={i} className="bg-white/[0.03] rounded-xl p-4 border border-white/[0.04]"><p className={`font-bold ${T.text} mb-1`} dangerouslySetInnerHTML={{__html:s.i+' '+s.t}}/><p>{s.d}</p></div>
           ))}
-          <div className="bg-white/[0.03] rounded-xl p-4 border border-white/[0.04]"><p className="font-bold text-white mb-2">Categories</p><div className="space-y-1.5">{allCatNames.map(c=>{const ct=getCT(c);return(<div key={c} className="flex items-center gap-2"><div className={'w-3 h-3 rounded-full '+ct.bg+' shadow-sm '+ct.glow}/><span><strong className={ct.txt}>{c}</strong></span></div>);})}</div></div>
+          <div className="bg-white/[0.03] rounded-xl p-4 border border-white/[0.04]"><p className={`font-bold ${T.text} mb-2`}>Categories</p><div className="space-y-1.5">{allCatNames.map(c=>{const ct=getCT(c);return(<div key={c} className="flex items-center gap-2"><div className={'w-3 h-3 rounded-full '+ct.bg+' shadow-sm '+ct.glow}/><span><strong className={ct.txt}>{c}</strong></span></div>);})}</div></div>
         </div>
       </Modal>
 
       {/* Invite */}
       <Modal show={showInviteModal} onClose={()=>setShowInviteModal(false)}>
-        <div className="text-center"><h2 className="text-xl font-bold mb-2">Invite Friends</h2><p className="text-xs text-gray-600 mb-6 tracking-wider uppercase">Share this room code</p><div className="mb-6 relative inline-block"><code className="inline-block px-8 py-4 bg-gradient-to-b from-white/[0.08] to-white/[0.03] border border-white/[0.1] text-3xl font-mono rounded-xl tracking-[0.4em] shadow-2xl">{currentRoom?.code}</code><div className="absolute -inset-3 bg-gradient-to-r from-blue-500/10 via-purple-500/10 to-emerald-500/10 blur-xl rounded-xl -z-10"/></div>
+        <div className="text-center"><h2 className={`text-xl font-bold mb-2 ${T.text}`}>Invite Friends</h2><p className="text-xs text-gray-500 mb-6 tracking-wider uppercase">Share this room code</p><div className="mb-6 relative inline-block"><code className={`inline-block px-8 py-4 ${darkMode?'bg-gradient-to-b from-white/[0.08] to-white/[0.03] border-white/[0.1] text-white':'bg-gradient-to-b from-gray-100 to-gray-50 border-gray-200 text-gray-900'} border text-3xl font-mono rounded-xl tracking-[0.4em] shadow-2xl`}>{currentRoom?.code}</code><div className="absolute -inset-3 bg-gradient-to-r from-blue-500/10 via-purple-500/10 to-emerald-500/10 blur-xl rounded-xl -z-10"/></div>
         <button onClick={copyCode} className="w-full mb-2 px-6 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl shadow-lg shadow-blue-500/20 flex items-center justify-center gap-2 text-sm font-bold active:scale-[0.98]">{copied?<Check size={16}/>:<Copy size={16}/>}{copied?'Copied!':'Copy Code'}</button>
-        {navigator.share && <button onClick={async()=>{try{await navigator.share({title:'Join me on Versa',text:`Join my room on Versa! Code: ${currentRoom?.code}`,url:`${window.location.origin}?join=${currentRoom?.code}`});}catch{}}} className="w-full mb-2 px-6 py-3 border border-white/[0.08] text-white rounded-xl flex items-center justify-center gap-2 text-sm font-medium hover:bg-white/[0.04] active:scale-[0.98]"><UserPlus size={14}/>Share Link</button>}
-        <button onClick={()=>setShowInviteModal(false)} className="w-full text-gray-600 py-2 hover:text-white text-sm transition-colors">Close</button></div>
+        {navigator.share && <button onClick={async()=>{try{await navigator.share({title:'Join me on Versa',text:`Join my room on Versa! Code: ${currentRoom?.code}`,url:`${window.location.origin}?join=${currentRoom?.code}`});}catch{}}} className={`w-full mb-2 px-6 py-3 border ${darkMode?'border-white/[0.08] text-white hover:bg-white/[0.04]':'border-gray-200 text-gray-700 hover:bg-gray-50'} rounded-xl flex items-center justify-center gap-2 text-sm font-medium active:scale-[0.98]`}><UserPlus size={14}/>Share Link</button>}
+        <button onClick={()=>setShowInviteModal(false)} className={`w-full py-2 text-sm transition-colors ${darkMode?'text-gray-600 hover:text-white':'text-gray-400 hover:text-gray-900'}`}>Close</button></div>
       </Modal>
 
       {/* Competitor */}
