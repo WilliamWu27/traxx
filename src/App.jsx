@@ -760,11 +760,15 @@ export default function VersaApp() {
   // ─── COMPLETIONS (with embedded habit data for orphan-proofing) ───
   const getExisting = (hid) => { const t = getToday(); return completions.find(c=>c.userId===currentUser.id&&c.habitId===hid&&c.date===t); };
 
-  // Mystery bonus: 10% chance 2x, 1% chance jackpot (5x)
+  // Mystery bonus: variable multipliers with different probabilities
+  // ~18% total chance of getting a bonus on any completion
   const rollBonus = () => {
     const roll = Math.random();
-    if (roll < 0.01) return { multi: 5, label: '🎰 JACKPOT! 5×', type: 'jackpot' };
-    if (roll < 0.10) return { multi: 2, label: '✨ 2× BONUS!', type: 'bonus' };
+    if (roll < 0.005) return { multi: 5, label: '🎰 JACKPOT! 5×', type: 'jackpot' };
+    if (roll < 0.015) return { multi: 3, label: '🔥 3× BONUS!', type: 'epic' };
+    if (roll < 0.04) return { multi: 2, label: '⚡ 2× BONUS!', type: 'rare' };
+    if (roll < 0.09) return { multi: 1.5, label: '✨ 1.5× BONUS!', type: 'bonus' };
+    if (roll < 0.18) return { multi: 1.25, label: '🌟 1.25× BONUS!', type: 'common' };
     return null;
   };
 
@@ -863,7 +867,7 @@ export default function VersaApp() {
   };
 
   // ─── SCORING ───
-  const getCatPts = (uid, cat) => completions.filter(c=>c.userId===uid&&c.date===getToday()).reduce((s,c)=>{ const h=habits.find(x=>x.id===c.habitId); if(h&&h.category===cat) return s+(h.points*(c.count||1)); return s; },0);
+  const getCatPts = (uid, cat) => completions.filter(c=>c.userId===uid&&c.date===getToday()).reduce((s,c)=>{ const h=habits.find(x=>x.id===c.habitId); if((h?.category||c.habitCategory)===cat) return s+((c.habitPoints||h?.points||0)*(c.count||1))+(c.bonusPoints||0); return s; },0);
   const getTodayCrystals = (uid) => {
     const cr = {}; allCatNames.forEach(c => cr[c] = false);
     // Solo mode: earn crystal if you beat yesterday's category points
@@ -878,8 +882,8 @@ export default function VersaApp() {
     });
     return cr;
   };
-  const getTodayPts = (uid) => completions.filter(c=>c.userId===uid&&c.date===getToday()).reduce((s,c)=>{ const h=habits.find(x=>x.id===c.habitId); return s+((h?.points||c.habitPoints||0)*(c.count||1)); },0);
-  const getWeeklyPts = (uid) => { const ws=getWeekStart(),we=getWeekEnd(); return allCompletions.filter(c=>c.userId===uid&&c.date>=ws&&c.date<=we).reduce((s,c)=>{ const h=habits.find(x=>x.id===c.habitId); return s+((h?.points||c.habitPoints||0)*(c.count||1)); },0); };
+  const getTodayPts = (uid) => completions.filter(c=>c.userId===uid&&c.date===getToday()).reduce((s,c)=>{ return s+((c.habitPoints||habits.find(x=>x.id===c.habitId)?.points||0)*(c.count||1))+(c.bonusPoints||0); },0);
+  const getWeeklyPts = (uid) => { const ws=getWeekStart(),we=getWeekEnd(); return allCompletions.filter(c=>c.userId===uid&&c.date>=ws&&c.date<=we).reduce((s,c)=>{ return s+((c.habitPoints||habits.find(x=>x.id===c.habitId)?.points||0)*(c.count||1))+(c.bonusPoints||0); },0); };
   const getWeeklyCrystals = (uid) => {
     let t=0; const ws=getWeekStart(), td=getToday();
     const dates=[...new Set(allCompletions.filter(c=>c.date>=ws&&c.date<=td).map(c=>c.date))];
@@ -1257,7 +1261,7 @@ export default function VersaApp() {
       {/* Mystery Bonus popup */}
       {bonusMsg && (
         <div className="fixed top-20 left-1/2 -translate-x-1/2 z-[101] animate-bounce">
-          <div className={`px-6 py-3 rounded-2xl shadow-2xl text-center ${bonusMsg.type==='jackpot'?'bg-gradient-to-r from-amber-500 to-yellow-500 text-black':'bg-gradient-to-r from-purple-600 to-blue-600 text-white'}`}>
+          <div className={`px-6 py-3 rounded-2xl shadow-2xl text-center ${bonusMsg.type==='jackpot'?'bg-gradient-to-r from-amber-500 to-yellow-500 text-black':bonusMsg.type==='epic'?'bg-gradient-to-r from-red-500 to-orange-500 text-white':bonusMsg.type==='rare'?'bg-gradient-to-r from-purple-600 to-blue-600 text-white':bonusMsg.type==='bonus'?'bg-gradient-to-r from-blue-500 to-cyan-500 text-white':'bg-gradient-to-r from-emerald-500 to-green-500 text-white'}`}>
             <div className="text-lg font-black">{bonusMsg.label}</div>
           </div>
         </div>
@@ -1272,7 +1276,7 @@ export default function VersaApp() {
         </div>
       )}
       {/* Header — slim */}
-      <div className={`${T.headerBg} ${T.blurBg} border-b ${T.border} sticky top-0 z-40`}>
+      <div className={`${T.headerBg} ${T.blurBg} sticky top-0 z-40`}>
         <div className="max-w-2xl mx-auto px-4 py-2.5">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
@@ -1291,6 +1295,8 @@ export default function VersaApp() {
             </div>
           </div>
         </div>
+        {/* Week progress bar */}
+        <div className={`h-[2px] ${darkMode?'bg-white/[0.04]':'bg-gray-200'}`}><div className="h-full transition-all duration-700 ease-out" style={{width:((((new Date()).getDay()||7)/7)*100)+'%',background:'linear-gradient(90deg,#3b82f6,#8b5cf6,#10b981)'}}/></div>
       </div>
 
       <div className="max-w-2xl mx-auto px-4 py-4">
@@ -1471,7 +1477,7 @@ export default function VersaApp() {
               return (
                 <div key={a.id} className="px-3 py-1.5 flex items-center gap-2">
                   <Avatar user={activeMembers.find(m=>m.id===a.userId)||{username:a.username}} size={16} className={isMe?'bg-blue-500/20 text-blue-400':'bg-white/[0.06] text-gray-500'}/>
-                  <div className="flex-1 min-w-0 truncate"><span className={`text-[10px] ${isMe?'text-blue-400':'text-gray-500'} font-medium`}>{isMe?'You':a.username}</span><span className={`text-[10px] ${T.textDim} ml-1`}>{a.text}</span>{a.bonus==='jackpot'&&<span className="ml-1 text-[9px] text-amber-300 font-bold">JACKPOT</span>}</div>
+                  <div className="flex-1 min-w-0 truncate"><span className={`text-[10px] ${isMe?'text-blue-400':'text-gray-500'} font-medium`}>{isMe?'You':a.username}</span><span className={`text-[10px] ${T.textDim} ml-1`}>{a.text}</span>{a.bonus==='jackpot'&&<span className="ml-1 text-[9px] text-amber-300 font-bold">5×</span>}{a.bonus==='epic'&&<span className="ml-1 text-[9px] text-red-400 font-bold">3×</span>}{a.bonus==='rare'&&<span className="ml-1 text-[9px] text-purple-400 font-bold">2×</span>}{a.bonus==='bonus'&&<span className="ml-1 text-[9px] text-cyan-400 font-bold">1.5×</span>}{a.bonus==='common'&&<span className="ml-1 text-[9px] text-emerald-400 font-bold">1.25×</span>}</div>
                   <span className={`text-[8px] ${T.textFaint} shrink-0 ml-1`}>{timeAgo}</span>
                 </div>
               );
