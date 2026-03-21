@@ -73,9 +73,10 @@ const PUNISHMENTS = [
   '🧹 Clean winner\'s room',
   '🎬 Embarrassing TikTok',
 ];
-function Modal({ show, onClose, children, wide, dark = true }) {
+function Modal({ show, onClose, children, wide, dark }) {
   if (!show) return null;
-  const mbg = dark ? 'bg-[#12121a] border-white/[0.06]' : 'bg-white border-gray-200';
+  const isDark = dark !== undefined ? dark : true;
+  const mbg = isDark ? 'bg-[#12121a] border-white/[0.06]' : 'bg-white border-gray-200';
   return (
     <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 z-50" onClick={onClose}>
       <div className={`rounded-2xl w-full p-6 border shadow-2xl max-h-[85vh] overflow-y-auto ${mbg} ` + (wide ? 'max-w-md' : 'max-w-sm')} onClick={e => e.stopPropagation()}>
@@ -85,11 +86,12 @@ function Modal({ show, onClose, children, wide, dark = true }) {
   );
 }
 
-function ModalHeader({ title, onClose, icon }) {
+function ModalHeader({ title, onClose, icon, dark }) {
+  const isDark = dark !== undefined ? dark : true;
   return (
     <div className="flex items-center justify-between mb-5">
-      <div className="flex items-center gap-2">{icon}{typeof title === 'string' ? <h2 className={`text-lg font-bold ${dark?'text-white':'text-gray-900'}`}>{title}</h2> : title}</div>
-      <button onClick={onClose} className={`${dark?'text-gray-600 hover:text-white':'text-gray-400 hover:text-gray-900'} transition-colors`}><X size={20} /></button>
+      <div className="flex items-center gap-2">{icon}{typeof title === 'string' ? <h2 className={`text-lg font-bold ${isDark?'text-white':'text-gray-900'}`}>{title}</h2> : title}</div>
+      <button onClick={onClose} className={`${isDark?'text-gray-600 hover:text-white':'text-gray-400 hover:text-gray-900'} transition-colors`}><X size={20} /></button>
     </div>
   );
 }
@@ -1502,8 +1504,8 @@ export default function VersaApp() {
       {/* ═══ MODALS ═══ */}
 
       {/* Add Habit */}
-      <Modal show={showAddHabit} onClose={()=>setShowAddHabit(false)}>
-        <ModalHeader title="Add Habit" onClose={()=>setShowAddHabit(false)}/>
+      <Modal show={showAddHabit} onClose={()=>setShowAddHabit(false)} dark={darkMode}>
+        <ModalHeader title="Add Habit" onClose={()=>setShowAddHabit(false)} dark={darkMode}/>
         <button onClick={loadDefaultHabits} disabled={loading} className="w-full mb-5 px-4 py-3 bg-gradient-to-r from-violet-600 to-purple-600 text-white rounded-xl shadow-lg shadow-violet-500/20 text-sm font-bold active:scale-[0.98] disabled:opacity-50">{loading?'Loading...':'⚡ Load Student Preset (10 habits)'}</button>
         <div className="space-y-3">
           <input type="text" placeholder="Habit name" value={newHabit.name} onChange={e=>setNewHabit({...newHabit,name:e.target.value})} className={inputCls} maxLength={30}/>
@@ -1514,13 +1516,13 @@ export default function VersaApp() {
           <label className="flex items-center gap-3 py-1 cursor-pointer"><input type="checkbox" checked={newHabit.isRepeatable} onChange={e=>setNewHabit({...newHabit,isRepeatable:e.target.checked,maxCompletions:e.target.checked?5:1})} className="w-4 h-4 rounded accent-blue-500"/><span className="text-sm text-gray-400">Repeatable</span></label>
           {newHabit.isRepeatable&&<input type="number" placeholder="Max per day" value={newHabit.maxCompletions} onChange={e=>setNewHabit({...newHabit,maxCompletions:e.target.value})} className={inputCls}/>}
           {error&&<p className="text-red-400 text-xs text-center">{error}</p>}
-          <div className="flex gap-3 pt-2"><button onClick={()=>setShowAddHabit(false)} className="flex-1 px-4 py-3 border border-white/[0.08] rounded-xl text-sm text-gray-400 hover:bg-white/[0.04]">Cancel</button><button onClick={addHabit} className="flex-1 px-4 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl text-sm font-bold shadow-lg shadow-blue-500/20 active:scale-[0.98]">Add</button></div>
+          <div className="flex gap-3 pt-2"><button onClick={()=>setShowAddHabit(false)} className={`flex-1 px-4 py-3 border ${T.border} rounded-xl text-sm ${T.textMuted} hover:${T.bgCardHover}`}>Cancel</button><button onClick={addHabit} className="flex-1 px-4 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl text-sm font-bold shadow-lg shadow-blue-500/20 active:scale-[0.98]">Add</button></div>
         </div>
       </Modal>
 
       {/* Edit Habit */}
-      <Modal show={!!showEditHabit} onClose={()=>setShowEditHabit(null)}>
-        <ModalHeader title="Edit Habit" onClose={()=>setShowEditHabit(null)} icon={<Edit3 size={18} className="text-blue-400"/>}/>
+      <Modal show={!!showEditHabit} onClose={()=>setShowEditHabit(null)} dark={darkMode}>
+        <ModalHeader title="Edit Habit" onClose={()=>setShowEditHabit(null)} icon={<Edit3 size={18} className="text-blue-400"/>} dark={darkMode}/>
         <div className="space-y-3">
           <input type="text" placeholder="Name" value={editHabitData.name||''} onChange={e=>setEditHabitData({...editHabitData,name:e.target.value})} className={inputCls} maxLength={30}/>
           <div className="grid grid-cols-2 gap-3">
@@ -1529,19 +1531,19 @@ export default function VersaApp() {
           </div>
           <label className="flex items-center gap-3 py-1 cursor-pointer"><input type="checkbox" checked={editHabitData.isRepeatable||false} onChange={e=>setEditHabitData({...editHabitData,isRepeatable:e.target.checked,maxCompletions:e.target.checked?5:1})} className="w-4 h-4 rounded accent-blue-500"/><span className="text-sm text-gray-400">Repeatable</span></label>
           {editHabitData.isRepeatable&&<input type="number" placeholder="Max per day" value={editHabitData.maxCompletions||''} onChange={e=>setEditHabitData({...editHabitData,maxCompletions:e.target.value})} className={inputCls}/>}
-          <div className="flex gap-3 pt-2"><button onClick={()=>setShowEditHabit(null)} className="flex-1 px-4 py-3 border border-white/[0.08] rounded-xl text-sm text-gray-400 hover:bg-white/[0.04]">Cancel</button><button onClick={saveEditHabit} className="flex-1 px-4 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl text-sm font-bold shadow-lg shadow-blue-500/20 active:scale-[0.98]">Save</button></div>
+          <div className="flex gap-3 pt-2"><button onClick={()=>setShowEditHabit(null)} className={`flex-1 px-4 py-3 border ${T.border} rounded-xl text-sm ${T.textMuted} hover:${T.bgCardHover}`}>Cancel</button><button onClick={saveEditHabit} className="flex-1 px-4 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl text-sm font-bold shadow-lg shadow-blue-500/20 active:scale-[0.98]">Save</button></div>
         </div>
       </Modal>
 
       {/* Add Category */}
       <Modal show={showAddCategory} onClose={()=>setShowAddCategory(false)} dark={darkMode}>
-        <ModalHeader title="Manage Categories" onClose={()=>setShowAddCategory(false)}/>
+        <ModalHeader title="Manage Categories" onClose={()=>setShowAddCategory(false)} dark={darkMode}/>
         <div className="space-y-2 mb-5">{activeCategories.map(cat => {
           const ct = getCT(cat.name);
           return (
             <div key={cat.name} className={`flex items-center justify-between p-3 rounded-xl border ${ct.bdr} ${ct.bgS}`}>
               <div className="flex items-center gap-2"><span>{cat.icon}</span><span className={`text-sm font-semibold ${ct.txt}`}>{cat.name}</span></div>
-              {!['Mind','Body','Spirit'].includes(cat.name) && <button onClick={()=>deleteCategory(cat.name)} className="text-[10px] text-gray-600 hover:text-red-400 uppercase tracking-wider">Remove</button>}
+              {!['Study','Health','Focus'].includes(cat.name) && <button onClick={()=>deleteCategory(cat.name)} className="text-[10px] text-gray-600 hover:text-red-400 uppercase tracking-wider">Remove</button>}
             </div>
           );
         })}</div>
@@ -1558,8 +1560,8 @@ export default function VersaApp() {
       </Modal>
 
       {/* History */}
-      <Modal show={showHistory} onClose={()=>setShowHistory(false)}>
-        <ModalHeader title="History" onClose={()=>setShowHistory(false)} icon={<Calendar size={18} className="text-purple-400"/>}/>
+      <Modal show={showHistory} onClose={()=>setShowHistory(false)} dark={darkMode}>
+        <ModalHeader title="History" onClose={()=>setShowHistory(false)} icon={<Calendar size={18} className="text-purple-400"/>} dark={darkMode}/>
         <div className="flex items-center justify-between mb-4">
           <button onClick={()=>shiftHistoryDate(-1)} className="p-2 text-gray-600 hover:text-white"><ChevronLeft size={18}/></button>
           <span className="text-sm font-medium text-gray-300">{historyDate ? formatDate(historyDate) : ''}</span>
@@ -1573,7 +1575,7 @@ export default function VersaApp() {
               const h = habits.find(x=>x.id===c.habitId);
               const name = h?.name || c.habitName || 'Deleted habit';
               const pts = (h?.points || c.habitPoints || 0) * (c.count||1);
-              const cat = h?.category || c.habitCategory || 'Mind';
+              const cat = h?.category || c.habitCategory || 'Study';
               return (
                 <div key={c.id} className={'p-3 rounded-xl border bg-white/[0.02] '+(CT[cat]||getCT(cat)).bdr+' flex items-center justify-between'}>
                   <div className="flex items-center gap-2"><span className="text-sm">{(CT[cat]||getCT(cat)).icon}</span><span className="text-sm text-gray-300">{name}</span></div>
@@ -1590,8 +1592,8 @@ export default function VersaApp() {
       </Modal>
 
       {/* Stakes */}
-      <Modal show={showStakes} onClose={()=>setShowStakes(false)}>
-        <ModalHeader title="Stakes" onClose={()=>setShowStakes(false)} icon={<Zap size={18} className="text-red-400"/>}/>
+      <Modal show={showStakes} onClose={()=>setShowStakes(false)} dark={darkMode}>
+        <ModalHeader title="Stakes" onClose={()=>setShowStakes(false)} icon={<Zap size={18} className="text-red-400"/>} dark={darkMode}/>
         {roomStakes ? (
           <div>
             <div className="p-4 bg-gradient-to-r from-red-500/10 via-pink-500/10 to-purple-500/10 border border-red-500/15 rounded-xl mb-4">
@@ -1615,8 +1617,8 @@ export default function VersaApp() {
       </Modal>
 
       {/* Switch Room */}
-      <Modal show={showSwitchRoom} onClose={()=>setShowSwitchRoom(false)}>
-        <ModalHeader title="Your Rooms" onClose={()=>setShowSwitchRoom(false)}/>
+      <Modal show={showSwitchRoom} onClose={()=>setShowSwitchRoom(false)} dark={darkMode}>
+        <ModalHeader title="Your Rooms" onClose={()=>setShowSwitchRoom(false)} dark={darkMode}/>
         <div className="space-y-2 mb-4">{userRooms.map(rid=>(
           <div key={rid} className={'p-3 rounded-xl border flex items-center justify-between transition-all '+(currentRoom?.id===rid?'border-blue-500/30 bg-blue-500/10':'border-white/[0.06] bg-white/[0.02] hover:bg-white/[0.04]')}>
             <div className="flex items-center gap-3"><span className="font-mono text-sm tracking-widest text-white">{rid}</span>{currentRoom?.id===rid&&<span className="text-[9px] bg-blue-500/20 text-blue-400 px-2 py-0.5 rounded-full font-bold">ACTIVE</span>}</div>
@@ -1628,8 +1630,8 @@ export default function VersaApp() {
       </Modal>
 
       {/* Leaderboard */}
-      <Modal show={showLeaderboard} onClose={()=>setShowLeaderboard(false)} wide>
-        <ModalHeader title="Leaderboard" onClose={()=>setShowLeaderboard(false)} icon={<span className="text-xl">&#x1F3C6;</span>}/>
+      <Modal show={showLeaderboard} onClose={()=>setShowLeaderboard(false)} wide dark={darkMode}>
+        <ModalHeader title="Leaderboard" onClose={()=>setShowLeaderboard(false)} icon={<span className="text-xl">&#x1F3C6;</span>} dark={darkMode}/>
         <div className="flex gap-1 mb-5 bg-white/[0.03] rounded-xl p-1">{['today','week'].map(tab=><button key={tab} onClick={()=>setLeaderboardTab(tab)} className={'flex-1 py-2 text-xs font-bold rounded-lg transition-all tracking-wider uppercase '+(leaderboardTab===tab?'bg-white/[0.08] text-white':'text-gray-600 hover:text-gray-400')}>{tab==='today'?'Today':'This Week'}</button>)}</div>
         <div className="space-y-2">{getLeaderboard().map((item,i)=>{
           const pts=leaderboardTab==='today'?item.todayPts:item.weeklyPts, isMe=item.member.id===currentUser.id;
@@ -1646,8 +1648,8 @@ export default function VersaApp() {
       </Modal>
 
       {/* Profile */}
-      <Modal show={showProfile} onClose={()=>setShowProfile(false)}>
-        <ModalHeader title="Profile" onClose={()=>setShowProfile(false)}/>
+      <Modal show={showProfile} onClose={()=>setShowProfile(false)} dark={darkMode}>
+        <ModalHeader title="Profile" onClose={()=>setShowProfile(false)} dark={darkMode}/>
         <div className="text-center mb-6"><div className="relative inline-block">{currentUser.photoURL?<img src={currentUser.photoURL} className="w-20 h-20 rounded-full object-cover border-2 border-blue-500/30" referrerPolicy="no-referrer"/>:<><ProgressRing progress={dailyProg} size={80} stroke={4} color={dailyProg>=1?'#10b981':'#3b82f6'}/><div className="absolute inset-0 flex items-center justify-center"><span className="text-xl font-black">{Math.round(dailyProg*100)}%</span></div></>}</div><h3 className="text-xl font-bold mt-3">{currentUser.username}</h3><p className="text-gray-600 text-xs">{currentUser.email}</p></div>
         <div className="grid grid-cols-3 gap-3 mb-4">{[{v:streakData.streak||0,l:'Streak',c:'text-orange-400',i:<Flame size={16} className="text-orange-400 mx-auto mb-1"/>},{v:myPts,l:'Today',c:'text-blue-400',i:<Star size={16} className="text-blue-400 mx-auto mb-1"/>},{v:getWeeklyPts(currentUser.id),l:'Week',c:'text-emerald-400',i:<TrendingUp size={16} className="text-emerald-400 mx-auto mb-1"/>}].map((s,i)=><div key={i} className={`text-center p-3 ${T.bgCard} rounded-xl border ${T.border}`}>{s.i}<div className={'text-xl font-black '+s.c}>{s.v}</div><div className="text-[9px] text-gray-600 tracking-wider uppercase mt-0.5">{s.l}</div></div>)}</div>
         <div className="grid grid-cols-2 gap-3 mb-4"><div className={`text-center p-3 ${T.bgCard} rounded-xl border ${T.border}`}><div className="text-lg font-black text-purple-400">{streakData.activeDays||0}</div><div className="text-[9px] text-gray-600 tracking-wider uppercase mt-0.5">Active Days</div></div><div className={`text-center p-3 ${T.bgCard} rounded-xl border ${T.border}`}><div className="text-lg font-black text-cyan-400">{streakData.totalCompletions||0}</div><div className="text-[9px] text-gray-600 tracking-wider uppercase mt-0.5">Completions</div></div></div>
@@ -1664,8 +1666,8 @@ export default function VersaApp() {
       </Modal>
 
       {/* Help */}
-      <Modal show={showHelp} onClose={()=>setShowHelp(false)}>
-        <ModalHeader title="How Versa Works" onClose={()=>setShowHelp(false)}/>
+      <Modal show={showHelp} onClose={()=>setShowHelp(false)} dark={darkMode}>
+        <ModalHeader title="How Versa Works" onClose={()=>setShowHelp(false)} dark={darkMode}/>
         <div className="space-y-3 text-sm text-gray-400">
           {[{i:'&#x1F3AF;',t:'Track & Earn',d:'Use + and \u2212 to track habits. Max them out for neon glow.'},{i:'&#x1F525;',t:'Streak Multipliers',d:'Keep your streak alive for bonus points: 3d→1.1× · 7d→1.25× · 14d→1.5× · 30d→1.75× · 60d→2× (max). Break your streak and you reset to 1×.'},{i:'&#x1F3C6;',t:'Compete',d:'Invite friends and dominate the leaderboard.'},{i:'&#x26A1;',t:'Stakes',d:'Set real consequences for the weekly loser.'},{i:'&#x1F465;',t:'Solo Mode',d:'No friends yet? Compete against yesterday.'}].map((s,i)=>(
             <div key={i} className="bg-white/[0.03] rounded-xl p-4 border border-white/[0.04]"><p className={`font-bold ${T.text} mb-1`} dangerouslySetInnerHTML={{__html:s.i+' '+s.t}}/><p>{s.d}</p></div>
@@ -1675,7 +1677,7 @@ export default function VersaApp() {
       </Modal>
 
       {/* Invite */}
-      <Modal show={showInviteModal} onClose={()=>setShowInviteModal(false)}>
+      <Modal show={showInviteModal} onClose={()=>setShowInviteModal(false)} dark={darkMode}>
         <div className="text-center"><h2 className={`text-xl font-bold mb-2 ${T.text}`}>Invite Friends</h2><p className="text-xs text-gray-500 mb-6 tracking-wider uppercase">Share this room code</p><div className="mb-6 relative inline-block"><code className={`inline-block px-8 py-4 ${darkMode?'bg-gradient-to-b from-white/[0.08] to-white/[0.03] border-white/[0.1] text-white':'bg-gradient-to-b from-gray-100 to-gray-50 border-gray-200 text-gray-900'} border text-3xl font-mono rounded-xl tracking-[0.4em] shadow-2xl`}>{currentRoom?.code}</code><div className="absolute -inset-3 bg-gradient-to-r from-blue-500/10 via-purple-500/10 to-emerald-500/10 blur-xl rounded-xl -z-10"/></div>
         <button onClick={copyCode} className="w-full mb-2 px-6 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl shadow-lg shadow-blue-500/20 flex items-center justify-center gap-2 text-sm font-bold active:scale-[0.98]">{copied?<Check size={16}/>:<Copy size={16}/>}{copied?'Copied!':'Copy Code'}</button>
         {navigator.share && <button onClick={async()=>{try{await navigator.share({title:'Join me on Versa',text:`Join my room on Versa! Code: ${currentRoom?.code}`,url:`${window.location.origin}?join=${currentRoom?.code}`});}catch{}}} className={`w-full mb-2 px-6 py-3 border ${darkMode?'border-white/[0.08] text-white hover:bg-white/[0.04]':'border-gray-200 text-gray-700 hover:bg-gray-50'} rounded-xl flex items-center justify-center gap-2 text-sm font-medium active:scale-[0.98]`}><UserPlus size={14}/>Share Link</button>}
@@ -1683,14 +1685,14 @@ export default function VersaApp() {
       </Modal>
 
       {/* Competitor */}
-      <Modal show={!!showCompetitor} onClose={()=>setShowCompetitor(null)}>
-        {showCompetitor&&<><ModalHeader title={showCompetitor.username} onClose={()=>setShowCompetitor(null)}/>
+      <Modal show={!!showCompetitor} onClose={()=>setShowCompetitor(null)} dark={darkMode}>
+        {showCompetitor&&<><ModalHeader title={showCompetitor.username} onClose={()=>setShowCompetitor(null)} dark={darkMode}/>
         <div className="space-y-3"><div className="grid grid-cols-3 gap-3">{allCatNames.map(c=><div key={c} className={'text-center p-4 rounded-xl border '+getCT(c).bgS+' '+getCT(c).bdr}><div className={'text-2xl font-black '+getCT(c).txt}>{getCatPts(showCompetitor.id,c)}</div><div className="text-[9px] text-gray-600 mt-1 tracking-wider uppercase">{c}</div></div>)}</div><div className="text-center p-5 bg-gradient-to-r from-blue-600/20 to-indigo-600/20 rounded-xl border border-blue-500/20"><div className="text-3xl font-black">{getTodayPts(showCompetitor.id)}</div><div className="text-[10px] text-gray-500 mt-1 tracking-wider uppercase">Total Today</div></div></div></>}
       </Modal>
 
       {/* Weekly Recap */}
       <Modal show={showWeeklyRecap} onClose={()=>setShowWeeklyRecap(false)} wide dark={darkMode}>
-        <ModalHeader title="Weekly Recap" onClose={()=>setShowWeeklyRecap(false)} icon={<BarChart3 size={18} className="text-purple-400"/>}/>
+        <ModalHeader title="Weekly Recap" onClose={()=>setShowWeeklyRecap(false)} icon={<BarChart3 size={18} className="text-purple-400" dark={darkMode}/>} dark={darkMode}/>
         {lastWeekData ? (
           <div>
             <p className={`text-xs ${T.textDim} mb-4`}>{lastWeekData.dateRange}</p>
@@ -1735,7 +1737,7 @@ export default function VersaApp() {
 
       {/* Punishment Wheel */}
       <Modal show={showPunishmentWheel} onClose={()=>{setShowPunishmentWheel(false);setWheelResult(null);setWheelSpinning(false);}} wide dark={darkMode}>
-        <ModalHeader title="🎰 Punishment Wheel" onClose={()=>{setShowPunishmentWheel(false);setWheelResult(null);setWheelSpinning(false);}}/>
+        <ModalHeader title="🎰 Punishment Wheel" onClose={()=>{setShowPunishmentWheel(false);setWheelResult(null);setWheelSpinning(false);}} dark={darkMode}/>
         {lastWeekData && lastWeekData.scores.length > 1 && (
           <div className="text-center">
             <div className="mb-4">
@@ -1803,7 +1805,7 @@ export default function VersaApp() {
 
       {/* Heat Map Calendar */}
       <Modal show={showHeatMap} onClose={()=>setShowHeatMap(false)} wide dark={darkMode}>
-        <ModalHeader title="90-Day Heat Map" onClose={()=>setShowHeatMap(false)} icon={<Calendar size={18} className="text-emerald-400"/>}/>
+        <ModalHeader title="90-Day Heat Map" onClose={()=>setShowHeatMap(false)} icon={<Calendar size={18} className="text-emerald-400" dark={darkMode}/>} dark={darkMode}/>
         <div className="mb-3"><p className={`text-xs ${T.textDim}`}>Points per day · darker = more active</p></div>
         <div className="flex flex-wrap gap-[3px]">{(() => {
           const cells = [];
@@ -1849,7 +1851,7 @@ export default function VersaApp() {
 
       {/* Personal Insights */}
       <Modal show={showInsights} onClose={()=>setShowInsights(false)} wide dark={darkMode}>
-        <ModalHeader title="Your Insights" onClose={()=>setShowInsights(false)} icon={<TrendingUp size={18} className="text-blue-400"/>}/>
+        <ModalHeader title="Your Insights" onClose={()=>setShowInsights(false)} icon={<TrendingUp size={18} className="text-blue-400" dark={darkMode}/>} dark={darkMode}/>
         {insightsData?.empty ? (
           <p className={`text-sm ${T.textDim} text-center py-8`}>Not enough data yet. Keep tracking!</p>
         ) : insightsData ? (
@@ -1916,7 +1918,7 @@ export default function VersaApp() {
 
       {/* Custom Board Proposal */}
       <Modal show={showCustomBoard} onClose={()=>setShowCustomBoard(false)} wide dark={darkMode}>
-        <ModalHeader title="Custom Board" onClose={()=>setShowCustomBoard(false)}/>
+        <ModalHeader title="Custom Board" onClose={()=>setShowCustomBoard(false)} dark={darkMode}/>
         <p className={`text-xs ${T.textDim} mb-4`}>Pick which habits go on your personal board, or add new ones. Needs approval from your room.</p>
         {pendingBoards.find(b=>b.userId===currentUser?.id&&b.status==='approved') && (
           <div className="mb-3 p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-xl">
@@ -1993,7 +1995,7 @@ export default function VersaApp() {
 
       {/* Room Settings (Creator only) */}
       <Modal show={showRoomSettings} onClose={()=>setShowRoomSettings(false)} wide dark={darkMode}>
-        <ModalHeader title="Room Settings" onClose={()=>setShowRoomSettings(false)} icon={<Crown size={16} className="text-amber-400"/>}/>
+        <ModalHeader title="Room Settings" onClose={()=>setShowRoomSettings(false)} icon={<Crown size={16} className="text-amber-400" dark={darkMode}/>} dark={darkMode}/>
         <div className={`text-[10px] ${T.textDim} mb-4 flex items-center gap-2`}>
           <span className="font-mono tracking-wider bg-white/[0.06] px-2 py-1 rounded">{currentRoom?.code}</span>
           <span>·</span>
