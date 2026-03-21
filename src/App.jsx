@@ -1307,18 +1307,16 @@ export default function VersaApp() {
           <div className="flex items-center justify-between mb-1.5">
             <p className={`text-xs ${T.textDim} italic flex-1 min-w-0 truncate`}>{dailyProg>=1?'🎉 All done — nice work.':getMotivation()}</p>
             <div className="flex items-center gap-2 shrink-0 ml-2">
+              {roomStakes ? (
+                <button onClick={()=>setShowStakes(true)} className="flex items-center gap-1 px-2 py-0.5 rounded-md bg-red-500/10 border border-red-500/20 hover:bg-red-500/15 transition-all active:scale-[0.98]"><Zap size={9} className="text-red-400"/><span className="text-[9px] text-red-400 font-medium truncate max-w-[100px]">{roomStakes.description}</span></button>
+              ) : (
+                <button onClick={()=>setShowStakes(true)} className={`flex items-center gap-1 px-2 py-0.5 rounded-md border transition-all active:scale-[0.98] ${darkMode?'bg-white/[0.03] text-gray-500 border-white/[0.06] hover:text-gray-300':'bg-gray-50 text-gray-400 border-gray-200 hover:text-gray-600'}`}><Zap size={9}/><span className="text-[9px] font-bold">Stakes</span></button>
+              )}
               <span className={`text-[10px] font-bold ${T.text}`}>{myPts} pts</span>
               <span className={`text-[10px] font-bold ${dailyProg>=1?'text-emerald-400':'text-blue-400'}`}>{Math.round(dailyProg*100)}%</span>
             </div>
           </div>
           <div className="relative h-1 bg-white/[0.04] rounded-full overflow-hidden"><div className="absolute inset-y-0 left-0 rounded-full transition-all duration-700 ease-out" style={{width:(dailyProg*100)+'%',background:dailyProg>=1?'linear-gradient(90deg,#10b981,#34d399)':'linear-gradient(90deg,#3b82f6,#8b5cf6)'}}/></div>
-          <div className="flex justify-end mt-2">
-            {roomStakes ? (
-              <button onClick={()=>setShowStakes(true)} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-500/10 border border-red-500/20 hover:bg-red-500/15 transition-all active:scale-[0.98]"><Zap size={11} className="text-red-400"/><span className="text-[11px] text-red-400 font-medium truncate max-w-[200px]">{roomStakes.description}</span></button>
-            ) : (
-              <button onClick={()=>setShowStakes(true)} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/[0.03] text-gray-500 border border-white/[0.06] hover:text-gray-300 transition-all active:scale-[0.98]"><Zap size={12}/><span className="text-[11px] font-bold">Set Stakes</span></button>
-            )}
-          </div>
         </div>
 
         {/* Rival pills — inline, small */}
