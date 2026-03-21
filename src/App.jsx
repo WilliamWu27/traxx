@@ -148,7 +148,7 @@ export default function VersaApp() {
   const [userRooms, setUserRooms] = useState([]);
   const [roomStakes, setRoomStakes] = useState(null);
   const [newStake, setNewStake] = useState({ type: 'custom', description: '', duration: 'weekly' });
-  const [newHabit, setNewHabit] = useState({ name: '', category: 'Grind', points: 10, isRepeatable: false, maxCompletions: 1 });
+  const [newHabit, setNewHabit] = useState({ name: '', category: 'Study', points: 10, isRepeatable: false, maxCompletions: 1 });
   const [historyDate, setHistoryDate] = useState(null);
   const [editHabitData, setEditHabitData] = useState({});
   const [weeklyWinner, setWeeklyWinner] = useState(null);
@@ -225,18 +225,18 @@ export default function VersaApp() {
   const loadDefaultHabits = async () => {
     const defaultHabits = [
       // GRIND — academics, productivity, getting ahead
-      { name: 'Study session', category: 'Grind', points: 5, isRepeatable: true, maxCompletions: 20, unit: 'per 30 min' },
-      { name: 'Read', category: 'Grind', points: 8, isRepeatable: true, maxCompletions: 6, unit: 'per 30 min' },
-      { name: 'Side project', category: 'Grind', points: 5, isRepeatable: true, maxCompletions: 12, unit: 'per 30 min' },
+      { name: 'Study session', category: 'Study', points: 5, isRepeatable: true, maxCompletions: 20, unit: 'per 30 min' },
+      { name: 'Read', category: 'Study', points: 8, isRepeatable: true, maxCompletions: 6, unit: 'per 30 min' },
+      { name: 'Side project', category: 'Study', points: 5, isRepeatable: true, maxCompletions: 12, unit: 'per 30 min' },
       // HEALTH — gym, sleep, nutrition
       { name: 'Hit the gym', category: 'Health', points: 15, isRepeatable: true, maxCompletions: 4, unit: 'per 30 min' },
       { name: 'Slept 7+ hours', category: 'Health', points: 15, isRepeatable: false, maxCompletions: 1 },
       { name: 'Woke up before 7', category: 'Health', points: 15, isRepeatable: false, maxCompletions: 1 },
       { name: 'Clean eating', category: 'Health', points: 8, isRepeatable: true, maxCompletions: 3, unit: 'per meal' },
       // DISCIPLINE — screen time, substances, mindset
-      { name: 'Screen time under 2.5hrs', category: 'Discipline', points: 15, isRepeatable: false, maxCompletions: 1 },
-      { name: 'No vaping / substances', category: 'Discipline', points: 15, isRepeatable: false, maxCompletions: 1 },
-      { name: 'Journaled', category: 'Discipline', points: 8, isRepeatable: true, maxCompletions: 3, unit: 'per 5 min' },
+      { name: 'Screen time under 2.5hrs', category: 'Focus', points: 15, isRepeatable: false, maxCompletions: 1 },
+      { name: 'No vaping / substances', category: 'Focus', points: 15, isRepeatable: false, maxCompletions: 1 },
+      { name: 'Journaled', category: 'Focus', points: 8, isRepeatable: true, maxCompletions: 3, unit: 'per 5 min' },
     ];
     try {
       setLoading(true);
@@ -367,7 +367,7 @@ export default function VersaApp() {
           const mc = comps.filter(c=>c.userId===m.id);
           const pts = mc.reduce((s,c)=>{const h=habits.find(x=>x.id===c.habitId);return s+((h?.points||c.habitPoints||0)*(c.count||1));},0);
           const catPts = {}; allCatNames.forEach(c => catPts[c] = 0);
-          mc.forEach(c=>{const h=habits.find(x=>x.id===c.habitId);const cat=h?.category||c.habitCategory||'Grind';catPts[cat]+=(h?.points||c.habitPoints||0)*(c.count||1);});
+          mc.forEach(c=>{const h=habits.find(x=>x.id===c.habitId);const cat=h?.category||c.habitCategory||'Study';catPts[cat]+=(h?.points||c.habitPoints||0)*(c.count||1);});
           const activeDays = [...new Set(mc.map(c=>c.date))].length;
           return {member:m, pts, catPts, activeDays, completions:mc.length};
         }).sort((a,b)=>b.pts-a.pts);
@@ -738,7 +738,7 @@ export default function VersaApp() {
         const boardDocId = currentUser.id+'_'+currentRoom.id;
         await setDoc(doc(db, 'myBoard', boardDocId), { habitIds: [...myBoardIds, hid], userId: currentUser.id, roomId: currentRoom.id });
       }
-      setNewHabit({ name:'', category:'Grind', points:10, isRepeatable:false, maxCompletions:1 }); setShowAddHabit(false);
+      setNewHabit({ name:'', category:'Study', points:10, isRepeatable:false, maxCompletions:1 }); setShowAddHabit(false);
     } catch { setError('Failed to add'); }
   };
   const saveEditHabit = async () => {
@@ -905,9 +905,9 @@ export default function VersaApp() {
   ];
   const ICON_OPTIONS = ['🧠','💪','✨','⭐','📚','🎨','💼','🏃','🧘','💰','🎯','❤️','🌱','🔬','🎮','🍎'];
   const DEFAULT_CATEGORIES = [
-    { name:'Grind', colorIdx:0, icon:'📚' },
+    { name:'Study', colorIdx:0, icon:'📚' },
     { name:'Health', colorIdx:1, icon:'💪' },
-    { name:'Discipline', colorIdx:2, icon:'🎯' },
+    { name:'Focus', colorIdx:2, icon:'🎯' },
   ];
   const activeCategories = roomCategories.length > 0 ? roomCategories : DEFAULT_CATEGORIES;
   const getCT = (catName) => {
@@ -932,7 +932,7 @@ export default function VersaApp() {
   const deleteCategory = async (catName) => {
     const catHabits = habits.filter(h=>h.category===catName);
     if (catHabits.length > 0) { setError('Delete habits in this category first'); setTimeout(()=>setError(''),2000); return; }
-    if (['Grind','Health','Discipline'].includes(catName)) { setError("Can't delete default categories"); setTimeout(()=>setError(''),2000); return; }
+    if (['Study','Health','Focus'].includes(catName)) { setError("Can't delete default categories"); setTimeout(()=>setError(''),2000); return; }
     const updated = activeCategories.filter(c=>c.name!==catName);
     try { await setDoc(doc(db, 'roomCategories', currentRoom.id), { categories: updated }); } catch {}
   };
@@ -1282,6 +1282,7 @@ export default function VersaApp() {
               <button onClick={()=>setShowLeaderboard(true)} className="p-1.5 text-amber-400 hover:text-amber-300 transition-colors"><Trophy size={13}/></button>
               {roomStakes&&<button onClick={()=>setShowStakes(true)} className="p-1.5 text-red-400"><Zap size={13}/></button>}
               <button onClick={()=>setShowInviteModal(true)} className={`p-1.5 ${T.textDim} hover:${T.text} transition-colors`}><UserPlus size={13}/></button>
+              <button onClick={toggleTheme} className={`p-1.5 ${T.textDim} hover:text-amber-400 transition-colors`}>{darkMode?<Sun size={13}/>:<Moon size={13}/>}</button>
               <button onClick={()=>setShowProfile(true)} className={`p-1.5 ${T.textDim} hover:${T.text} transition-colors`}><User size={14}/></button>
               <button onClick={()=>setShowSwitchRoom(true)} className={`flex items-center gap-1 px-2 py-1 ${T.bgCard} border ${T.border} rounded-lg text-[9px] ${T.textMuted} hover:${T.text} transition-all ml-0.5`}><span className="font-mono tracking-wider">{currentRoom?.code}</span>{userRooms.length>1&&<ArrowLeftRight size={9}/>}</button>
               {isRoomCreator&&<button onClick={()=>setShowRoomSettings(true)} className={`p-1 ${T.textDim} hover:text-amber-400 transition-colors`}><Crown size={11}/></button>}
@@ -1476,16 +1477,25 @@ export default function VersaApp() {
           </div>
         )}
 
-        {/* Tools */}
-        <div className="flex items-center justify-center gap-1 flex-wrap mb-4">
-          {devMode&&<><button onClick={loadHeatMap} className={`text-[9px] font-medium tracking-wider uppercase px-2.5 py-1 rounded-md transition-all ${T.textDim} hover:text-purple-400`}>📊 Map</button>
-          <button onClick={loadInsights} className={`text-[9px] font-medium tracking-wider uppercase px-2.5 py-1 rounded-md transition-all ${T.textDim} hover:text-blue-400`}>📈 Insights</button>
-          <button onClick={()=>{setCustomBoardHabits(myBoardIds||habits.map(h=>h.id));setShowCustomBoard(true);}} className={`text-[9px] font-medium tracking-wider uppercase px-2.5 py-1 rounded-md transition-all ${T.textDim} hover:text-indigo-400`}>🎯 Board</button>
-          {habits.length>0&&<button onClick={()=>setEditMode(!editMode)} className={'text-[9px] font-medium tracking-wider uppercase px-2.5 py-1 rounded-md transition-all '+(editMode?'bg-blue-500/20 text-blue-400':T.textDim+' hover:text-gray-400')}>{editMode?'Done':'✏️ Edit'}</button>}
-          <button onClick={()=>{setHistoryDate(getYesterday());loadHistoryDate(getYesterday());setShowHistory(true);}} className={`text-[9px] font-medium tracking-wider uppercase px-2.5 py-1 rounded-md transition-all ${T.textDim} hover:text-gray-400`}>📅 History</button>
-          {lastWeekData&&<button onClick={()=>setShowWeeklyRecap(true)} className={`text-[9px] font-medium tracking-wider uppercase px-2.5 py-1 rounded-md transition-all ${T.textDim} hover:text-purple-400`}>📊 Recap</button>}
-          <button onClick={toggleTheme} className={`text-[9px] font-medium tracking-wider uppercase px-2.5 py-1 rounded-md transition-all ${T.textDim} hover:text-amber-400`}>{darkMode?'☀️ Light':'🌙 Dark'}</button></>}
-          <button onClick={toggleDevMode} className={`text-[9px] font-medium tracking-wider uppercase px-2.5 py-1 rounded-md transition-all ${devMode?'bg-amber-500/20 text-amber-400 border border-amber-500/30':T.textDim+' hover:text-gray-400'}`}>{devMode?'🔧 Dev Mode':'⚙️ Settings'}</button>
+        {/* Settings toggle */}
+        <div className="mb-4">
+          <div className="flex justify-center">
+            <button onClick={toggleDevMode} className={`text-[9px] font-medium tracking-wider uppercase px-3 py-1.5 rounded-lg transition-all ${devMode?'bg-amber-500/15 text-amber-400 border border-amber-500/20':'text-gray-600 hover:text-gray-400'}`}>⚙️ Settings</button>
+          </div>
+          {devMode && (
+            <div className={`mt-3 p-3 rounded-xl border ${darkMode?'border-amber-500/10 bg-amber-500/5':'border-amber-200 bg-amber-50'}`}>
+              <div className="flex items-center justify-center gap-1.5 flex-wrap">
+                <button onClick={()=>setShowAddHabit(true)} className={`text-[9px] font-medium tracking-wider uppercase px-2.5 py-1 rounded-md transition-all ${T.textDim} hover:text-blue-400`}>➕ Add Habit</button>
+                <button onClick={()=>setShowAddCategory(true)} className={`text-[9px] font-medium tracking-wider uppercase px-2.5 py-1 rounded-md transition-all ${T.textDim} hover:text-purple-400`}>➕ Category</button>
+                {habits.length>0&&<button onClick={()=>setEditMode(!editMode)} className={'text-[9px] font-medium tracking-wider uppercase px-2.5 py-1 rounded-md transition-all '+(editMode?'bg-blue-500/20 text-blue-400':T.textDim+' hover:text-gray-400')}>{editMode?'Done':'✏️ Edit'}</button>}
+                <button onClick={()=>{setCustomBoardHabits(myBoardIds||habits.map(h=>h.id));setShowCustomBoard(true);}} className={`text-[9px] font-medium tracking-wider uppercase px-2.5 py-1 rounded-md transition-all ${T.textDim} hover:text-indigo-400`}>🎯 Board</button>
+                <button onClick={loadHeatMap} className={`text-[9px] font-medium tracking-wider uppercase px-2.5 py-1 rounded-md transition-all ${T.textDim} hover:text-purple-400`}>📊 Map</button>
+                <button onClick={loadInsights} className={`text-[9px] font-medium tracking-wider uppercase px-2.5 py-1 rounded-md transition-all ${T.textDim} hover:text-blue-400`}>📈 Insights</button>
+                <button onClick={()=>{setHistoryDate(getYesterday());loadHistoryDate(getYesterday());setShowHistory(true);}} className={`text-[9px] font-medium tracking-wider uppercase px-2.5 py-1 rounded-md transition-all ${T.textDim} hover:text-gray-400`}>📅 History</button>
+                {lastWeekData&&<button onClick={()=>setShowWeeklyRecap(true)} className={`text-[9px] font-medium tracking-wider uppercase px-2.5 py-1 rounded-md transition-all ${T.textDim} hover:text-purple-400`}>📊 Recap</button>}
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
