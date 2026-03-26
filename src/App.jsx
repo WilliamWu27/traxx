@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Clock, Plus, X, LogOut, Copy, Check, UserPlus, HelpCircle, Trophy, User, Flame, Zap, Star, TrendingUp, ArrowLeftRight, Edit3, Calendar, ChevronLeft, ChevronRight, Crown, Target, ArrowUp, ArrowDown, Minus as MinusIcon, GripVertical, BarChart3, Sun, Moon, ChevronDown } from 'lucide-react';
+import { Clock, Plus, X, LogOut, Copy, Check, UserPlus, HelpCircle, Trophy, User, Flame, Zap, Star, TrendingUp, ArrowLeftRight, Edit3, Calendar, ChevronLeft, ChevronRight, Crown, Target, ArrowUp, ArrowDown, Minus as MinusIcon, GripVertical, BarChart3, Sun, Moon, ChevronDown, Trash2 } from 'lucide-react';
 import { auth, db } from './firebase';
 import {
   createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, sendPasswordResetEmail, signInWithPopup, GoogleAuthProvider
@@ -1578,7 +1578,7 @@ export default function VersaApp() {
                         )}
                       </div>
                       <div className="flex items-center gap-1.5 shrink-0">
-                        {cnt > 0 && !editMode && <button onClick={()=>handleDecrement(h.id)} className={`w-8 h-8 rounded-full flex items-center justify-center transition-all active:scale-90 ${darkMode?'bg-white/[0.04] text-gray-500 hover:bg-white/[0.08]':'bg-gray-100 text-gray-400 hover:bg-gray-200'}`}><Minus size={14}/></button>}
+                        {cnt > 0 && !editMode && <button onClick={()=>handleDecrement(h.id)} className={`w-8 h-8 rounded-full flex items-center justify-center transition-all active:scale-90 ${darkMode?'bg-white/[0.04] text-gray-500 hover:bg-white/[0.08]':'bg-gray-100 text-gray-400 hover:bg-gray-200'}`}><MinusIcon size={14}/></button>}
                         {!maxed && !editMode && <button onClick={()=>handleIncrement(h.id)} className={`w-10 h-10 rounded-full flex items-center justify-center transition-all active:scale-90 shadow-lg text-white font-bold ${t.bg} hover:opacity-90`} style={{boxShadow:`0 4px 14px ${t.neon}40`}}><Plus size={18}/></button>}
                         {maxed && !editMode && <div className={`w-10 h-10 rounded-full flex items-center justify-center ${t.bg} text-white`}><Check size={18}/></div>}
                         {editMode && <><button onClick={()=>openEditHabit(h)} className="text-blue-400 p-1.5"><Edit3 size={14}/></button><button onClick={()=>deleteHabit(h.id)} className="text-red-400 p-1.5"><Trash2 size={14}/></button></>}
