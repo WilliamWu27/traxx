@@ -1151,6 +1151,7 @@ export default function VersaApp() {
   const myPts = currentUser&&currentRoom ? getTodayPts(currentUser.id) : 0;
   const isPerfect = allCatNames.length > 0 && allCatNames.every(c => myCr[c]);
   const dailyProg = currentUser&&currentRoom ? getDailyProgress() : 0;
+  const displayHabits = (myBoardIds && !editMode) ? habits.filter(h => myBoardIds.includes(h.id)) : habits;
   if (dailyProg >= 1 && prevProgRef.current < 1 && prevProgRef.current > 0) {
     // Schedule celebration (can't call hooks here but can set ref + trigger state in next tick)
     setTimeout(() => setCelebrateComplete(true), 0);
