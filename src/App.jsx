@@ -393,17 +393,15 @@ export default function VersaApp() {
         const snap = await getDocs(query(collection(db, 'completions'), where('userId', '==', currentUser.id), where('date', '>=', formatDateStr(ago))));
         const allDocs = snap.docs.map(d => d.data());
 
-        // Calculate which dates hit 20% progress
-        // We need total possible completions (from current habits) and actual completions per day
-        const totalPossible = habits.reduce((s, h) => s + (h.isRepeatable ? (h.maxCompletions || 1) : 1), 0);
+        // Calculate which dates hit 20% of daily target (60pts)
         const qualifyingDates = new Set();
-        const dateCompletions = {};
+        const datePts = {};
         allDocs.forEach(d => {
-          if (!dateCompletions[d.date]) dateCompletions[d.date] = 0;
-          dateCompletions[d.date] += Math.min(d.count || 1, habits.find(h => h.id === d.habitId)?.effectiveMax || d.count || 1);
+          if (!datePts[d.date]) datePts[d.date] = 0;
+          datePts[d.date] += ((d.habitPoints || habits.find(h => h.id === d.habitId)?.points || 0) * (d.count || 1)) + (d.bonusPoints || 0);
         });
-        Object.entries(dateCompletions).forEach(([date, done]) => {
-          if (totalPossible > 0 && done / totalPossible >= 0.2) qualifyingDates.add(date);
+        Object.entries(datePts).forEach(([date, pts]) => {
+          if (pts >= 80) qualifyingDates.add(date);
         });
 
         const dates = [...qualifyingDates].sort().reverse();
@@ -653,12 +651,11 @@ export default function VersaApp() {
   const freezeEarnedRef = useRef(false);
   useEffect(() => {
     if (!currentUser || !currentRoom || freezeEarnedRef.current || streakFreeze > 0) return;
-    // Calculate progress inline (habits with at least 1 completion / total habits)
+    // Calculate progress inline (points / daily target)
     const dh = myBoardIds ? habits.filter(h=>myBoardIds.includes(h.id)) : habits;
     if (!dh.length) return;
-    let done = 0;
-    dh.forEach(h => { if (getCount(h.id) > 0) done++; });
-    const prog = done / dh.length;
+    const pts = completions.filter(c=>c.userId===currentUser.id&&c.date===getToday()).reduce((s,c)=>{ return s+((c.habitPoints||habits.find(x=>x.id===c.habitId)?.points||0)*(c.count||1))+(c.bonusPoints||0); },0);
+    const prog = Math.min(pts / 400, 1);
     if (prog >= 0.8) {
       freezeEarnedRef.current = true;
       const award = async () => {
@@ -997,7 +994,8 @@ export default function VersaApp() {
     return t;
   };
   const getCount = (hid) => { const e=getExisting(hid); return e?.count||0; };
-  const getDailyProgress = () => { const dh=myBoardIds?habits.filter(h=>myBoardIds.includes(h.id)):habits; if(!dh.length)return 0; let done=0; dh.forEach(h=>{if(getCount(h.id)>0)done++;}); return done/dh.length; };
+  const DAILY_TARGET = 400;
+  const getDailyProgress = () => { if(!currentUser||!currentRoom)return 0; const pts=getTodayPts(currentUser.id); return Math.min(pts/DAILY_TARGET,1); };
   const getLeaderboard = () => activeMembers.map(m=>({member:m,todayPts:getTodayPts(m.id),weeklyPts:getWeeklyPts(m.id),crystals:getTodayCrystals(m.id),weeklyCrystals:getWeeklyCrystals(m.id)})).sort((a,b)=>leaderboardTab==='today'?b.todayPts-a.todayPts:b.weeklyPts-a.weeklyPts);
 
   // ─── CATEGORY SYSTEM ───
