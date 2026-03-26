@@ -150,7 +150,7 @@ export default function VersaApp() {
   const [userRooms, setUserRooms] = useState([]);
   const [roomStakes, setRoomStakes] = useState(null);
   const [newStake, setNewStake] = useState({ type: 'custom', description: '', duration: 'weekly' });
-  const [newHabit, setNewHabit] = useState({ name: '', category: 'Study', points: 10, isRepeatable: false, maxCompletions: 1, unit: '' });
+  const [newHabit, setNewHabit] = useState({ name: '', category: 'Study', points: 10, isRepeatable: false, maxCompletions: 1, unit: '', description: '' });
   const [historyDate, setHistoryDate] = useState(null);
   const [editHabitData, setEditHabitData] = useState({});
   const [weeklyWinner, setWeeklyWinner] = useState(null);
@@ -175,6 +175,7 @@ export default function VersaApp() {
   const [bonusMsg, setBonusMsg] = useState(null);
   const [rivalStatus, setRivalStatus] = useState([]);
   const [showInsights, setShowInsights] = useState(false);
+  const [showActivityExpanded, setShowActivityExpanded] = useState(false);
   const [insightsData, setInsightsData] = useState(null);
   const [streakMilestone, setStreakMilestone] = useState(null);
   const [streakFreeze, setStreakFreeze] = useState(0);
@@ -871,6 +872,7 @@ export default function VersaApp() {
         name: newHabit.name.trim(), category: newHabit.category, points: parseInt(newHabit.points)||10,
         isRepeatable: newHabit.isRepeatable, maxCompletions: parseInt(newHabit.maxCompletions)||1,
         ...(newHabit.unit?.trim() ? { unit: newHabit.unit.trim() } : {}),
+        ...(newHabit.description?.trim() ? { description: newHabit.description.trim() } : {}),
         roomId: currentRoom.id, createdBy: currentUser.id, createdAt: new Date().toISOString()
       });
       // Auto-add to personal board if one exists
@@ -878,7 +880,7 @@ export default function VersaApp() {
         const boardDocId = currentUser.id+'_'+currentRoom.id;
         await setDoc(doc(db, 'myBoard', boardDocId), { habitIds: [...myBoardIds, hid], userId: currentUser.id, roomId: currentRoom.id });
       }
-      setNewHabit({ name:'', category:'Study', points:10, isRepeatable:false, maxCompletions:1, unit:'' }); setShowAddHabit(false);
+      setNewHabit({ name:'', category:'Study', points:10, isRepeatable:false, maxCompletions:1, unit:'', description:'' }); setShowAddHabit(false);
     } catch { setError('Failed to add'); }
   };
   const saveEditHabit = async () => {
@@ -888,13 +890,14 @@ export default function VersaApp() {
         name: editHabitData.name.trim(), category: editHabitData.category,
         points: parseInt(editHabitData.points)||10, isRepeatable: editHabitData.isRepeatable,
         maxCompletions: parseInt(editHabitData.maxCompletions)||1,
-        unit: editHabitData.unit?.trim() || null
+        unit: editHabitData.unit?.trim() || null,
+        description: editHabitData.description?.trim() || null
       });
       setShowEditHabit(null);
     } catch { setError('Failed to save'); }
   };
   const deleteHabit = async (hid) => { if (!confirm('Delete this habit?')) return; try { await deleteDoc(doc(db, 'habits', hid)); } catch {} };
-  const openEditHabit = (habit) => { setEditHabitData({ name: habit.name, category: habit.category, points: habit.points, isRepeatable: habit.isRepeatable, maxCompletions: habit.maxCompletions, unit: habit.unit||'' }); setShowEditHabit(habit.id); };
+  const openEditHabit = (habit) => { setEditHabitData({ name: habit.name, category: habit.category, points: habit.points, isRepeatable: habit.isRepeatable, maxCompletions: habit.maxCompletions, unit: habit.unit||'', description: habit.description||'' }); setShowEditHabit(habit.id); };
 
   // ─── COMPLETIONS (with embedded habit data for orphan-proofing) ───
   const getExisting = (hid) => { const t = getToday(); return completions.find(c=>c.userId===currentUser.id&&c.habitId===hid&&c.date===t); };
@@ -1180,7 +1183,7 @@ export default function VersaApp() {
               { icon: '📚', title: 'Track What Matters', desc: 'Studying, gym, screen time, sleep. Earn points for everything.', color: 'from-blue-500/10 to-blue-600/5' },
               { icon: '🔥', title: 'Streak Multipliers', desc: 'Don\'t break the chain → earn up to 2× points.', color: 'from-orange-500/10 to-red-600/5' },
               { icon: '🏆', title: 'Compete with Friends', desc: 'Real-time leaderboards. Set stakes. Loser pays.', color: 'from-amber-500/10 to-yellow-600/5' },
-              { icon: '💎', title: 'Win Crystals', desc: 'Top scorer in Grind, Health, or Discipline earns the crystal.', color: 'from-purple-500/10 to-indigo-600/5' },
+              { icon: '💎', title: 'Win Crystals', desc: 'Top scorer in Study, Health, or Focus earns the crystal.', color: 'from-purple-500/10 to-indigo-600/5' },
             ].map((item,i) => (
               <div key={i} className={`bg-gradient-to-r ${item.color} backdrop-blur-sm border border-white/[0.06] rounded-2xl p-4 flex items-center gap-4`}>
                 <span className="text-2xl">{item.icon}</span>
@@ -1305,7 +1308,7 @@ export default function VersaApp() {
             <div>
               <div className="text-5xl mb-4">👋</div>
               <h1 className="text-2xl font-bold text-white mb-2">Welcome, <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-emerald-400">{currentUser.username}</span></h1>
-              <p className="text-gray-500 text-sm leading-relaxed">Versa turns your daily habits into a competition.<br/>Let's get you set up in 30 seconds.</p>
+              <p className="text-gray-500 text-sm leading-relaxed">Compete with friends on real habits.<br/>Let's get you set up in 30 seconds.</p>
             </div>
             <div className="space-y-3">
               {[
@@ -1452,207 +1455,169 @@ export default function VersaApp() {
           </div>
         </div>
       )}
-      {/* Header — slim */}
+      {/* ═══ HEADER ═══ */}
       <div className={`${T.headerBg} ${T.blurBg} border-b ${T.border} sticky top-0 z-40`}>
-        <div className="max-w-2xl mx-auto px-4 py-2.5">
+        <div className="max-w-2xl mx-auto px-4 py-3">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <h1 className="text-base font-black tracking-[0.15em]">VERSA</h1>
-              <div className="flex gap-0.5"><div className="w-1 h-1 rounded-full bg-blue-500"/><div className="w-1 h-1 rounded-full bg-orange-500"/><div className="w-1 h-1 rounded-full bg-emerald-500"/></div>
-              {streakData.streak>0&&<div className="flex items-center gap-1 ml-1"><Flame size={11} className="text-orange-400"/><span className="text-orange-400 text-xs font-bold">{streakData.streak}</span>{streakMulti.multi>1&&<span className={`text-[8px] font-bold ${streakMulti.color}`}>{streakMulti.label}</span>}{streakFreeze>0&&<span className="text-[8px] text-cyan-400">🛡️</span>}</div>}
-              <span className={`text-[9px] ${T.textDim} ml-1`}>{timeDisplay} · D{(new Date()).getDay()||7}</span>
+            <div className="flex items-center gap-3">
+              <h1 className="text-lg font-black tracking-[0.15em]">VERSA</h1>
+              {streakData.streak>0&&<div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full ${darkMode?'bg-orange-500/10':'bg-orange-50'}`}><Flame size={13} className="text-orange-400"/><span className="text-orange-400 text-sm font-bold">{streakData.streak}</span>{streakMulti.multi>1&&<span className={`text-[9px] font-bold ${streakMulti.color}`}>{streakMulti.label}</span>}{streakFreeze>0&&<span className="text-xs">🛡️</span>}</div>}
             </div>
-            <div className="flex items-center gap-1">
-              <button onClick={()=>setShowLeaderboard(true)} className="p-1.5 text-amber-400 hover:text-amber-300 transition-colors"><Trophy size={13}/></button>
-              <button onClick={()=>setShowInviteModal(true)} className={`p-1.5 ${T.textDim} hover:${T.text} transition-colors`}><UserPlus size={13}/></button>
-              <button onClick={toggleTheme} className={`p-1.5 ${T.textDim} hover:text-amber-400 transition-colors`}>{darkMode?<Sun size={13}/>:<Moon size={13}/>}</button>
-              <button onClick={()=>setShowProfile(true)} className={`p-1.5 ${T.textDim} hover:${T.text} transition-colors`}><User size={14}/></button>
-              <button onClick={()=>setShowSwitchRoom(true)} className={`flex items-center gap-1 px-2 py-1 ${T.bgCard} border ${T.border} rounded-lg text-[9px] ${T.textMuted} hover:${T.text} transition-all ml-0.5`}><span className="font-mono tracking-wider">{currentRoom?.code}</span>{userRooms.length>1&&<ArrowLeftRight size={9}/>}</button>
-              {isRoomCreator&&<button onClick={()=>setShowRoomSettings(true)} className={`p-1 ${T.textDim} hover:text-amber-400 transition-colors`}><Crown size={11}/></button>}
+            <div className="flex items-center gap-2">
+              <button onClick={toggleTheme} className={`p-2 rounded-xl ${darkMode?'hover:bg-white/[0.06]':'hover:bg-gray-100'} transition-colors`}>{darkMode?<Sun size={16} className="text-gray-500"/>:<Moon size={16} className="text-gray-400"/>}</button>
+              <button onClick={()=>setShowProfile(true)} className={`p-2 rounded-xl ${darkMode?'hover:bg-white/[0.06]':'hover:bg-gray-100'} transition-colors`}>{currentUser.photoURL?<img src={currentUser.photoURL} className="w-7 h-7 rounded-full object-cover" referrerPolicy="no-referrer"/>:<User size={16} className={T.textMuted}/>}</button>
             </div>
           </div>
         </div>
       </div>
 
-      <div className="max-w-2xl mx-auto px-4 py-4">
-        {/* Motivational line + progress — compact */}
-        <div className="mb-3">
-          <div className="flex items-center justify-between mb-2">
-            <div className="flex items-center gap-2 flex-1 min-w-0">
-              {roomStakes ? (
-                <button onClick={()=>setShowStakes(true)} className="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-red-500/10 border border-red-500/20 hover:bg-red-500/15 transition-all active:scale-[0.98] shrink-0"><Zap size={12} className="text-red-400"/><span className="text-xs text-red-400 font-semibold truncate max-w-[120px]">{roomStakes.description}</span></button>
-              ) : (
-                <button onClick={()=>setShowStakes(true)} className={`flex items-center gap-1.5 px-3 py-1 rounded-lg border transition-all active:scale-[0.98] shrink-0 ${darkMode?'bg-white/[0.03] text-gray-500 border-white/[0.06] hover:text-gray-300':'bg-gray-50 text-gray-400 border-gray-200 hover:text-gray-600'}`}><Zap size={12}/><span className="text-xs font-bold">Stakes</span></button>
-              )}
-              <p className={`text-sm ${T.textDim} italic truncate`}>{dailyProg>=1?'🎉 All done — nice work.':getMotivation()}</p>
-            </div>
-            <div className="flex items-center gap-2.5 shrink-0 ml-2">
-              {streakFreeze>0&&<span className="text-sm" title="Streak freeze banked">🛡️</span>}
-              <span className={`text-sm font-bold ${T.text}`}>{myPts} pts</span>
-              <span className={`text-sm font-bold ${dailyProg>=1?'text-emerald-400':'text-blue-400'}`}>{Math.round(dailyProg*100)}%</span>
+      <div className="max-w-2xl mx-auto px-4 pt-6 pb-20">
+
+        {/* ═══ SCORE RING ═══ */}
+        <div className="text-center mb-6">
+          <div className="relative inline-block">
+            <svg width="140" height="140" className="transform -rotate-90">
+              <circle cx="70" cy="70" r="60" stroke={darkMode?"rgba(255,255,255,0.06)":"rgba(0,0,0,0.08)"} strokeWidth="8" fill="none"/>
+              <circle cx="70" cy="70" r="60" stroke="url(#scoreGrad)" strokeWidth="8" fill="none" strokeLinecap="round" strokeDasharray={`${dailyProg * 377} 377`} className="transition-all duration-700"/>
+              <defs><linearGradient id="scoreGrad" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stopColor="#3b82f6"/><stop offset="50%" stopColor="#8b5cf6"/><stop offset="100%" stopColor="#10b981"/></linearGradient></defs>
+            </svg>
+            <div className="absolute inset-0 flex flex-col items-center justify-center">
+              <span className={`text-3xl font-black ${T.text}`}>{myPts}</span>
+              <span className={`text-[10px] font-bold ${dailyProg>=1?'text-emerald-400':'text-blue-400'}`}>{Math.round(dailyProg*100)}%</span>
             </div>
           </div>
-          <div className="relative h-1 bg-white/[0.04] rounded-full overflow-hidden"><div className="absolute inset-y-0 left-0 rounded-full transition-all duration-700 ease-out" style={{width:(dailyProg*100)+'%',background:dailyProg>=1?'linear-gradient(90deg,#10b981,#34d399)':'linear-gradient(90deg,#3b82f6,#8b5cf6)'}}/></div>
+          <div className="mt-2">
+            {roomStakes ? (
+              <button onClick={()=>setShowStakes(true)} className={`inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full text-xs font-semibold transition-all active:scale-[0.97] ${darkMode?'bg-red-500/10 text-red-400 border border-red-500/20':'bg-red-50 text-red-500 border border-red-200'}`}><Zap size={12}/>{roomStakes.description}</button>
+            ) : dailyProg >= 1 ? (
+              <p className="text-sm font-medium text-emerald-400">🎉 All done — nice work.</p>
+            ) : (
+              <p className={`text-sm ${T.textDim} italic`}>{getMotivation()}</p>
+            )}
+          </div>
         </div>
 
-        {/* Rival pills — inline, small */}
+        {/* ═══ CATEGORY CHIPS ═══ */}
+        <div className="grid grid-cols-3 gap-2 mb-6">
+          {allCatNames.map(c => {
+            const ct = getCT(c);
+            const pts = getCatPts(currentUser.id, c);
+            const hasCrystal = myCr[c];
+            return (
+              <div key={c} className={`relative rounded-2xl p-3 text-center transition-all ${hasCrystal?ct.bgM+' border '+ct.bdr+' shadow-lg '+ct.glow:(darkMode?'bg-white/[0.03] border border-white/[0.06]':'bg-white border border-gray-200 shadow-sm')}`}>
+                <div className="text-xl mb-0.5">{activeCategories.find(cat=>cat.name===c)?.icon||'📋'}</div>
+                <div className={`text-lg font-black ${hasCrystal?ct.txt:T.text}`}>{pts}</div>
+                <div className={`text-[9px] font-bold tracking-wider uppercase ${hasCrystal?ct.txt:T.textDim}`}>{c}</div>
+                {hasCrystal&&<div className="absolute -top-1 -right-1 text-sm">💎</div>}
+              </div>
+            );
+          })}
+        </div>
+
+        {/* ═══ RIVAL PILLS ═══ */}
         {rivalStatus.length > 0 && (
-          <div className="flex items-center gap-2 mb-4 overflow-x-auto pb-0.5 -mx-1 px-1">
+          <div className="flex items-center gap-2 mb-5 overflow-x-auto pb-1 -mx-1 px-1">
             {rivalStatus.slice(0,4).map(r => {
               const ahead = r.pts > myPts;
               const ms = mutualStreaks[r.member.id] || 0;
               return (
-                <div key={r.member.id} className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border shrink-0 ${ahead?'border-red-500/15 bg-red-500/5':'border-emerald-500/15 bg-emerald-500/5'}`}>
-                  <Avatar user={r.member} size={20} className={ahead?'bg-red-500/20 text-red-400':'bg-emerald-500/20 text-emerald-400'}/>
-                  <span className={`text-[10px] font-medium ${darkMode?'text-gray-400':'text-gray-600'}`}>{r.member.username}</span>
-                  <span className={`text-[10px] font-bold ${ahead?'text-red-400':'text-emerald-400'}`}>{r.pts}</span>
+                <div key={r.member.id} className={`flex items-center gap-2 px-3 py-2 rounded-xl border shrink-0 ${ahead?(darkMode?'border-red-500/20 bg-red-500/5':'border-red-200 bg-red-50'):(darkMode?'border-emerald-500/20 bg-emerald-500/5':'border-emerald-200 bg-emerald-50')}`}>
+                  <Avatar user={r.member} size={22} className={ahead?'bg-red-500/20 text-red-400':'bg-emerald-500/20 text-emerald-400'}/>
+                  <div className="flex flex-col"><span className={`text-[11px] font-medium ${darkMode?'text-gray-300':'text-gray-700'}`}>{r.member.username}</span><span className={`text-[10px] font-bold ${ahead?'text-red-400':'text-emerald-400'}`}>{r.pts} pts</span></div>
                   {ms > 0 && <span className="text-[9px] text-orange-400 font-bold">🔗{ms}</span>}
                 </div>
               );
             })}
-            {myPts === 0 && rivalStatus.some(r=>r.pts>0) && <span className="text-[9px] text-red-400/70 shrink-0">⚠️ They started</span>}
+            {myPts === 0 && rivalStatus.some(r=>r.pts>0) && <span className="text-[10px] text-red-400/70 shrink-0 font-medium">⚠️ They started</span>}
           </div>
         )}
 
-        {/* Solo nudge — one line */}
         {soloMode && !rivalStatus.length && yesterdayPoints > 0 && (
-          <div className="flex items-center justify-between mb-3">
+          <div className={`flex items-center justify-between mb-4 px-4 py-2.5 rounded-xl ${darkMode?'bg-white/[0.03] border border-white/[0.06]':'bg-gray-50 border border-gray-200'}`}>
             <span className={`text-xs ${T.textDim}`}>Yesterday: {yesterdayPoints} pts</span>
-            {myPts > yesterdayPoints && myPts > 0 && <span className="text-[10px] text-emerald-400 font-bold">↑ Ahead</span>}
+            {myPts > yesterdayPoints && myPts > 0 && <span className="text-[11px] text-emerald-400 font-bold">↑ Ahead</span>}
           </div>
         )}
 
-        {/* Board requests — dev mode only */}
+        {!roomStakes && <div className="flex justify-center mb-4"><button onClick={()=>setShowStakes(true)} className={`flex items-center gap-2 px-5 py-2 rounded-full text-xs font-bold transition-all active:scale-[0.97] ${darkMode?'bg-white/[0.04] text-gray-500 border border-white/[0.06] hover:text-gray-300':'bg-gray-100 text-gray-400 border border-gray-200 hover:text-gray-600'}`}><Zap size={13}/>Set Stakes</button></div>}
+
         {devMode && boardRequests.length > 0 && boardRequests.map(br => (
-          <div key={br.id} className={`mb-2 p-2.5 rounded-lg border ${darkMode?'bg-purple-500/5 border-purple-500/15':'bg-purple-50 border-purple-200'}`}>
-            <div className="flex items-center justify-between">
-              <div><span className="text-xs font-medium text-purple-400">{br.username}</span><span className={`text-[10px] ${T.textDim} ml-1`}>wants a custom board</span></div>
-              <div className="flex gap-1.5">
-                <button onClick={()=>voteOnBoard(br,true)} className="px-2.5 py-1 bg-emerald-500/20 text-emerald-400 text-[9px] font-bold rounded-md">Approve</button>
-                <button onClick={()=>voteOnBoard(br,false)} className="px-2.5 py-1 bg-red-500/20 text-red-400 text-[9px] font-bold rounded-md">Deny</button>
-              </div>
-            </div>
+          <div key={br.id} className={`mb-2 p-2.5 rounded-xl border ${darkMode?'bg-purple-500/5 border-purple-500/15':'bg-purple-50 border-purple-200'}`}>
+            <div className="flex items-center justify-between"><span className={`text-xs ${T.textMuted}`}>{br.username} proposed a board</span><div className="flex gap-1"><button onClick={()=>voteBoardRequest(br,true)} className="text-[10px] text-emerald-400 font-bold px-2 py-1 bg-emerald-500/10 rounded-lg">✓</button><button onClick={()=>voteBoardRequest(br,false)} className="text-[10px] text-red-400 font-bold px-2 py-1 bg-red-500/10 rounded-lg">✗</button></div></div>
           </div>
         ))}
+        {myBoardIds && <div className={`mb-3 px-3 py-1.5 rounded-xl text-center text-[10px] font-medium ${darkMode?'bg-indigo-500/10 text-indigo-300 border border-indigo-500/15':'bg-indigo-50 text-indigo-600 border border-indigo-200'}`}>Custom board active · <button onClick={()=>{setMyBoardIds(null);try{deleteDoc(doc(db,'myBoard',currentUser.id+'_'+currentRoom.id));}catch{}}} className="underline">Show All</button></div>}
 
-        {/* Board indicator — dev mode only */}
-        {devMode && boardActive && (
-          <div className={`mb-2 p-2 rounded-lg border flex items-center justify-between ${darkMode?'bg-indigo-500/5 border-indigo-500/15':'bg-indigo-50 border-indigo-200'}`}>
-            <span className="text-[10px] text-indigo-400 font-medium">🎯 Custom Board — {myBoardIds?.length||0} of {habits.length}</span>
-            <button onClick={resetBoard} className="text-[10px] text-gray-500 hover:text-red-400">Show All</button>
-          </div>
-        )}
-
-        {devMode && editMode && (
-          <div className={`mb-2 p-2.5 rounded-lg border ${darkMode?'bg-blue-500/5 border-blue-500/15':'bg-blue-50 border-blue-200'}`}>
-            <p className={`text-[10px] ${darkMode?'text-blue-300':'text-blue-600'}`}>Drag to reorder · ✓ show/hide · ✏️ edit · ✕ delete</p>
-          </div>
-        )}
-
-        {/* ═══ CATEGORY COLUMNS AT TOP ═══ */}
-        <div className="grid grid-cols-3 gap-2 mb-4">
-          {allCatNames.map(cat => {
-            const t = getCT(cat);
-            const catPts = getCatPts(currentUser.id, cat);
-            const hasCrystal = myCr[cat];
+        {/* ═══ HABITS ═══ */}
+        <div className="space-y-2 mb-6">
+          {allCatNames.map(catName => {
+            const catHabits = displayHabits.filter(h => h.category === catName);
+            if (!catHabits.length) return null;
+            const t = getCT(catName);
+            const catIcon = activeCategories.find(cat=>cat.name===catName)?.icon||'📋';
             return (
-              <div key={cat} className={`text-center p-2.5 rounded-xl border ${hasCrystal ? t.bdr+' '+t.bgS+' shadow-sm '+t.glow : darkMode?'border-white/[0.04] bg-white/[0.02]':'border-gray-200 bg-gray-50'}`}>
-                <div className="text-sm mb-0.5">{t.icon}</div>
-                <div className={'text-lg font-black '+t.txt}>{catPts}</div>
-                <div className={`text-[8px] tracking-wider uppercase ${T.textDim}`}>{t.label}</div>
-                {hasCrystal && <div className="text-[9px] mt-0.5">💎</div>}
-              </div>
-            );
-          })}
-        </div>
-
-        {/* ═══ HABITS — THE MAIN EVENT ═══ */}
-        <div className="space-y-6">
-          {allCatNames.map(cat => {
-            const ch = getOrderedHabits(cat); if(!ch.length) return null;
-            const t = getCT(cat);
-            return (
-              <div key={cat}>
-                <div className="flex items-center gap-2.5 mb-3 px-1"><span className="text-sm">{t.icon}</span><h2 className={'text-[11px] font-bold tracking-[0.2em] uppercase '+t.txt}>{t.label}</h2><div className={'flex-1 h-px ml-1 '+(darkMode?'bg-white/[0.04]':'bg-gray-200')}/></div>
-                <div className="space-y-2">{ch.map((h, idx) => {
-                  const cnt = getCount(h.id), mx = h.isRepeatable?(h.maxCompletions||1):1, done=cnt>0, maxed=cnt>=mx, pct=mx>0?cnt/mx:0;
+              <div key={catName}>
+                <div className="flex items-center gap-2 mb-2 mt-4 first:mt-0"><span className="text-base">{catIcon}</span><span className={`text-xs font-bold tracking-wider uppercase ${t.txt}`}>{catName}</span></div>
+                {catHabits.map(h => {
+                  const cnt = getCount(h.id), mx = h.isRepeatable ? (h.maxCompletions||1) : 1;
+                  const done = cnt > 0, maxed = cnt >= mx;
                   return (
-                    <div key={h.id}
-                      draggable={devMode&&editMode}
-                      onDragStart={devMode&&editMode?(e)=>{e.dataTransfer.setData('text/plain',cat+'|'+idx);e.dataTransfer.effectAllowed='move';}:undefined}
-                      onDragOver={devMode&&editMode?(e)=>{e.preventDefault();}:undefined}
-                      onDrop={devMode&&editMode?(e)=>{e.preventDefault();const data=e.dataTransfer.getData('text/plain');const [srcCat,srcIdx]=data.split('|');if(srcCat!==cat)return;const ni=parseInt(srcIdx);if(ni===idx)return;const arr=[...ch];const [moved]=arr.splice(ni,1);arr.splice(idx,0,moved);saveHabitOrder(cat,arr);}:undefined}
-                      className={'relative rounded-xl p-3 flex items-center justify-between transition-all border '+(devMode&&editMode?'cursor-grab active:cursor-grabbing ':'')+
-                        (devMode&&editMode && !isOnBoard(h.id)?'opacity-40 ':'')+
-                        (maxed?t.bdr+' '+(darkMode?t.bgS:'bg-white')+' shadow-lg '+t.glow:done?t.bdr+' '+(darkMode?t.bgS:'bg-white'):darkMode?'border-white/[0.04] bg-white/[0.02] hover:bg-white/[0.03]':'border-gray-200 bg-white hover:bg-gray-50')+
-                        (maxedHabit===h.id?' animate-pulse ring-2 ring-offset-2 ring-offset-transparent':'')}>
-                      {/* Maxout flash overlay */}
-                      {maxedHabit===h.id&&<div className="absolute inset-0 rounded-xl animate-ping opacity-20" style={{backgroundColor:t.neon}}/>}
-                      {mx>1&&<div className={'absolute bottom-0 left-0 right-0 h-0.5 rounded-b-xl overflow-hidden '+(darkMode?'bg-white/[0.03]':'bg-gray-100')}><div className="h-full rounded-full transition-all duration-500" style={{width:(pct*100)+'%',backgroundColor:t.neon}}/></div>}
-                      <div className="flex items-center gap-3 flex-1 min-w-0">
-                        {devMode&&editMode?<div className={darkMode?'text-gray-600':'text-gray-400'}><GripVertical size={16}/></div>:(
-                        <div className="flex items-center gap-1 shrink-0">
-                          <button onClick={()=>handleDecrement(h.id)} disabled={cnt===0} className={'w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold transition-all active:scale-90 '+(cnt===0?'border '+(darkMode?'border-white/[0.06] text-gray-700':'border-gray-200 text-gray-300')+' cursor-not-allowed':'border-2 '+t.bdr+' '+t.txt)}>&minus;</button>
-                          <div className={'w-10 h-10 rounded-full border-2 flex items-center justify-center text-sm font-black transition-all duration-300 '+(maxed?t.bg+' border-transparent text-white shadow-lg '+t.glow+' scale-110':done?'border-current '+t.txt+' '+t.bgM:'border-'+(darkMode?'white/[0.08]':'gray-200')+' '+(darkMode?'text-gray-600':'text-gray-400')+' '+(darkMode?'bg-white/[0.02]':'bg-gray-50'))}>{maxed?'✓':cnt}</div>
-                          <button onClick={()=>handleIncrement(h.id)} disabled={maxed} className={'w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold transition-all active:scale-90 '+(maxed?'border '+(darkMode?'border-white/[0.06] text-gray-700':'border-gray-200 text-gray-300')+' cursor-not-allowed':'border-2 '+t.bdr+' '+t.txt)}>+</button>
-                        </div>)}
-                        <div className="min-w-0 flex-1">
-                          <div className={'text-sm font-medium truncate '+(done?(darkMode?'text-gray-200':'text-gray-800'):(darkMode?'text-gray-500':'text-gray-600'))}>{h.name}</div>
-                          <div className={(darkMode?'text-gray-600':'text-gray-400')+' text-[11px] flex items-center gap-1.5 flex-wrap'}><span>{h.points}pts</span><span>&middot;</span><span className={maxed?'font-bold '+t.txtB:''}>{cnt}/{mx}</span>{h.unit&&<span>{h.unit}</span>}{maxed&&<span className={t.pill+' text-[9px] font-bold px-1.5 py-0.5 rounded-full'+(maxedHabit===h.id?' animate-bounce':'')}>✓ MAXED</span>}</div>
+                    <div key={h.id} className={`flex items-center gap-3 mb-1.5 rounded-2xl p-3 pl-0 overflow-hidden transition-all ${maxed?(darkMode?'bg-gradient-to-r from-'+t.bg.replace('bg-','')+'10 to-transparent':'bg-'+t.bg.replace('bg-','').replace('500','50')):(darkMode?'bg-white/[0.02]':'bg-white')} ${darkMode?'border border-white/[0.04]':'border border-gray-100 shadow-sm'}`}>
+                      <div className={`w-1 self-stretch rounded-r-full ${done?t.bg:'bg-transparent'} transition-all`}/>
+                      <div className="min-w-0 flex-1">
+                        <div className={`text-[13px] font-semibold ${done?(darkMode?'text-white':'text-gray-900'):(darkMode?'text-gray-400':'text-gray-600')}`}>{h.name}</div>
+                        {h.description&&<div className={`text-[10px] ${T.textDim} mt-0.5`}>{h.description}</div>}
+                        <div className={`text-[10px] ${T.textDim} flex items-center gap-1.5 mt-0.5`}>
+                          <span>{h.points}pts</span>
+                          {h.unit&&<><span>·</span><span>{h.unit}</span></>}
+                          {h.isRepeatable&&<><span>·</span><span className={maxed?'font-bold '+t.txt:''}>{cnt}/{mx}</span></>}
+                          {maxed&&<span className={`${t.pill} text-[8px] font-bold px-1.5 py-0.5 rounded-full ${maxedHabit===h.id?'animate-bounce':''}`}>MAXED ✓</span>}
                         </div>
+                        {h.isRepeatable && mx > 1 && cnt > 0 && !maxed && (
+                          <div className={`mt-1.5 h-1 rounded-full overflow-hidden ${darkMode?'bg-white/[0.06]':'bg-gray-100'}`}><div className={`h-full rounded-full ${t.bg} transition-all duration-500`} style={{width:(cnt/mx*100)+'%'}}/></div>
+                        )}
                       </div>
-                      {devMode&&editMode&&<div className="flex items-center gap-0.5 shrink-0 ml-1">
-                        <button onClick={()=>toggleHabitOnBoard(h.id)} title={isOnBoard(h.id)?'Hide from board':'Show on board'} className={'p-1.5 transition-colors '+(isOnBoard(h.id)?(darkMode?'text-indigo-400 hover:text-indigo-300':'text-indigo-500 hover:text-indigo-400'):(darkMode?'text-gray-700 hover:text-indigo-400':'text-gray-400 hover:text-indigo-500'))}>{isOnBoard(h.id)?<Check size={11}/>:<MinusIcon size={11}/>}</button>
-                        <button onClick={()=>openEditHabit(h)} className={'p-1.5 transition-colors '+(darkMode?'text-gray-700 hover:text-blue-400':'text-gray-400 hover:text-blue-500')}><Edit3 size={11}/></button>
-                        <button onClick={()=>deleteHabit(h.id)} className={'p-1.5 transition-colors '+(darkMode?'text-gray-700 hover:text-red-400':'text-gray-400 hover:text-red-500')}><X size={12}/></button>
-                      </div>}
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        {cnt > 0 && !editMode && <button onClick={()=>handleDecrement(h.id)} className={`w-8 h-8 rounded-full flex items-center justify-center transition-all active:scale-90 ${darkMode?'bg-white/[0.04] text-gray-500 hover:bg-white/[0.08]':'bg-gray-100 text-gray-400 hover:bg-gray-200'}`}><Minus size={14}/></button>}
+                        {!maxed && !editMode && <button onClick={()=>handleIncrement(h.id)} className={`w-10 h-10 rounded-full flex items-center justify-center transition-all active:scale-90 shadow-lg text-white font-bold ${t.bg} hover:opacity-90`} style={{boxShadow:`0 4px 14px ${t.neon}40`}}><Plus size={18}/></button>}
+                        {maxed && !editMode && <div className={`w-10 h-10 rounded-full flex items-center justify-center ${t.bg} text-white`}><Check size={18}/></div>}
+                        {editMode && <><button onClick={()=>openEditHabit(h)} className="text-blue-400 p-1.5"><Edit3 size={14}/></button><button onClick={()=>deleteHabit(h.id)} className="text-red-400 p-1.5"><Trash2 size={14}/></button></>}
+                      </div>
                     </div>
                   );
-                })}</div>
+                })}
               </div>
             );
           })}
           {habits.length===0 ? (
-            <div className="text-center py-16"><div className="text-5xl mb-4">&#x1F3AF;</div><p className="text-gray-500 text-sm mb-5">No habits yet</p><button onClick={()=>setShowAddHabit(true)} className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl shadow-lg shadow-blue-500/20 text-sm font-bold active:scale-[0.98]"><Plus size={18}/>Add Habits</button></div>
+            <div className="text-center py-16"><div className="text-5xl mb-4">🎯</div><p className={`${T.textMuted} text-sm mb-5`}>No habits yet</p><button onClick={()=>setShowAddHabit(true)} className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-2xl shadow-lg shadow-blue-500/20 text-sm font-bold active:scale-[0.98]"><Plus size={18}/>Add Habits</button></div>
           ) : devMode ? (
-            <div className="flex gap-2">
-              <button onClick={()=>setShowAddHabit(true)} className={'flex-1 border border-dashed rounded-xl p-4 hover:text-blue-400 hover:border-blue-500/30 hover:bg-blue-500/5 flex items-center justify-center gap-2 transition-all '+(darkMode?'border-white/[0.08] text-gray-600':'border-gray-300 text-gray-400')}><Plus size={15}/><span className="text-xs font-medium tracking-wide">Add Habit</span></button>
-              <button onClick={()=>setShowAddCategory(true)} className={'border border-dashed rounded-xl p-4 hover:text-purple-400 hover:border-purple-500/30 hover:bg-purple-500/5 flex items-center justify-center gap-2 transition-all '+(darkMode?'border-white/[0.08] text-gray-600':'border-gray-300 text-gray-400')}><span className="text-xs font-medium tracking-wide">+ Category</span></button>
+            <div className="flex gap-2 mt-2">
+              <button onClick={()=>setShowAddHabit(true)} className={`flex-1 border border-dashed rounded-2xl p-4 hover:text-blue-400 hover:border-blue-500/30 hover:bg-blue-500/5 flex items-center justify-center gap-2 transition-all ${darkMode?'border-white/[0.08] text-gray-600':'border-gray-300 text-gray-400'}`}><Plus size={15}/><span className="text-xs font-medium">Add Habit</span></button>
+              <button onClick={()=>setShowAddCategory(true)} className={`border border-dashed rounded-2xl p-4 hover:text-purple-400 hover:border-purple-500/30 hover:bg-purple-500/5 flex items-center justify-center gap-2 transition-all ${darkMode?'border-white/[0.08] text-gray-600':'border-gray-300 text-gray-400'}`}><span className="text-xs font-medium">+ Category</span></button>
             </div>
           ) : null}
         </div>
 
-        {/* ═══ SECONDARY CONTENT (below habits) ═══ */}
-
-        {/* Quick stats */}
-        <div className="grid grid-cols-3 gap-2 mt-6 mb-4">
-          <div className={`${T.bgCard} rounded-xl border ${T.border} p-3 text-center`}><div className="text-lg font-black text-blue-400">{myPts}</div><div className={`text-[8px] ${T.textDim} uppercase tracking-wider`}>Today</div></div>
-          <div className={`${T.bgCard} rounded-xl border ${T.border} p-3 text-center`}><div className="text-lg font-black text-emerald-400">{getWeeklyPts(currentUser.id)}</div><div className={`text-[8px] ${T.textDim} uppercase tracking-wider`}>Week</div></div>
-          <div className={`${T.bgCard} rounded-xl border ${T.border} p-3 text-center`}><div className="flex justify-center gap-1.5 mb-0.5">{allCatNames.map(c=><div key={c} className={'w-4 h-4 rounded-full transition-all '+(myCr[c]?getCT(c).bg+' shadow-sm':darkMode?'bg-white/[0.06]':'bg-gray-200')}/>)}</div><div className={`text-[8px] ${T.textDim} uppercase tracking-wider`}>Crystals</div></div>
+        {/* ═══ SECONDARY ═══ */}
+        <div className="grid grid-cols-3 gap-2 mb-4">
+          <div className={`rounded-2xl p-3 text-center ${darkMode?'bg-white/[0.03] border border-white/[0.06]':'bg-white border border-gray-200 shadow-sm'}`}><div className="text-xl font-black text-blue-400">{myPts}</div><div className={`text-[9px] ${T.textDim} uppercase tracking-wider font-bold`}>Today</div></div>
+          <div className={`rounded-2xl p-3 text-center ${darkMode?'bg-white/[0.03] border border-white/[0.06]':'bg-white border border-gray-200 shadow-sm'}`}><div className="text-xl font-black text-emerald-400">{getWeeklyPts(currentUser.id)}</div><div className={`text-[9px] ${T.textDim} uppercase tracking-wider font-bold`}>Week</div></div>
+          <div className={`rounded-2xl p-3 text-center ${darkMode?'bg-white/[0.03] border border-white/[0.06]':'bg-white border border-gray-200 shadow-sm'}`}><div className="flex justify-center gap-2 mb-1">{allCatNames.map(c=><div key={c} className={`w-5 h-5 rounded-full transition-all ${myCr[c]?getCT(c).bg+' shadow-md '+getCT(c).glow:(darkMode?'bg-white/[0.06]':'bg-gray-200')}`}/>)}</div><div className={`text-[9px] ${T.textDim} uppercase tracking-wider font-bold`}>Crystals</div></div>
         </div>
 
-        {/* Weekly winner */}
-        {weeklyWinner && (
-          <div className="mb-3 p-2.5 bg-amber-500/5 border border-amber-500/10 rounded-lg flex items-center justify-between">
-            <div className="flex items-center gap-2"><Crown size={11} className="text-amber-400"/><span className="text-[11px] text-amber-300/80">{weeklyWinner.member.username} leads · {weeklyWinner.pts} pts</span></div>
-            <span className={`text-[10px] ${T.textDim}`}>{weeklyWinner.daysLeft > 0 ? weeklyWinner.daysLeft+'d left' : timeDisplay}</span>
-          </div>
-        )}
+        {weeklyWinner && <div className={`mb-3 p-3 rounded-2xl flex items-center justify-between ${darkMode?'bg-amber-500/5 border border-amber-500/10':'bg-amber-50 border border-amber-200'}`}><div className="flex items-center gap-2"><Crown size={14} className="text-amber-400"/><span className={`text-xs font-medium ${darkMode?'text-amber-300':'text-amber-700'}`}>{weeklyWinner.member.username} leads · {weeklyWinner.pts} pts</span></div><span className={`text-[10px] ${T.textDim}`}>{weeklyWinner.daysLeft > 0 ? weeklyWinner.daysLeft+'d left' : timeDisplay}</span></div>}
 
-        {/* Weekly drama countdown */}
-        {weeklyWinner && weeklyWinner.daysLeft <= 1 && activeMembers.length > 1 && (
-          <div className="mb-3 p-3 bg-gradient-to-r from-amber-500/5 via-red-500/5 to-purple-500/5 border border-amber-500/10 rounded-lg text-center">
-            <div className="text-sm font-bold text-amber-300">{weeklyWinner.daysLeft === 0 ? '⏰ Final Hours — '+timeDisplay : '⚡ Final Day'}</div>
-          </div>
-        )}
+        {weeklyWinner && weeklyWinner.daysLeft <= 1 && activeMembers.length > 1 && <div className={`mb-3 p-3 rounded-2xl text-center ${darkMode?'bg-gradient-to-r from-amber-500/5 via-red-500/5 to-purple-500/5 border border-amber-500/10':'bg-gradient-to-r from-amber-50 via-red-50 to-purple-50 border border-amber-200'}`}><div className={`text-sm font-bold ${darkMode?'text-amber-300':'text-amber-700'}`}>{weeklyWinner.daysLeft === 0 ? '⏰ Final Hours — '+timeDisplay : '⚡ Final Day'}</div></div>}
 
-        {/* Activity Feed */}
+        {/* ═══ ACTIVITY FEED (collapsible) ═══ */}
         {activityFeed.length > 0 && (
-          <div className={`mb-4 rounded-xl border ${T.border} ${T.bgCard} overflow-hidden`}>
-            <div className="px-3 py-2 border-b border-white/[0.04]">
-              <span className={`text-[9px] font-bold tracking-wider uppercase ${T.textMuted}`}>Activity</span>
-            </div>
-            <div className="max-h-40 overflow-y-auto divide-y divide-white/[0.04]">{activityFeed.slice(0,8).map(a => {
+          <div className={`mb-4 rounded-2xl border overflow-hidden ${darkMode?'border-white/[0.06] bg-white/[0.02]':'border-gray-200 bg-white shadow-sm'}`}>
+            <button onClick={()=>setShowActivityExpanded(!showActivityExpanded)} className={`w-full px-4 py-2.5 flex items-center justify-between ${darkMode?'hover:bg-white/[0.02]':'hover:bg-gray-50'} transition-colors`}>
+              <span className={`text-[10px] font-bold tracking-wider uppercase ${T.textMuted}`}>Activity</span>
+              <ChevronDown size={14} className={`${T.textDim} transition-transform ${showActivityExpanded?'rotate-180':''}`}/>
+            </button>
+            {showActivityExpanded && <div className={`max-h-48 overflow-y-auto border-t ${T.border}`}>{activityFeed.slice(0,10).map(a => {
               const isMe = a.userId === currentUser.id;
               const ts = a.ts ? new Date(a.ts) : null;
               const timeAgo = ts ? (Math.floor((Date.now()-ts.getTime())/60000)<60 ? Math.floor((Date.now()-ts.getTime())/60000)+'m' : Math.floor((Date.now()-ts.getTime())/3600000)+'h') : '';
@@ -1661,43 +1626,49 @@ export default function VersaApp() {
               Object.values(reactions).forEach(e => { reactionCounts[e] = (reactionCounts[e]||0)+1; });
               const myReaction = reactions[currentUser?.id];
               return (
-                <div key={a.id} className="px-3 py-2">
+                <div key={a.id} className={`px-4 py-2.5 border-b last:border-b-0 ${T.border}`}>
                   <div className="flex items-center gap-2">
-                    <Avatar user={activeMembers.find(m=>m.id===a.userId)||{username:a.username}} size={18} className={isMe?'bg-blue-500/20 text-blue-400':'bg-white/[0.06] text-gray-500'}/>
-                    <div className="flex-1 min-w-0 truncate"><span className={`text-[10px] ${isMe?'text-blue-400':'text-gray-500'} font-medium`}>{isMe?'You':a.username}</span><span className={`text-[10px] ${T.textDim} ml-1`}>{a.text}</span>{a.bonus==='jackpot'&&<span className="ml-1 text-[9px] text-amber-300 font-bold">5×</span>}{a.bonus==='epic'&&<span className="ml-1 text-[9px] text-red-400 font-bold">3×</span>}{a.bonus==='rare'&&<span className="ml-1 text-[9px] text-purple-400 font-bold">2×</span>}{a.bonus==='bonus'&&<span className="ml-1 text-[9px] text-cyan-400 font-bold">1.5×</span>}{a.bonus==='common'&&<span className="ml-1 text-[9px] text-emerald-400 font-bold">1.25×</span>}</div>
-                    <span className={`text-[8px] ${T.textFaint} shrink-0`}>{timeAgo}</span>
+                    <Avatar user={activeMembers.find(m=>m.id===a.userId)||{username:a.username}} size={20} className={isMe?'bg-blue-500/20 text-blue-400':(darkMode?'bg-white/[0.06] text-gray-500':'bg-gray-100 text-gray-500')}/>
+                    <div className="flex-1 min-w-0 truncate"><span className={`text-[11px] ${isMe?'text-blue-400':(darkMode?'text-gray-400':'text-gray-600')} font-medium`}>{isMe?'You':a.username}</span><span className={`text-[11px] ${T.textDim} ml-1`}>{a.text}</span>{a.bonus==='jackpot'&&<span className="ml-1 text-[9px] text-amber-300 font-bold">5×</span>}{a.bonus==='epic'&&<span className="ml-1 text-[9px] text-red-400 font-bold">3×</span>}{a.bonus==='rare'&&<span className="ml-1 text-[9px] text-purple-400 font-bold">2×</span>}{a.bonus==='bonus'&&<span className="ml-1 text-[9px] text-cyan-400 font-bold">1.5×</span>}{a.bonus==='common'&&<span className="ml-1 text-[9px] text-emerald-400 font-bold">1.25×</span>}</div>
+                    <span className={`text-[9px] ${T.textFaint} shrink-0`}>{timeAgo}</span>
                   </div>
-                  {/* Reactions */}
                   <div className="flex items-center gap-1 mt-1 ml-7">
                     {Object.keys(reactionCounts).length > 0 && Object.entries(reactionCounts).map(([emoji, count]) => (
-                      <span key={emoji} className={`text-[9px] px-1.5 py-0.5 rounded-full ${myReaction===emoji?'bg-blue-500/20 border border-blue-500/30':'bg-white/[0.04]'}`}>{emoji} {count}</span>
+                      <span key={emoji} className={`text-[9px] px-1.5 py-0.5 rounded-full ${myReaction===emoji?'bg-blue-500/20 border border-blue-500/30':(darkMode?'bg-white/[0.04]':'bg-gray-100')}`}>{emoji} {count}</span>
                     ))}
                     {!isMe && <div className="flex gap-0.5 ml-1">{REACTION_EMOJIS.map(e => (
-                      <button key={e} onClick={()=>reactToActivity(a.id,e)} className={`text-[10px] w-6 h-6 rounded-full flex items-center justify-center transition-all hover:scale-125 ${myReaction===e?'bg-blue-500/20':'hover:bg-white/[0.06]'}`}>{e}</button>
+                      <button key={e} onClick={()=>reactToActivity(a.id,e)} className={`text-[11px] w-7 h-7 rounded-full flex items-center justify-center transition-all hover:scale-110 ${myReaction===e?'bg-blue-500/20':(darkMode?'hover:bg-white/[0.06]':'hover:bg-gray-100')}`}>{e}</button>
                     ))}</div>}
                   </div>
                 </div>
               );
-            })}</div>
+            })}</div>}
           </div>
         )}
 
-        {/* Settings toggle */}
+        {/* Quick actions */}
+        <div className="flex items-center justify-center gap-2 mb-4 flex-wrap">
+          <button onClick={()=>setShowLeaderboard(true)} className={`flex items-center gap-1.5 px-4 py-2 rounded-full text-[11px] font-bold transition-all active:scale-[0.97] ${darkMode?'bg-amber-500/10 text-amber-400 border border-amber-500/20':'bg-amber-50 text-amber-600 border border-amber-200'}`}><Trophy size={13}/>Leaderboard</button>
+          <button onClick={()=>setShowInviteModal(true)} className={`flex items-center gap-1.5 px-4 py-2 rounded-full text-[11px] font-bold transition-all active:scale-[0.97] ${darkMode?'bg-blue-500/10 text-blue-400 border border-blue-500/20':'bg-blue-50 text-blue-600 border border-blue-200'}`}><UserPlus size={13}/>Rooms</button>
+          {isRoomCreator&&<button onClick={()=>setShowRoomSettings(true)} className={`flex items-center gap-1.5 px-3 py-2 rounded-full text-[11px] font-bold transition-all active:scale-[0.97] ${darkMode?'bg-amber-500/10 text-amber-400 border border-amber-500/20':'bg-amber-50 text-amber-600 border border-amber-200'}`}><Crown size={12}/></button>}
+        </div>
+
+        {/* Settings */}
         <div className="mb-4">
           <div className="flex justify-center">
-            <button onClick={toggleDevMode} className={`text-[9px] font-medium tracking-wider uppercase px-3 py-1.5 rounded-lg transition-all ${devMode?'bg-amber-500/15 text-amber-400 border border-amber-500/20':'text-gray-600 hover:text-gray-400'}`}>⚙️ Settings</button>
+            <button onClick={toggleDevMode} className={`text-[10px] font-bold tracking-wider uppercase px-4 py-2 rounded-full transition-all ${devMode?(darkMode?'bg-amber-500/15 text-amber-400 border border-amber-500/20':'bg-amber-50 text-amber-600 border border-amber-200'):(darkMode?'text-gray-600 hover:text-gray-400':'text-gray-400 hover:text-gray-600')}`}>⚙️ Settings</button>
           </div>
           {devMode && (
-            <div className={`mt-3 p-3 rounded-xl border ${darkMode?'border-amber-500/10 bg-amber-500/5':'border-amber-200 bg-amber-50'}`}>
-              <div className="flex items-center justify-center gap-1.5 flex-wrap">
-                <button onClick={()=>setShowAddHabit(true)} className={`text-[9px] font-medium tracking-wider uppercase px-2.5 py-1 rounded-md transition-all ${T.textDim} hover:text-blue-400`}>➕ Add Habit</button>
-                <button onClick={()=>setShowAddCategory(true)} className={`text-[9px] font-medium tracking-wider uppercase px-2.5 py-1 rounded-md transition-all ${T.textDim} hover:text-purple-400`}>➕ Category</button>
-                {habits.length>0&&<button onClick={()=>setEditMode(!editMode)} className={'text-[9px] font-medium tracking-wider uppercase px-2.5 py-1 rounded-md transition-all '+(editMode?'bg-blue-500/20 text-blue-400':T.textDim+' hover:text-gray-400')}>{editMode?'Done':'✏️ Edit'}</button>}
-                <button onClick={()=>{setCustomBoardHabits(myBoardIds||habits.map(h=>h.id));setShowCustomBoard(true);}} className={`text-[9px] font-medium tracking-wider uppercase px-2.5 py-1 rounded-md transition-all ${T.textDim} hover:text-indigo-400`}>🎯 Board</button>
-                <button onClick={loadHeatMap} className={`text-[9px] font-medium tracking-wider uppercase px-2.5 py-1 rounded-md transition-all ${T.textDim} hover:text-purple-400`}>📊 Map</button>
-                <button onClick={loadInsights} className={`text-[9px] font-medium tracking-wider uppercase px-2.5 py-1 rounded-md transition-all ${T.textDim} hover:text-blue-400`}>📈 Insights</button>
-                <button onClick={()=>{setHistoryDate(getYesterday());loadHistoryDate(getYesterday());setShowHistory(true);}} className={`text-[9px] font-medium tracking-wider uppercase px-2.5 py-1 rounded-md transition-all ${T.textDim} hover:text-gray-400`}>📅 History</button>
-                {lastWeekData&&<button onClick={()=>setShowWeeklyRecap(true)} className={`text-[9px] font-medium tracking-wider uppercase px-2.5 py-1 rounded-md transition-all ${T.textDim} hover:text-purple-400`}>📊 Recap</button>}
+            <div className={`mt-3 p-4 rounded-2xl border ${darkMode?'border-amber-500/10 bg-amber-500/5':'border-amber-200 bg-amber-50'}`}>
+              <div className="flex items-center justify-center gap-2 flex-wrap">
+                <button onClick={()=>setShowAddHabit(true)} className={`text-[10px] font-bold uppercase px-3 py-1.5 rounded-lg transition-all ${T.textDim} hover:text-blue-400`}>➕ Habit</button>
+                <button onClick={()=>setShowAddCategory(true)} className={`text-[10px] font-bold uppercase px-3 py-1.5 rounded-lg transition-all ${T.textDim} hover:text-purple-400`}>➕ Category</button>
+                {habits.length>0&&<button onClick={()=>setEditMode(!editMode)} className={'text-[10px] font-bold uppercase px-3 py-1.5 rounded-lg transition-all '+(editMode?'bg-blue-500/20 text-blue-400':T.textDim+' hover:text-gray-400')}>{editMode?'Done':'✏️ Edit'}</button>}
+                <button onClick={()=>{setCustomBoardHabits(myBoardIds||habits.map(h=>h.id));setShowCustomBoard(true);}} className={`text-[10px] font-bold uppercase px-3 py-1.5 rounded-lg transition-all ${T.textDim} hover:text-indigo-400`}>🎯 Board</button>
+                <button onClick={loadHeatMap} className={`text-[10px] font-bold uppercase px-3 py-1.5 rounded-lg transition-all ${T.textDim} hover:text-purple-400`}>📊 Map</button>
+                <button onClick={loadInsights} className={`text-[10px] font-bold uppercase px-3 py-1.5 rounded-lg transition-all ${T.textDim} hover:text-blue-400`}>📈 Insights</button>
+                <button onClick={()=>{setHistoryDate(getYesterday());loadHistoryDate(getYesterday());setShowHistory(true);}} className={`text-[10px] font-bold uppercase px-3 py-1.5 rounded-lg transition-all ${T.textDim} hover:text-gray-400`}>📅 History</button>
+                {lastWeekData&&<button onClick={()=>setShowWeeklyRecap(true)} className={`text-[10px] font-bold uppercase px-3 py-1.5 rounded-lg transition-all ${T.textDim} hover:text-purple-400`}>📊 Recap</button>}
               </div>
             </div>
           )}
@@ -1717,6 +1688,7 @@ export default function VersaApp() {
             <input type="number" placeholder="Points" value={newHabit.points} onChange={e=>setNewHabit({...newHabit,points:e.target.value})} className={inputCls}/>
           </div>
           <input type="text" placeholder="Time description (e.g. 30 min, per hour)" value={newHabit.unit} onChange={e=>setNewHabit({...newHabit,unit:e.target.value})} className={inputCls} maxLength={20}/>
+          <input type="text" placeholder="Description (e.g. what counts?)" value={newHabit.description} onChange={e=>setNewHabit({...newHabit,description:e.target.value})} className={inputCls} maxLength={60}/>
           <label className="flex items-center gap-3 py-1 cursor-pointer"><input type="checkbox" checked={newHabit.isRepeatable} onChange={e=>setNewHabit({...newHabit,isRepeatable:e.target.checked,maxCompletions:e.target.checked?5:1})} className="w-4 h-4 rounded accent-blue-500"/><span className="text-sm text-gray-400">Repeatable</span></label>
           {newHabit.isRepeatable&&<input type="number" placeholder="Max per day" value={newHabit.maxCompletions} onChange={e=>setNewHabit({...newHabit,maxCompletions:e.target.value})} className={inputCls}/>}
           {error&&<p className="text-red-400 text-xs text-center">{error}</p>}
@@ -1734,6 +1706,7 @@ export default function VersaApp() {
             <input type="number" placeholder="Points" value={editHabitData.points||''} onChange={e=>setEditHabitData({...editHabitData,points:e.target.value})} className={inputCls}/>
           </div>
           <input type="text" placeholder="Time description (e.g. 30 min, per hour)" value={editHabitData.unit||''} onChange={e=>setEditHabitData({...editHabitData,unit:e.target.value})} className={inputCls} maxLength={20}/>
+          <input type="text" placeholder="Description (e.g. what counts?)" value={editHabitData.description||''} onChange={e=>setEditHabitData({...editHabitData,description:e.target.value})} className={inputCls} maxLength={60}/>
           <label className="flex items-center gap-3 py-1 cursor-pointer"><input type="checkbox" checked={editHabitData.isRepeatable||false} onChange={e=>setEditHabitData({...editHabitData,isRepeatable:e.target.checked,maxCompletions:e.target.checked?5:1})} className="w-4 h-4 rounded accent-blue-500"/><span className="text-sm text-gray-400">Repeatable</span></label>
           {editHabitData.isRepeatable&&<input type="number" placeholder="Max per day" value={editHabitData.maxCompletions||''} onChange={e=>setEditHabitData({...editHabitData,maxCompletions:e.target.value})} className={inputCls}/>}
           <div className="flex gap-3 pt-2"><button onClick={()=>setShowEditHabit(null)} className={`flex-1 px-4 py-3 border ${T.border} rounded-xl text-sm ${T.textMuted} hover:${T.bgCardHover}`}>Cancel</button><button onClick={saveEditHabit} className="flex-1 px-4 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl text-sm font-bold shadow-lg shadow-blue-500/20 active:scale-[0.98]">Save</button></div>
@@ -1812,10 +1785,10 @@ export default function VersaApp() {
           <div>
             <p className={`${T.textMuted} text-sm mb-4`}>Set what's on the line. The weekly loser pays up.</p>
             <div className="grid grid-cols-2 gap-2 mb-4">{stakePresets.map(sp=>(
-              <button key={sp.type} onClick={()=>setNewStake({...newStake,type:sp.type,description:sp.ph.replace('e.g. ','')})} className={'p-3 rounded-xl border text-left transition-all '+(newStake.type===sp.type?'border-red-500/40 bg-red-500/10':'border-white/[0.06] bg-white/[0.02] hover:bg-white/[0.04]')}><div className={'text-xs font-bold mb-0.5 '+(newStake.type===sp.type?'text-red-400':'text-gray-400')}>{sp.label}</div><div className="text-[10px] text-gray-600">{sp.desc}</div></button>
+              <button key={sp.type} onClick={()=>setNewStake({...newStake,type:sp.type,description:sp.ph.replace('e.g. ','')})} className={'p-3 rounded-xl border text-left transition-all '+(newStake.type===sp.type?'border-red-500/40 bg-red-500/10':(darkMode?'border-white/[0.06] bg-white/[0.02] hover:bg-white/[0.04]':'border-gray-200 bg-gray-50 hover:bg-gray-100'))}><div className={'text-xs font-bold mb-0.5 '+(newStake.type===sp.type?'text-red-400':'text-gray-400')}>{sp.label}</div><div className="text-[10px] text-gray-600">{sp.desc}</div></button>
             ))}</div>
             <input type="text" placeholder={stakePresets.find(s=>s.type===newStake.type)?.ph||'Describe the stake...'} value={newStake.description} onChange={e=>setNewStake({...newStake,description:e.target.value})} className={inputCls+' mb-3'} maxLength={60}/>
-            <div className="flex gap-2 mb-4">{['weekly','monthly'].map(d=><button key={d} onClick={()=>setNewStake({...newStake,duration:d})} className={'flex-1 py-2.5 text-xs font-bold rounded-xl transition-all uppercase tracking-wider '+(newStake.duration===d?(darkMode?'bg-white/[0.1] text-white':'bg-gray-200 text-gray-900'):(darkMode?'bg-white/[0.02] text-gray-600':'bg-gray-50 text-gray-400'))}>{d}</button>)}</div>
+            <div className="flex gap-2 mb-4">{['weekly','monthly'].map(d=><button key={d} onClick={()=>setNewStake({...newStake,duration:d})} className={'flex-1 py-2.5 text-xs font-bold rounded-xl transition-all uppercase tracking-wider '+(newStake.duration===d?(darkMode?'bg-white/[0.1] text-white':'bg-gray-200 text-gray-900'):(darkMode?'bg-white/[0.02] text-gray-600':'bg-gray-100 text-gray-400'))}>{d}</button>)}</div>
             <button onClick={saveStake} disabled={!newStake.description.trim()||loading} className="w-full px-4 py-4 bg-gradient-to-r from-red-600 to-pink-600 text-white rounded-xl text-base font-bold shadow-lg shadow-red-500/20 active:scale-[0.98] disabled:opacity-30 transition-all">{loading?'Saving...':!newStake.description.trim()?'Type a stake above':'⚡ Set Stakes'}</button>
             {error&&<p className="text-red-400 text-xs text-center mt-2">{error}</p>}
           </div>
@@ -1826,12 +1799,12 @@ export default function VersaApp() {
       {/* Leaderboard */}
       <Modal show={showLeaderboard} onClose={()=>setShowLeaderboard(false)} wide dark={darkMode}>
         <ModalHeader title="Leaderboard" onClose={()=>setShowLeaderboard(false)} icon={<span className="text-xl">&#x1F3C6;</span>} dark={darkMode}/>
-        <div className="flex gap-1 mb-5 bg-white/[0.03] rounded-xl p-1">{['today','week'].map(tab=><button key={tab} onClick={()=>setLeaderboardTab(tab)} className={'flex-1 py-2 text-xs font-bold rounded-lg transition-all tracking-wider uppercase '+(leaderboardTab===tab?'bg-white/[0.08] text-white':'text-gray-600 hover:text-gray-400')}>{tab==='today'?'Today':'This Week'}</button>)}</div>
+        <div className="flex gap-1 mb-5 bg-white/[0.03] rounded-xl p-1">{['today','week'].map(tab=><button key={tab} onClick={()=>setLeaderboardTab(tab)} className={'flex-1 py-2 text-xs font-bold rounded-lg transition-all tracking-wider uppercase '+(leaderboardTab===tab?(darkMode?'bg-white/[0.08] text-white':'bg-gray-200 text-gray-900'):(darkMode?'text-gray-600 hover:text-gray-400':'text-gray-400 hover:text-gray-600'))}>{tab==='today'?'Today':'This Week'}</button>)}</div>
         <div className="space-y-2">{getLeaderboard().map((item,i)=>{
           const pts=leaderboardTab==='today'?item.todayPts:item.weeklyPts, isMe=item.member.id===currentUser.id;
           const medals=['\u{1F947}','\u{1F948}','\u{1F949}'];
           return (
-            <div key={item.member.id} className={'rounded-xl p-4 border transition-all '+(isMe?'bg-gradient-to-r from-blue-600/20 to-indigo-600/20 border-blue-500/30 shadow-lg shadow-blue-500/10':i===0?'bg-amber-500/5 border-amber-500/20':'bg-white/[0.02] border-white/[0.04] hover:bg-white/[0.04]')}>
+            <div key={item.member.id} className={'rounded-xl p-4 border transition-all '+(isMe?'bg-gradient-to-r from-blue-600/20 to-indigo-600/20 border-blue-500/30 shadow-lg shadow-blue-500/10':i===0?'bg-amber-500/5 border-amber-500/20':(darkMode?'bg-white/[0.02] border-white/[0.04] hover:bg-white/[0.04]':'bg-gray-50 border-gray-200 hover:bg-gray-100'))}>
               <div className="flex items-center justify-between"><div className="flex items-center gap-3"><div className="text-lg w-8 text-center">{i<3?medals[i]:<span className="text-sm text-gray-600">{i+1}</span>}</div><Avatar user={item.member} size={28} className={isMe?'bg-blue-500/20 text-blue-400':'bg-white/[0.06] text-gray-400'}/><div><div className={'text-sm font-semibold flex items-center gap-1.5 '+(isMe?'text-blue-300':'text-gray-300')}>{item.member.username}{isMe&&<span className="text-[10px] text-gray-600">(you)</span>}{getRoomRole(item.member.id)&&<span className={`text-[9px] font-bold ${getRoomRole(item.member.id).color}`}>{getRoomRole(item.member.id).icon}</span>}</div><div className="text-xs text-gray-600">{pts} pts{leaderboardTab==='week'?' \u00b7 '+item.weeklyCrystals+' crystals':''}</div></div></div>
                 <div className="flex items-center gap-3">{leaderboardTab==='today'&&<div className="flex items-center gap-1.5">{allCatNames.map(c=><div key={c} className={'w-2.5 h-2.5 rounded-full '+(item.crystals[c]?getCT(c).bg.replace('bg-','bg-').replace('500','400')+' shadow-sm shadow-'+getCT(c).neon.replace('#','')+'/50':isMe?'bg-white/10':'bg-white/[0.06]')}/>)}</div>}{!isMe&&<button onClick={()=>{setShowLeaderboard(false);setShowCompetitor(item.member);}} className="text-[10px] text-gray-600 hover:text-white uppercase tracking-wider font-medium">View</button>}</div>
               </div>
