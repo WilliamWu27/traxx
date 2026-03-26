@@ -656,13 +656,13 @@ export default function VersaApp() {
     if (!dh.length) return;
     const pts = completions.filter(c=>c.userId===currentUser.id&&c.date===getToday()).reduce((s,c)=>{ return s+((c.habitPoints||habits.find(x=>x.id===c.habitId)?.points||0)*(c.count||1))+(c.bonusPoints||0); },0);
     const prog = Math.min(pts / 400, 1);
-    if (prog >= 0.8) {
+    if (prog >= 0.9) {
       freezeEarnedRef.current = true;
       const award = async () => {
         try {
           await updateDoc(doc(db, 'users', currentUser.id), { streakFreeze: 1 });
           setStreakFreeze(1);
-          setFreezeMsg('🛡️ Streak freeze earned! Complete 80% tomorrow to earn another.');
+          setFreezeMsg('🛡️ Streak freeze earned! Complete 90% tomorrow to earn another.');
           setTimeout(() => setFreezeMsg(null), 4000);
         } catch {}
       };
