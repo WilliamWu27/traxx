@@ -649,6 +649,31 @@ export default function VersaApp() {
     update(); const iv = setInterval(update, 30000); return () => clearInterval(iv);
   }, []);
 
+  // ─── STREAK FREEZE EARN CHECK ───
+  const freezeEarnedRef = useRef(false);
+  useEffect(() => {
+    if (!currentUser || !currentRoom || freezeEarnedRef.current || streakFreeze > 0) return;
+    // Calculate progress inline (can't use dailyProg since it's computed after early return)
+    const dh = myBoardIds ? habits.filter(h=>myBoardIds.includes(h.id)) : habits;
+    if (!dh.length) return;
+    let tm = 0, td = 0;
+    dh.forEach(h => { const mx = h.isRepeatable ? (h.maxCompletions||1) : 1; tm += mx; td += Math.min(getCount(h.id), mx); });
+    const prog = tm > 0 ? td / tm : 0;
+    if (prog >= 0.8) {
+      freezeEarnedRef.current = true;
+      const award = async () => {
+        try {
+          await updateDoc(doc(db, 'users', currentUser.id), { streakFreeze: 1 });
+          setStreakFreeze(1);
+          setFreezeMsg('🛡️ Streak freeze earned! Complete 80% tomorrow to earn another.');
+          setTimeout(() => setFreezeMsg(null), 4000);
+        } catch {}
+      };
+      award();
+    }
+  }, [currentUser, currentRoom, completions, habits, streakFreeze]);
+  useEffect(() => { freezeEarnedRef.current = false; }, [dateKey]);
+
   // ─── AUTH HANDLERS ───
   const handleSignup = async (e) => {
     e.preventDefault(); setError(''); setLoading(true);
@@ -1044,26 +1069,6 @@ export default function VersaApp() {
   const myPts = currentUser&&currentRoom ? getTodayPts(currentUser.id) : 0;
   const isPerfect = allCatNames.length > 0 && allCatNames.every(c => myCr[c]);
   const dailyProg = currentUser&&currentRoom ? getDailyProgress() : 0;
-
-  // ─── STREAK FREEZE EARN CHECK ───
-  const freezeEarnedRef = useRef(false);
-  useEffect(() => {
-    if (!currentUser || freezeEarnedRef.current || streakFreeze > 0) return;
-    if (dailyProg >= 0.8) {
-      freezeEarnedRef.current = true;
-      const award = async () => {
-        try {
-          await updateDoc(doc(db, 'users', currentUser.id), { streakFreeze: 1 });
-          setStreakFreeze(1);
-          setFreezeMsg('🛡️ Streak freeze earned! Complete 80% tomorrow to earn another.');
-          setTimeout(() => setFreezeMsg(null), 4000);
-        } catch {}
-      };
-      award();
-    }
-  }, [dailyProg, currentUser, streakFreeze]);
-  // Reset freeze earned flag at midnight
-  useEffect(() => { freezeEarnedRef.current = false; }, [dateKey]);
   if (dailyProg >= 1 && prevProgRef.current < 1 && prevProgRef.current > 0) {
     // Schedule celebration (can't call hooks here but can set ref + trigger state in next tick)
     setTimeout(() => setCelebrateComplete(true), 0);
