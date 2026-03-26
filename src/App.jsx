@@ -177,6 +177,8 @@ export default function VersaApp() {
   const [showInsights, setShowInsights] = useState(false);
   const [insightsData, setInsightsData] = useState(null);
   const [streakMilestone, setStreakMilestone] = useState(null);
+  const [streakFreeze, setStreakFreeze] = useState(0);
+  const [freezeMsg, setFreezeMsg] = useState(null);
   const [myBoardIds, setMyBoardIds] = useState(null); // null = show all, array = custom selection
   const [showCustomBoard, setShowCustomBoard] = useState(false);
   const [customBoardHabits, setCustomBoardHabits] = useState([]);
@@ -226,10 +228,12 @@ export default function VersaApp() {
   // ─── DEFAULT HABITS ───
   const loadDefaultHabits = async () => {
     const defaultHabits = [
-      // STUDY — academics, productivity, getting ahead
-      { name: 'Study session', category: 'Study', points: 10, isRepeatable: true, maxCompletions: 20, unit: 'per 30 min' },
+      // STUDY — time-based
+      { name: 'Deep work', category: 'Study', points: 10, isRepeatable: true, maxCompletions: 20, unit: 'per 30 min' },
       { name: 'Read', category: 'Study', points: 10, isRepeatable: true, maxCompletions: 6, unit: 'per 30 min' },
-      { name: 'Side project', category: 'Study', points: 10, isRepeatable: true, maxCompletions: 12, unit: 'per 30 min' },
+      // STUDY — completion-based
+      { name: 'Small task', category: 'Study', points: 10, isRepeatable: true, maxCompletions: 5 },
+      { name: 'Big task', category: 'Study', points: 30, isRepeatable: true, maxCompletions: 2 },
       // HEALTH — gym, sleep, nutrition
       { name: 'Hit the gym', category: 'Health', points: 20, isRepeatable: true, maxCompletions: 4, unit: 'per 30 min' },
       { name: 'Slept 7+ hours', category: 'Health', points: 30, isRepeatable: false, maxCompletions: 1 },
@@ -238,6 +242,7 @@ export default function VersaApp() {
       // FOCUS — screen time, substances, mindset
       { name: 'Screen time under 2.5hrs', category: 'Focus', points: 30, isRepeatable: false, maxCompletions: 1 },
       { name: 'No vaping / substances', category: 'Focus', points: 30, isRepeatable: false, maxCompletions: 1 },
+      { name: 'Work done before 9pm', category: 'Focus', points: 30, isRepeatable: false, maxCompletions: 1 },
       { name: 'Journaled', category: 'Focus', points: 10, isRepeatable: true, maxCompletions: 3, unit: 'per 5 min' },
     ];
     try {
@@ -386,24 +391,63 @@ export default function VersaApp() {
       try {
         const ago = new Date(); ago.setDate(ago.getDate()-60);
         const snap = await getDocs(query(collection(db, 'completions'), where('userId', '==', currentUser.id), where('date', '>=', formatDateStr(ago))));
-        const dates = [...new Set(snap.docs.map(d=>d.data().date))].sort().reverse();
+        const allDocs = snap.docs.map(d => d.data());
+
+        // Calculate which dates hit 20% progress
+        // We need total possible completions (from current habits) and actual completions per day
+        const totalPossible = habits.reduce((s, h) => s + (h.isRepeatable ? (h.maxCompletions || 1) : 1), 0);
+        const qualifyingDates = new Set();
+        const dateCompletions = {};
+        allDocs.forEach(d => {
+          if (!dateCompletions[d.date]) dateCompletions[d.date] = 0;
+          dateCompletions[d.date] += Math.min(d.count || 1, habits.find(h => h.id === d.habitId)?.effectiveMax || d.count || 1);
+        });
+        Object.entries(dateCompletions).forEach(([date, done]) => {
+          if (totalPossible > 0 && done / totalPossible >= 0.2) qualifyingDates.add(date);
+        });
+
+        const dates = [...qualifyingDates].sort().reverse();
         let streak = 0;
         const today = getToday(), yStr = getYesterday();
+
+        // Load freeze from user doc
+        const userSnap = await getDoc(doc(db, 'users', currentUser.id));
+        const savedFreeze = userSnap.exists() ? (userSnap.data().streakFreeze || 0) : 0;
+        setStreakFreeze(savedFreeze);
+
         if (dates.includes(today) || dates.includes(yStr)) {
           let check = dates.includes(today) ? new Date() : new Date(Date.now()-86400000);
-          while (dates.includes(formatDateStr(check))) { streak++; check.setDate(check.getDate()-1); }
+          let freezeUsed = false;
+          while (true) {
+            const ds = formatDateStr(check);
+            if (dates.includes(ds)) {
+              streak++;
+              check.setDate(check.getDate()-1);
+            } else if (!freezeUsed && savedFreeze > 0 && streak > 0) {
+              freezeUsed = true;
+              check.setDate(check.getDate()-1);
+            } else {
+              break;
+            }
+          }
+          if (freezeUsed && savedFreeze > 0) {
+            await updateDoc(doc(db, 'users', currentUser.id), { streakFreeze: 0 });
+            setStreakFreeze(0);
+            setFreezeMsg('🛡️ Streak freeze saved your streak!');
+            setTimeout(() => setFreezeMsg(null), 4000);
+          }
         }
+
         // Yesterday's points for solo mode
         const yComps = snap.docs.filter(d => d.data().date === yStr && d.data().roomId === currentRoom.id);
         let yPts = 0;
         yComps.forEach(d => {
           const data = d.data();
-          // Use stored points if available (orphan-proof), else look up habit
           const pts = data.habitPoints || habits.find(h=>h.id===data.habitId)?.points || 0;
           yPts += pts * (data.count || 1);
         });
         setYesterdayPoints(yPts);
-        // Check for streak milestone (tier thresholds)
+        // Check for streak milestone
         const milestones = [60, 30, 14, 7, 3];
         const prevStreak = streakData.streak || 0;
         if (streak > prevStreak) {
@@ -797,6 +841,23 @@ export default function VersaApp() {
     } catch {}
   };
 
+  const REACTION_EMOJIS = ['🔥','💀','👏','😤'];
+  const reactToActivity = async (activityId, emoji) => {
+    if (!currentUser) return;
+    try {
+      const ref = doc(db, 'activity', activityId);
+      const snap = await getDoc(ref);
+      if (!snap.exists()) return;
+      const reactions = snap.data().reactions || {};
+      if (reactions[currentUser.id] === emoji) {
+        delete reactions[currentUser.id];
+      } else {
+        reactions[currentUser.id] = emoji;
+      }
+      await updateDoc(ref, { reactions });
+    } catch (err) { console.error('Reaction error:', err); }
+  };
+
   const handleIncrement = async (hid) => {
     const t = getToday(), h = habits.find(x=>x.id===hid); if(!h) return;
     const max = h.isRepeatable ? (h.maxCompletions||1) : 1;
@@ -983,6 +1044,26 @@ export default function VersaApp() {
   const myPts = currentUser&&currentRoom ? getTodayPts(currentUser.id) : 0;
   const isPerfect = allCatNames.length > 0 && allCatNames.every(c => myCr[c]);
   const dailyProg = currentUser&&currentRoom ? getDailyProgress() : 0;
+
+  // ─── STREAK FREEZE EARN CHECK ───
+  const freezeEarnedRef = useRef(false);
+  useEffect(() => {
+    if (!currentUser || freezeEarnedRef.current || streakFreeze > 0) return;
+    if (dailyProg >= 0.8) {
+      freezeEarnedRef.current = true;
+      const award = async () => {
+        try {
+          await updateDoc(doc(db, 'users', currentUser.id), { streakFreeze: 1 });
+          setStreakFreeze(1);
+          setFreezeMsg('🛡️ Streak freeze earned! Complete 80% tomorrow to earn another.');
+          setTimeout(() => setFreezeMsg(null), 4000);
+        } catch {}
+      };
+      award();
+    }
+  }, [dailyProg, currentUser, streakFreeze]);
+  // Reset freeze earned flag at midnight
+  useEffect(() => { freezeEarnedRef.current = false; }, [dateKey]);
   if (dailyProg >= 1 && prevProgRef.current < 1 && prevProgRef.current > 0) {
     // Schedule celebration (can't call hooks here but can set ref + trigger state in next tick)
     setTimeout(() => setCelebrateComplete(true), 0);
@@ -1279,6 +1360,14 @@ export default function VersaApp() {
           </div>
         </div>
       )}
+      {/* Freeze popup */}
+      {freezeMsg && (
+        <div className="fixed top-20 left-1/2 -translate-x-1/2 z-[101] animate-bounce">
+          <div className="px-6 py-3 rounded-2xl shadow-2xl text-center bg-gradient-to-r from-cyan-500 to-blue-500 text-white">
+            <div className="text-sm font-black">{freezeMsg}</div>
+          </div>
+        </div>
+      )}
       {/* Header — slim */}
       <div className={`${T.headerBg} ${T.blurBg} border-b ${T.border} sticky top-0 z-40`}>
         <div className="max-w-2xl mx-auto px-4 py-2.5">
@@ -1286,7 +1375,7 @@ export default function VersaApp() {
             <div className="flex items-center gap-2">
               <h1 className="text-base font-black tracking-[0.15em]">VERSA</h1>
               <div className="flex gap-0.5"><div className="w-1 h-1 rounded-full bg-blue-500"/><div className="w-1 h-1 rounded-full bg-orange-500"/><div className="w-1 h-1 rounded-full bg-emerald-500"/></div>
-              {streakData.streak>0&&<div className="flex items-center gap-1 ml-1"><Flame size={11} className="text-orange-400"/><span className="text-orange-400 text-xs font-bold">{streakData.streak}</span>{streakMulti.multi>1&&<span className={`text-[8px] font-bold ${streakMulti.color}`}>{streakMulti.label}</span>}</div>}
+              {streakData.streak>0&&<div className="flex items-center gap-1 ml-1"><Flame size={11} className="text-orange-400"/><span className="text-orange-400 text-xs font-bold">{streakData.streak}</span>{streakMulti.multi>1&&<span className={`text-[8px] font-bold ${streakMulti.color}`}>{streakMulti.label}</span>}{streakFreeze>0&&<span className="text-[8px] text-cyan-400">🛡️</span>}</div>}
               <span className={`text-[9px] ${T.textDim} ml-1`}>{timeDisplay} · D{(new Date()).getDay()||7}</span>
             </div>
             <div className="flex items-center gap-1">
@@ -1476,15 +1565,30 @@ export default function VersaApp() {
             <div className="px-3 py-2 border-b border-white/[0.04]">
               <span className={`text-[9px] font-bold tracking-wider uppercase ${T.textMuted}`}>Activity</span>
             </div>
-            <div className="max-h-24 overflow-y-auto divide-y divide-white/[0.04]">{activityFeed.slice(0,6).map(a => {
+            <div className="max-h-40 overflow-y-auto divide-y divide-white/[0.04]">{activityFeed.slice(0,8).map(a => {
               const isMe = a.userId === currentUser.id;
               const ts = a.ts ? new Date(a.ts) : null;
               const timeAgo = ts ? (Math.floor((Date.now()-ts.getTime())/60000)<60 ? Math.floor((Date.now()-ts.getTime())/60000)+'m' : Math.floor((Date.now()-ts.getTime())/3600000)+'h') : '';
+              const reactions = a.reactions || {};
+              const reactionCounts = {};
+              Object.values(reactions).forEach(e => { reactionCounts[e] = (reactionCounts[e]||0)+1; });
+              const myReaction = reactions[currentUser?.id];
               return (
-                <div key={a.id} className="px-3 py-1.5 flex items-center gap-2">
-                  <Avatar user={activeMembers.find(m=>m.id===a.userId)||{username:a.username}} size={16} className={isMe?'bg-blue-500/20 text-blue-400':'bg-white/[0.06] text-gray-500'}/>
-                  <div className="flex-1 min-w-0 truncate"><span className={`text-[10px] ${isMe?'text-blue-400':'text-gray-500'} font-medium`}>{isMe?'You':a.username}</span><span className={`text-[10px] ${T.textDim} ml-1`}>{a.text}</span>{a.bonus==='jackpot'&&<span className="ml-1 text-[9px] text-amber-300 font-bold">5×</span>}{a.bonus==='epic'&&<span className="ml-1 text-[9px] text-red-400 font-bold">3×</span>}{a.bonus==='rare'&&<span className="ml-1 text-[9px] text-purple-400 font-bold">2×</span>}{a.bonus==='bonus'&&<span className="ml-1 text-[9px] text-cyan-400 font-bold">1.5×</span>}{a.bonus==='common'&&<span className="ml-1 text-[9px] text-emerald-400 font-bold">1.25×</span>}</div>
-                  <span className={`text-[8px] ${T.textFaint} shrink-0 ml-1`}>{timeAgo}</span>
+                <div key={a.id} className="px-3 py-2">
+                  <div className="flex items-center gap-2">
+                    <Avatar user={activeMembers.find(m=>m.id===a.userId)||{username:a.username}} size={18} className={isMe?'bg-blue-500/20 text-blue-400':'bg-white/[0.06] text-gray-500'}/>
+                    <div className="flex-1 min-w-0 truncate"><span className={`text-[10px] ${isMe?'text-blue-400':'text-gray-500'} font-medium`}>{isMe?'You':a.username}</span><span className={`text-[10px] ${T.textDim} ml-1`}>{a.text}</span>{a.bonus==='jackpot'&&<span className="ml-1 text-[9px] text-amber-300 font-bold">5×</span>}{a.bonus==='epic'&&<span className="ml-1 text-[9px] text-red-400 font-bold">3×</span>}{a.bonus==='rare'&&<span className="ml-1 text-[9px] text-purple-400 font-bold">2×</span>}{a.bonus==='bonus'&&<span className="ml-1 text-[9px] text-cyan-400 font-bold">1.5×</span>}{a.bonus==='common'&&<span className="ml-1 text-[9px] text-emerald-400 font-bold">1.25×</span>}</div>
+                    <span className={`text-[8px] ${T.textFaint} shrink-0`}>{timeAgo}</span>
+                  </div>
+                  {/* Reactions */}
+                  <div className="flex items-center gap-1 mt-1 ml-7">
+                    {Object.keys(reactionCounts).length > 0 && Object.entries(reactionCounts).map(([emoji, count]) => (
+                      <span key={emoji} className={`text-[9px] px-1.5 py-0.5 rounded-full ${myReaction===emoji?'bg-blue-500/20 border border-blue-500/30':'bg-white/[0.04]'}`}>{emoji} {count}</span>
+                    ))}
+                    {!isMe && <div className="flex gap-0.5 ml-1">{REACTION_EMOJIS.map(e => (
+                      <button key={e} onClick={()=>reactToActivity(a.id,e)} className={`text-[10px] w-6 h-6 rounded-full flex items-center justify-center transition-all hover:scale-125 ${myReaction===e?'bg-blue-500/20':'hover:bg-white/[0.06]'}`}>{e}</button>
+                    ))}</div>}
+                  </div>
                 </div>
               );
             })}</div>
@@ -1518,7 +1622,7 @@ export default function VersaApp() {
       {/* Add Habit */}
       <Modal show={showAddHabit} onClose={()=>setShowAddHabit(false)} dark={darkMode}>
         <ModalHeader title="Add Habit" onClose={()=>setShowAddHabit(false)} dark={darkMode}/>
-        <button onClick={loadDefaultHabits} disabled={loading} className="w-full mb-5 px-4 py-3 bg-gradient-to-r from-violet-600 to-purple-600 text-white rounded-xl shadow-lg shadow-violet-500/20 text-sm font-bold active:scale-[0.98] disabled:opacity-50">{loading?'Loading...':'⚡ Load Student Preset (10 habits)'}</button>
+        <button onClick={loadDefaultHabits} disabled={loading} className="w-full mb-5 px-4 py-3 bg-gradient-to-r from-violet-600 to-purple-600 text-white rounded-xl shadow-lg shadow-violet-500/20 text-sm font-bold active:scale-[0.98] disabled:opacity-50">{loading?'Loading...':'⚡ Load Student Preset (12 habits)'}</button>
         <div className="space-y-3">
           <input type="text" placeholder="Habit name" value={newHabit.name} onChange={e=>setNewHabit({...newHabit,name:e.target.value})} className={inputCls} maxLength={30}/>
           <div className="grid grid-cols-2 gap-3">
@@ -1630,18 +1734,6 @@ export default function VersaApp() {
       </Modal>
 
       {/* Switch Room */}
-      <Modal show={showSwitchRoom} onClose={()=>setShowSwitchRoom(false)} dark={darkMode}>
-        <ModalHeader title="Your Rooms" onClose={()=>setShowSwitchRoom(false)} dark={darkMode}/>
-        <div className="space-y-2 mb-4">{userRooms.map(rid=>(
-          <div key={rid} className={'p-3 rounded-xl border flex items-center justify-between transition-all '+(currentRoom?.id===rid?'border-blue-500/30 bg-blue-500/10':'border-white/[0.06] bg-white/[0.02] hover:bg-white/[0.04]')}>
-            <div className="flex items-center gap-3"><span className="font-mono text-sm tracking-widest text-white">{rid}</span>{currentRoom?.id===rid&&<span className="text-[9px] bg-blue-500/20 text-blue-400 px-2 py-0.5 rounded-full font-bold">ACTIVE</span>}</div>
-            <div className="flex items-center gap-2">{currentRoom?.id!==rid&&<button onClick={()=>switchRoom(rid)} className="text-[10px] text-blue-400 hover:text-blue-300 font-medium uppercase tracking-wider">Switch</button>}<button onClick={()=>leaveRoom(rid)} className="text-[10px] text-gray-600 hover:text-red-400 font-medium uppercase tracking-wider">Leave</button></div>
-          </div>
-        ))}</div>
-        <div className="border-t border-white/[0.06] pt-4"><p className="text-xs text-gray-500 mb-3">Join another room</p><div className="flex gap-2"><input type="text" placeholder="CODE" value={roomCode} onChange={e=>setRoomCode(e.target.value.toUpperCase())} className={`flex-1 px-3 py-2.5 ${T.bgInput} border ${T.borderInput} rounded-xl ${T.text} placeholder-gray-400 text-sm font-mono tracking-[0.2em] text-center`} maxLength={6}/><button onClick={joinRoom} className="px-5 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl text-sm font-bold shadow-lg shadow-blue-500/20 active:scale-[0.98]">Join</button></div>{error&&<p className="text-red-400 text-xs mt-2 text-center">{error}</p>}</div>
-        <button onClick={createRoom} className="w-full mt-3 px-4 py-2.5 border border-white/[0.06] text-gray-400 rounded-xl hover:bg-white/[0.04] text-sm transition-all">+ Create New Room</button>
-      </Modal>
-
       {/* Leaderboard */}
       <Modal show={showLeaderboard} onClose={()=>setShowLeaderboard(false)} wide dark={darkMode}>
         <ModalHeader title="Leaderboard" onClose={()=>setShowLeaderboard(false)} icon={<span className="text-xl">&#x1F3C6;</span>} dark={darkMode}/>
@@ -1664,7 +1756,7 @@ export default function VersaApp() {
       <Modal show={showProfile} onClose={()=>setShowProfile(false)} dark={darkMode}>
         <ModalHeader title="Profile" onClose={()=>setShowProfile(false)} dark={darkMode}/>
         <div className="text-center mb-6"><div className="relative inline-block">{currentUser.photoURL?<img src={currentUser.photoURL} className="w-20 h-20 rounded-full object-cover border-2 border-blue-500/30" referrerPolicy="no-referrer"/>:<><ProgressRing progress={dailyProg} size={80} stroke={4} color={dailyProg>=1?'#10b981':'#3b82f6'}/><div className="absolute inset-0 flex items-center justify-center"><span className="text-xl font-black">{Math.round(dailyProg*100)}%</span></div></>}</div><h3 className="text-xl font-bold mt-3">{currentUser.username}</h3><p className="text-gray-600 text-xs">{currentUser.email}</p></div>
-        <div className="grid grid-cols-3 gap-3 mb-4">{[{v:streakData.streak||0,l:'Streak',c:'text-orange-400',i:<Flame size={16} className="text-orange-400 mx-auto mb-1"/>},{v:myPts,l:'Today',c:'text-blue-400',i:<Star size={16} className="text-blue-400 mx-auto mb-1"/>},{v:getWeeklyPts(currentUser.id),l:'Week',c:'text-emerald-400',i:<TrendingUp size={16} className="text-emerald-400 mx-auto mb-1"/>}].map((s,i)=><div key={i} className={`text-center p-3 ${T.bgCard} rounded-xl border ${T.border}`}>{s.i}<div className={'text-xl font-black '+s.c}>{s.v}</div><div className="text-[9px] text-gray-600 tracking-wider uppercase mt-0.5">{s.l}</div></div>)}</div>
+        <div className="grid grid-cols-4 gap-2 mb-4">{[{v:streakData.streak||0,l:'Streak',c:'text-orange-400',i:<Flame size={16} className="text-orange-400 mx-auto mb-1"/>},{v:streakFreeze>0?'🛡️':'—',l:'Freeze',c:streakFreeze>0?'text-cyan-400':'text-gray-600',i:null},{v:myPts,l:'Today',c:'text-blue-400',i:<Star size={16} className="text-blue-400 mx-auto mb-1"/>},{v:getWeeklyPts(currentUser.id),l:'Week',c:'text-emerald-400',i:<TrendingUp size={16} className="text-emerald-400 mx-auto mb-1"/>}].map((s,i)=><div key={i} className={`text-center p-3 ${T.bgCard} rounded-xl border ${T.border}`}>{s.i}<div className={'text-xl font-black '+s.c}>{s.v}</div><div className="text-[9px] text-gray-600 tracking-wider uppercase mt-0.5">{s.l}</div></div>)}</div>
         <div className="grid grid-cols-2 gap-3 mb-4"><div className={`text-center p-3 ${T.bgCard} rounded-xl border ${T.border}`}><div className="text-lg font-black text-purple-400">{streakData.activeDays||0}</div><div className="text-[9px] text-gray-600 tracking-wider uppercase mt-0.5">Active Days</div></div><div className={`text-center p-3 ${T.bgCard} rounded-xl border ${T.border}`}><div className="text-lg font-black text-cyan-400">{streakData.totalCompletions||0}</div><div className="text-[9px] text-gray-600 tracking-wider uppercase mt-0.5">Completions</div></div></div>
         <div className={`p-3 ${T.bgCard} rounded-xl border ${T.border}`}><div className="text-[9px] text-gray-600 tracking-wider uppercase mb-2">Crystals</div><div className="flex justify-center gap-4">{allCatNames.map(c=><div key={c} className="text-center"><div className={'w-6 h-6 rounded-full mx-auto mb-1 transition-all '+(myCr[c]?getCT(c).bg+' shadow-md '+getCT(c).glow:'bg-white/[0.06]')}/><span className="text-[9px] text-gray-600">{c}</span></div>)}</div></div>
         <div className={`mt-4 p-3 ${T.bgCard} rounded-xl border ${T.border} flex items-center justify-between`}><div><div className={`text-sm font-medium ${T.text}`}>Email Reminders</div><div className="text-[10px] text-gray-500">Daily nudges at 12pm & 6pm</div></div><button onClick={async()=>{const newVal=currentUser.emailReminders===false?true:false;try{await updateDoc(doc(db,'users',currentUser.id),{emailReminders:!newVal});setCurrentUser(p=>({...p,emailReminders:!newVal}));}catch{}}} className={'relative w-11 h-6 rounded-full transition-all '+(currentUser.emailReminders!==false?'bg-blue-500':(darkMode?'bg-white/[0.08]':'bg-gray-200'))}><div className={'absolute top-1 w-4 h-4 rounded-full bg-white transition-all shadow-sm '+(currentUser.emailReminders!==false?'left-6':'left-1')}/></button></div>
@@ -1689,12 +1781,40 @@ export default function VersaApp() {
         </div>
       </Modal>
 
-      {/* Invite */}
-      <Modal show={showInviteModal} onClose={()=>setShowInviteModal(false)} dark={darkMode}>
-        <div className="text-center"><h2 className={`text-xl font-bold mb-2 ${T.text}`}>Invite Friends</h2><p className="text-xs text-gray-500 mb-6 tracking-wider uppercase">Share this room code</p><div className="mb-6 relative inline-block"><code className={`inline-block px-8 py-4 ${darkMode?'bg-gradient-to-b from-white/[0.08] to-white/[0.03] border-white/[0.1] text-white':'bg-gradient-to-b from-gray-100 to-gray-50 border-gray-200 text-gray-900'} border text-3xl font-mono rounded-xl tracking-[0.4em] shadow-2xl`}>{currentRoom?.code}</code><div className="absolute -inset-3 bg-gradient-to-r from-blue-500/10 via-purple-500/10 to-emerald-500/10 blur-xl rounded-xl -z-10"/></div>
-        <button onClick={copyCode} className="w-full mb-2 px-6 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl shadow-lg shadow-blue-500/20 flex items-center justify-center gap-2 text-sm font-bold active:scale-[0.98]">{copied?<Check size={16}/>:<Copy size={16}/>}{copied?'Copied!':'Copy Code'}</button>
-        {navigator.share && <button onClick={async()=>{try{await navigator.share({title:'Join me on Versa',text:`Join my room on Versa! Code: ${currentRoom?.code}`,url:`${window.location.origin}?join=${currentRoom?.code}`});}catch{}}} className={`w-full mb-2 px-6 py-3 border ${darkMode?'border-white/[0.08] text-white hover:bg-white/[0.04]':'border-gray-200 text-gray-700 hover:bg-gray-50'} rounded-xl flex items-center justify-center gap-2 text-sm font-medium active:scale-[0.98]`}><UserPlus size={14}/>Share Link</button>}
-        <button onClick={()=>setShowInviteModal(false)} className={`w-full py-2 text-sm transition-colors ${darkMode?'text-gray-600 hover:text-white':'text-gray-400 hover:text-gray-900'}`}>Close</button></div>
+      {/* Invite & Rooms */}
+      <Modal show={showInviteModal||showSwitchRoom} onClose={()=>{setShowInviteModal(false);setShowSwitchRoom(false);}} dark={darkMode}>
+        <ModalHeader title="Rooms" onClose={()=>{setShowInviteModal(false);setShowSwitchRoom(false);}} dark={darkMode}/>
+
+        {/* Current room code */}
+        <div className="text-center mb-4">
+          <p className="text-xs text-gray-500 mb-3 tracking-wider uppercase">Share this room code</p>
+          <div className="mb-4 relative inline-block"><code className={`inline-block px-8 py-4 ${darkMode?'bg-gradient-to-b from-white/[0.08] to-white/[0.03] border-white/[0.1] text-white':'bg-gradient-to-b from-gray-100 to-gray-50 border-gray-200 text-gray-900'} border text-3xl font-mono rounded-xl tracking-[0.4em] shadow-2xl`}>{currentRoom?.code}</code><div className="absolute -inset-3 bg-gradient-to-r from-blue-500/10 via-purple-500/10 to-emerald-500/10 blur-xl rounded-xl -z-10"/></div>
+          <div className="flex gap-2">
+            <button onClick={copyCode} className="flex-1 px-4 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl shadow-lg shadow-blue-500/20 flex items-center justify-center gap-2 text-sm font-bold active:scale-[0.98]">{copied?<Check size={14}/>:<Copy size={14}/>}{copied?'Copied!':'Copy Code'}</button>
+            {navigator.share && <button onClick={async()=>{try{await navigator.share({title:'Join me on Versa',text:`Join my room on Versa! Code: ${currentRoom?.code}`,url:`${window.location.origin}?join=${currentRoom?.code}`});}catch{}}} className={`flex-1 px-4 py-2.5 border ${darkMode?'border-white/[0.08] text-white hover:bg-white/[0.04]':'border-gray-200 text-gray-700 hover:bg-gray-50'} rounded-xl flex items-center justify-center gap-2 text-sm font-medium active:scale-[0.98]`}><UserPlus size={14}/>Share</button>}
+          </div>
+        </div>
+
+        {/* Your rooms */}
+        {userRooms.length > 1 && <>
+          <div className={`border-t ${T.border} pt-4 mt-4`}>
+            <p className={`text-xs ${T.textMuted} mb-2 font-bold tracking-wider uppercase`}>Your Rooms</p>
+            <div className="space-y-1.5">{userRooms.map(rid=>(
+              <div key={rid} className={`px-3 py-2.5 rounded-xl border flex items-center justify-between transition-all ${currentRoom?.id===rid?'border-blue-500/30 bg-blue-500/10':(darkMode?'border-white/[0.06] bg-white/[0.02] hover:bg-white/[0.04]':'border-gray-200 bg-gray-50 hover:bg-gray-100')}`}>
+                <div className="flex items-center gap-2"><span className={`font-mono text-sm tracking-widest ${T.text}`}>{rid}</span>{currentRoom?.id===rid&&<span className="text-[9px] bg-blue-500/20 text-blue-400 px-2 py-0.5 rounded-full font-bold">ACTIVE</span>}</div>
+                <div className="flex items-center gap-2">{currentRoom?.id!==rid&&<button onClick={()=>{switchRoom(rid);setShowInviteModal(false);setShowSwitchRoom(false);}} className="text-[10px] text-blue-400 hover:text-blue-300 font-medium uppercase tracking-wider">Switch</button>}<button onClick={()=>leaveRoom(rid)} className="text-[10px] text-gray-600 hover:text-red-400 font-medium uppercase tracking-wider">Leave</button></div>
+              </div>
+            ))}</div>
+          </div>
+        </>}
+
+        {/* Join / Create */}
+        <div className={`border-t ${T.border} pt-4 mt-4`}>
+          <p className={`text-xs ${T.textMuted} mb-2`}>Join another room</p>
+          <div className="flex gap-2"><input type="text" placeholder="CODE" value={roomCode} onChange={e=>setRoomCode(e.target.value.toUpperCase())} className={`flex-1 px-3 py-2.5 ${T.bgInput} border ${T.borderInput} rounded-xl ${T.text} placeholder-gray-400 text-sm font-mono tracking-[0.2em] text-center`} maxLength={6}/><button onClick={()=>{joinRoom();setShowInviteModal(false);setShowSwitchRoom(false);}} className="px-5 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl text-sm font-bold shadow-lg shadow-blue-500/20 active:scale-[0.98]">Join</button></div>
+          {error&&<p className="text-red-400 text-xs mt-2 text-center">{error}</p>}
+          <button onClick={()=>{createRoom();setShowInviteModal(false);setShowSwitchRoom(false);}} className={`w-full mt-3 px-4 py-2.5 border ${T.border} ${T.textMuted} rounded-xl hover:${T.bgCardHover} text-sm transition-all`}>+ Create New Room</button>
+        </div>
       </Modal>
 
       {/* Competitor */}
