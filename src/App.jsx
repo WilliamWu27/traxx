@@ -647,16 +647,16 @@ export default function VersaApp() {
     update(); const iv = setInterval(update, 30000); return () => clearInterval(iv);
   }, []);
 
-  // ─── STREAK FREEZE EARN CHECK ───
+  // ─── STREAK FREEZE EARN/REVOKE CHECK ───
   const freezeEarnedRef = useRef(false);
   useEffect(() => {
-    if (!currentUser || !currentRoom || freezeEarnedRef.current || streakFreeze > 0) return;
+    if (!currentUser || !currentRoom) return;
     // Calculate progress inline (points / daily target)
     const dh = myBoardIds ? habits.filter(h=>myBoardIds.includes(h.id)) : habits;
     if (!dh.length) return;
     const pts = completions.filter(c=>c.userId===currentUser.id&&c.date===getToday()).reduce((s,c)=>{ return s+((c.habitPoints||habits.find(x=>x.id===c.habitId)?.points||0)*(c.count||1))+(c.bonusPoints||0); },0);
     const prog = Math.min(pts / 400, 1);
-    if (prog >= 0.9) {
+    if (prog >= 0.9 && streakFreeze === 0 && !freezeEarnedRef.current) {
       freezeEarnedRef.current = true;
       const award = async () => {
         try {
@@ -667,6 +667,16 @@ export default function VersaApp() {
         } catch {}
       };
       award();
+    } else if (prog < 0.9 && freezeEarnedRef.current && streakFreeze > 0) {
+      // Progress dropped below 90% — revoke the freeze earned today
+      freezeEarnedRef.current = false;
+      const revoke = async () => {
+        try {
+          await updateDoc(doc(db, 'users', currentUser.id), { streakFreeze: 0 });
+          setStreakFreeze(0);
+        } catch {}
+      };
+      revoke();
     }
   }, [currentUser, currentRoom, completions, habits, streakFreeze]);
   useEffect(() => { freezeEarnedRef.current = false; }, [dateKey]);
@@ -1418,6 +1428,7 @@ export default function VersaApp() {
               <p className={`text-sm ${T.textDim} italic truncate`}>{dailyProg>=1?'🎉 All done — nice work.':getMotivation()}</p>
             </div>
             <div className="flex items-center gap-2.5 shrink-0 ml-2">
+              {streakFreeze>0&&<span className="text-sm" title="Streak freeze banked">🛡️</span>}
               <span className={`text-sm font-bold ${T.text}`}>{myPts} pts</span>
               <span className={`text-sm font-bold ${dailyProg>=1?'text-emerald-400':'text-blue-400'}`}>{Math.round(dailyProg*100)}%</span>
             </div>
