@@ -653,12 +653,12 @@ export default function VersaApp() {
   const freezeEarnedRef = useRef(false);
   useEffect(() => {
     if (!currentUser || !currentRoom || freezeEarnedRef.current || streakFreeze > 0) return;
-    // Calculate progress inline (can't use dailyProg since it's computed after early return)
+    // Calculate progress inline (habits with at least 1 completion / total habits)
     const dh = myBoardIds ? habits.filter(h=>myBoardIds.includes(h.id)) : habits;
     if (!dh.length) return;
-    let tm = 0, td = 0;
-    dh.forEach(h => { const mx = h.isRepeatable ? (h.maxCompletions||1) : 1; tm += mx; td += Math.min(getCount(h.id), mx); });
-    const prog = tm > 0 ? td / tm : 0;
+    let done = 0;
+    dh.forEach(h => { if (getCount(h.id) > 0) done++; });
+    const prog = done / dh.length;
     if (prog >= 0.8) {
       freezeEarnedRef.current = true;
       const award = async () => {
@@ -834,14 +834,14 @@ export default function VersaApp() {
   const getExisting = (hid) => { const t = getToday(); return completions.find(c=>c.userId===currentUser.id&&c.habitId===hid&&c.date===t); };
 
   // Mystery bonus: variable multipliers with different probabilities
-  // ~18% total chance of getting a bonus on any completion
+  // ~10% total chance of getting a bonus on any completion
   const rollBonus = () => {
     const roll = Math.random();
-    if (roll < 0.005) return { multi: 5, label: '🎰 JACKPOT! 5×', type: 'jackpot' };
-    if (roll < 0.015) return { multi: 3, label: '🔥 3× BONUS!', type: 'epic' };
-    if (roll < 0.04) return { multi: 2, label: '⚡ 2× BONUS!', type: 'rare' };
-    if (roll < 0.09) return { multi: 1.5, label: '✨ 1.5× BONUS!', type: 'bonus' };
-    if (roll < 0.18) return { multi: 1.25, label: '🌟 1.25× BONUS!', type: 'common' };
+    if (roll < 0.002) return { multi: 5, label: '🎰 JACKPOT! 5×', type: 'jackpot' };
+    if (roll < 0.007) return { multi: 3, label: '🔥 3× BONUS!', type: 'epic' };
+    if (roll < 0.02) return { multi: 2, label: '⚡ 2× BONUS!', type: 'rare' };
+    if (roll < 0.05) return { multi: 1.5, label: '✨ 1.5× BONUS!', type: 'bonus' };
+    if (roll < 0.10) return { multi: 1.25, label: '🌟 1.25× BONUS!', type: 'common' };
     return null;
   };
 
@@ -937,7 +937,19 @@ export default function VersaApp() {
   };
   const handleDecrement = async (hid) => {
     const ex = getExisting(hid); if(!ex) return;
-    try { if(ex.count>1) await updateDoc(doc(db,'completions',ex.id),{count:ex.count-1}); else await deleteDoc(doc(db,'completions',ex.id)); } catch(err){console.error(err);}
+    try {
+      if (ex.count > 1) {
+        // Proportionally reduce bonus: bonusPoints scales with count
+        const newCount = ex.count - 1;
+        const newBonus = ex.bonusPoints ? Math.round((ex.bonusPoints / ex.count) * newCount) : 0;
+        await updateDoc(doc(db, 'completions', ex.id), {
+          count: newCount,
+          ...(ex.bonusPoints ? { bonusPoints: newBonus } : {})
+        });
+      } else {
+        await deleteDoc(doc(db, 'completions', ex.id));
+      }
+    } catch(err) { console.error(err); }
   };
 
   // ─── HISTORY ───
@@ -985,7 +997,7 @@ export default function VersaApp() {
     return t;
   };
   const getCount = (hid) => { const e=getExisting(hid); return e?.count||0; };
-  const getDailyProgress = () => { const dh=myBoardIds?habits.filter(h=>myBoardIds.includes(h.id)):habits; if(!dh.length)return 0; let tm=0,td=0; dh.forEach(h=>{const mx=h.isRepeatable?(h.maxCompletions||1):1;tm+=mx;td+=Math.min(getCount(h.id),mx);}); return tm>0?td/tm:0; };
+  const getDailyProgress = () => { const dh=myBoardIds?habits.filter(h=>myBoardIds.includes(h.id)):habits; if(!dh.length)return 0; let done=0; dh.forEach(h=>{if(getCount(h.id)>0)done++;}); return done/dh.length; };
   const getLeaderboard = () => activeMembers.map(m=>({member:m,todayPts:getTodayPts(m.id),weeklyPts:getWeeklyPts(m.id),crystals:getTodayCrystals(m.id),weeklyCrystals:getWeeklyCrystals(m.id)})).sort((a,b)=>leaderboardTab==='today'?b.todayPts-a.todayPts:b.weeklyPts-a.weeklyPts);
 
   // ─── CATEGORY SYSTEM ───
