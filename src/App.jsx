@@ -1523,9 +1523,17 @@ export default function VersaApp() {
               const ms = mutualStreaks[r.member.id] || 0;
               return (
                 <div key={r.member.id} className={`flex items-center gap-2 px-3 py-2 rounded-xl border shrink-0 ${ahead?(darkMode?'border-red-500/20 bg-red-500/5':'border-red-200 bg-red-50'):(darkMode?'border-emerald-500/20 bg-emerald-500/5':'border-emerald-200 bg-emerald-50')}`}>
-                  <Avatar user={r.member} size={22} className={ahead?'bg-red-500/20 text-red-400':'bg-emerald-500/20 text-emerald-400'}/>
-                  <div className="flex flex-col"><span className={`text-[11px] font-medium ${darkMode?'text-gray-300':'text-gray-700'}`}>{r.member.username}</span><span className={`text-[10px] font-bold ${ahead?'text-red-400':'text-emerald-400'}`}>{r.pts} pts</span></div>
-                  {ms > 0 && <span className="text-[9px] text-orange-400 font-bold">🔗{ms}</span>}
+                  <div className="relative">
+                    <Avatar user={r.member} size={22} className={ahead?'bg-red-500/20 text-red-400':'bg-emerald-500/20 text-emerald-400'}/>
+                    {ms > 0 && <div className={`absolute -bottom-1 -right-1 w-4 h-4 rounded-full flex items-center justify-center text-[7px] font-black text-white ${ms>=7?'bg-gradient-to-r from-orange-500 to-red-500':ms>=3?'bg-orange-500':'bg-amber-500'}`}>{ms}</div>}
+                  </div>
+                  <div className="flex flex-col">
+                    <span className={`text-[11px] font-medium ${darkMode?'text-gray-300':'text-gray-700'}`}>{r.member.username}</span>
+                    <div className="flex items-center gap-1.5">
+                      <span className={`text-[10px] font-bold ${ahead?'text-red-400':'text-emerald-400'}`}>{r.pts} pts</span>
+                      {ms > 0 && <span className={`text-[9px] font-bold ${ms>=7?'text-orange-400':ms>=3?'text-amber-400':'text-amber-500/70'}`}>🔗{ms}d</span>}
+                    </div>
+                  </div>
                 </div>
               );
             })}
@@ -1804,10 +1812,11 @@ export default function VersaApp() {
         <div className="space-y-2">{getLeaderboard().map((item,i)=>{
           const pts=leaderboardTab==='today'?item.todayPts:item.weeklyPts, isMe=item.member.id===currentUser.id;
           const medals=['\u{1F947}','\u{1F948}','\u{1F949}'];
+          const ms = !isMe ? (mutualStreaks[item.member.id] || 0) : 0;
           return (
             <div key={item.member.id} className={'rounded-xl p-4 border transition-all '+(isMe?'bg-gradient-to-r from-blue-600/20 to-indigo-600/20 border-blue-500/30 shadow-lg shadow-blue-500/10':i===0?'bg-amber-500/5 border-amber-500/20':(darkMode?'bg-white/[0.02] border-white/[0.04] hover:bg-white/[0.04]':'bg-gray-50 border-gray-200 hover:bg-gray-100'))}>
-              <div className="flex items-center justify-between"><div className="flex items-center gap-3"><div className="text-lg w-8 text-center">{i<3?medals[i]:<span className="text-sm text-gray-600">{i+1}</span>}</div><Avatar user={item.member} size={28} className={isMe?'bg-blue-500/20 text-blue-400':'bg-white/[0.06] text-gray-400'}/><div><div className={'text-sm font-semibold flex items-center gap-1.5 '+(isMe?'text-blue-300':'text-gray-300')}>{item.member.username}{isMe&&<span className="text-[10px] text-gray-600">(you)</span>}{getRoomRole(item.member.id)&&<span className={`text-[9px] font-bold ${getRoomRole(item.member.id).color}`}>{getRoomRole(item.member.id).icon}</span>}</div><div className="text-xs text-gray-600">{pts} pts{leaderboardTab==='week'?' \u00b7 '+item.weeklyCrystals+' crystals':''}</div></div></div>
-                <div className="flex items-center gap-3">{leaderboardTab==='today'&&<div className="flex items-center gap-1.5">{allCatNames.map(c=><div key={c} className={'w-2.5 h-2.5 rounded-full '+(item.crystals[c]?getCT(c).bg.replace('bg-','bg-').replace('500','400')+' shadow-sm shadow-'+getCT(c).neon.replace('#','')+'/50':isMe?'bg-white/10':'bg-white/[0.06]')}/>)}</div>}{!isMe&&<button onClick={()=>{setShowLeaderboard(false);setShowCompetitor(item.member);}} className="text-[10px] text-gray-600 hover:text-white uppercase tracking-wider font-medium">View</button>}</div>
+              <div className="flex items-center justify-between"><div className="flex items-center gap-3"><div className="text-lg w-8 text-center">{i<3?medals[i]:<span className="text-sm text-gray-600">{i+1}</span>}</div><Avatar user={item.member} size={28} className={isMe?'bg-blue-500/20 text-blue-400':(darkMode?'bg-white/[0.06] text-gray-400':'bg-gray-100 text-gray-500')}/><div><div className={'text-sm font-semibold flex items-center gap-1.5 '+(isMe?'text-blue-300':(darkMode?'text-gray-300':'text-gray-700'))}>{item.member.username}{isMe&&<span className="text-[10px] text-gray-600">(you)</span>}{getRoomRole(item.member.id)&&<span className={`text-[9px] font-bold ${getRoomRole(item.member.id).color}`}>{getRoomRole(item.member.id).icon}</span>}{ms>0&&<span className={`text-[9px] font-bold ${ms>=7?'text-orange-400':'text-amber-400'}`}>🔗{ms}</span>}</div><div className="text-xs text-gray-600">{pts} pts{leaderboardTab==='week'?' \u00b7 '+item.weeklyCrystals+' crystals':''}</div></div></div>
+                <div className="flex items-center gap-3">{leaderboardTab==='today'&&<div className="flex items-center gap-1.5">{allCatNames.map(c=><div key={c} className={'w-2.5 h-2.5 rounded-full '+(item.crystals[c]?getCT(c).bg+' shadow-sm':(isMe?'bg-white/10':(darkMode?'bg-white/[0.06]':'bg-gray-200')))}/>)}</div>}{!isMe&&<button onClick={()=>{setShowLeaderboard(false);setShowCompetitor(item.member);}} className={`text-[10px] uppercase tracking-wider font-medium ${darkMode?'text-gray-600 hover:text-white':'text-gray-400 hover:text-gray-700'}`}>View</button>}</div>
               </div>
             </div>
           );
@@ -2085,6 +2094,7 @@ export default function VersaApp() {
                         <div className="text-lg font-black">{lastWeekData.scores[0].pts-lastWeekData.scores[1].pts} pts</div>
                         <div className={`text-xs ${storyTheme==='light'?'text-gray-400':'text-gray-600'}`}>between 1st and 2nd</div>
                       </div>}
+                      {(()=>{const topMs=Object.entries(mutualStreaks).filter(([_,v])=>v>0).sort((a,b)=>b[1]-a[1])[0];if(!topMs)return null;const rival=activeMembers.find(m=>m.id===topMs[0]);if(!rival)return null;return(<div><div className={`text-[10px] uppercase tracking-wider ${storyTheme==='light'?'text-gray-400':'text-gray-600'}`}>Longest Duo Streak</div><div className="text-lg font-black">🔗 {topMs[1]} days</div><div className={`text-xs ${storyTheme==='neon'?'text-orange-400':'text-orange-400'}`}>{currentUser.username} & {rival.username}</div></div>);})()}
                     </div>
                     <div className={`text-[10px] mt-6 ${storyTheme==='light'?'text-gray-300':'text-gray-700'}`}>VERSA</div>
                   </div>
