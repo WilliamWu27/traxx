@@ -150,7 +150,7 @@ export default function VersaApp() {
   const [userRooms, setUserRooms] = useState([]);
   const [roomStakes, setRoomStakes] = useState(null);
   const [newStake, setNewStake] = useState({ type: 'custom', description: '', duration: 'weekly' });
-  const [newHabit, setNewHabit] = useState({ name: '', category: 'Study', points: 10, isRepeatable: false, maxCompletions: 1 });
+  const [newHabit, setNewHabit] = useState({ name: '', category: 'Study', points: 10, isRepeatable: false, maxCompletions: 1, unit: '' });
   const [historyDate, setHistoryDate] = useState(null);
   const [editHabitData, setEditHabitData] = useState({});
   const [weeklyWinner, setWeeklyWinner] = useState(null);
@@ -179,6 +179,10 @@ export default function VersaApp() {
   const [streakMilestone, setStreakMilestone] = useState(null);
   const [streakFreeze, setStreakFreeze] = useState(0);
   const [freezeMsg, setFreezeMsg] = useState(null);
+  const [mutualStreaks, setMutualStreaks] = useState({});
+  const [showStoryCards, setShowStoryCards] = useState(false);
+  const [storyCardIdx, setStoryCardIdx] = useState(0);
+  const [storyTheme, setStoryTheme] = useState('dark');
   const [myBoardIds, setMyBoardIds] = useState(null); // null = show all, array = custom selection
   const [showCustomBoard, setShowCustomBoard] = useState(false);
   const [customBoardHabits, setCustomBoardHabits] = useState([]);
@@ -462,6 +466,59 @@ export default function VersaApp() {
     };
     calc();
   }, [currentUser, currentRoom, completions, habits]);
+
+  // ─── MUTUAL STREAKS (Snapchat-style between pairs) ───
+  useEffect(() => {
+    if (!currentUser || !currentRoom || activeMembers.length < 2) { setMutualStreaks({}); return; }
+    const calc = async () => {
+      try {
+        const ago = new Date(); ago.setDate(ago.getDate() - 60);
+        const snap = await getDocs(query(collection(db, 'completions'), where('roomId', '==', currentRoom.id), where('date', '>=', formatDateStr(ago))));
+        const allDocs = snap.docs.map(d => d.data());
+
+        // Build a map of userId -> Set of qualifying dates (80+ pts)
+        const userDates = {};
+        activeMembers.forEach(m => { userDates[m.id] = {}; });
+        allDocs.forEach(d => {
+          if (!userDates[d.userId]) return;
+          if (!userDates[d.userId][d.date]) userDates[d.userId][d.date] = 0;
+          userDates[d.userId][d.date] += ((d.habitPoints || 0) * (d.count || 1)) + (d.bonusPoints || 0);
+        });
+        const userQualDates = {};
+        Object.entries(userDates).forEach(([uid, dates]) => {
+          userQualDates[uid] = new Set(Object.entries(dates).filter(([_, pts]) => pts >= 80).map(([date]) => date));
+        });
+
+        // For each pair (me + rival), count consecutive days both qualified
+        const myId = currentUser.id;
+        const myDates = userQualDates[myId] || new Set();
+        const streaks = {};
+        activeMembers.forEach(m => {
+          if (m.id === myId) return;
+          const theirDates = userQualDates[m.id] || new Set();
+          let streak = 0;
+          let check = new Date();
+          // Start from today or yesterday
+          const todayStr = formatDateStr(check);
+          const yStr = formatDateStr(new Date(Date.now() - 86400000));
+          const bothToday = myDates.has(todayStr) && theirDates.has(todayStr);
+          const bothYesterday = myDates.has(yStr) && theirDates.has(yStr);
+          if (!bothToday && !bothYesterday) { streaks[m.id] = 0; return; }
+          if (!bothToday) check = new Date(Date.now() - 86400000);
+          while (true) {
+            const ds = formatDateStr(check);
+            if (myDates.has(ds) && theirDates.has(ds)) {
+              streak++;
+              check.setDate(check.getDate() - 1);
+            } else break;
+          }
+          streaks[m.id] = streak;
+        });
+        setMutualStreaks(streaks);
+      } catch (err) { console.error('Mutual streaks error:', err); }
+    };
+    calc();
+  }, [currentUser, currentRoom, completions, roomMembers, roomKicked]);
 
   // ─── WEEKLY WINNER ───
   useEffect(() => {
@@ -813,6 +870,7 @@ export default function VersaApp() {
       await setDoc(doc(db, 'habits', hid), {
         name: newHabit.name.trim(), category: newHabit.category, points: parseInt(newHabit.points)||10,
         isRepeatable: newHabit.isRepeatable, maxCompletions: parseInt(newHabit.maxCompletions)||1,
+        ...(newHabit.unit?.trim() ? { unit: newHabit.unit.trim() } : {}),
         roomId: currentRoom.id, createdBy: currentUser.id, createdAt: new Date().toISOString()
       });
       // Auto-add to personal board if one exists
@@ -820,7 +878,7 @@ export default function VersaApp() {
         const boardDocId = currentUser.id+'_'+currentRoom.id;
         await setDoc(doc(db, 'myBoard', boardDocId), { habitIds: [...myBoardIds, hid], userId: currentUser.id, roomId: currentRoom.id });
       }
-      setNewHabit({ name:'', category:'Study', points:10, isRepeatable:false, maxCompletions:1 }); setShowAddHabit(false);
+      setNewHabit({ name:'', category:'Study', points:10, isRepeatable:false, maxCompletions:1, unit:'' }); setShowAddHabit(false);
     } catch { setError('Failed to add'); }
   };
   const saveEditHabit = async () => {
@@ -829,13 +887,14 @@ export default function VersaApp() {
       await updateDoc(doc(db, 'habits', showEditHabit), {
         name: editHabitData.name.trim(), category: editHabitData.category,
         points: parseInt(editHabitData.points)||10, isRepeatable: editHabitData.isRepeatable,
-        maxCompletions: parseInt(editHabitData.maxCompletions)||1
+        maxCompletions: parseInt(editHabitData.maxCompletions)||1,
+        unit: editHabitData.unit?.trim() || null
       });
       setShowEditHabit(null);
     } catch { setError('Failed to save'); }
   };
   const deleteHabit = async (hid) => { if (!confirm('Delete this habit?')) return; try { await deleteDoc(doc(db, 'habits', hid)); } catch {} };
-  const openEditHabit = (habit) => { setEditHabitData({ name: habit.name, category: habit.category, points: habit.points, isRepeatable: habit.isRepeatable, maxCompletions: habit.maxCompletions }); setShowEditHabit(habit.id); };
+  const openEditHabit = (habit) => { setEditHabitData({ name: habit.name, category: habit.category, points: habit.points, isRepeatable: habit.isRepeatable, maxCompletions: habit.maxCompletions, unit: habit.unit||'' }); setShowEditHabit(habit.id); };
 
   // ─── COMPLETIONS (with embedded habit data for orphan-proofing) ───
   const getExisting = (hid) => { const t = getToday(); return completions.find(c=>c.userId===currentUser.id&&c.habitId===hid&&c.date===t); };
@@ -1441,11 +1500,13 @@ export default function VersaApp() {
           <div className="flex items-center gap-2 mb-4 overflow-x-auto pb-0.5 -mx-1 px-1">
             {rivalStatus.slice(0,4).map(r => {
               const ahead = r.pts > myPts;
+              const ms = mutualStreaks[r.member.id] || 0;
               return (
                 <div key={r.member.id} className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border shrink-0 ${ahead?'border-red-500/15 bg-red-500/5':'border-emerald-500/15 bg-emerald-500/5'}`}>
                   <Avatar user={r.member} size={20} className={ahead?'bg-red-500/20 text-red-400':'bg-emerald-500/20 text-emerald-400'}/>
                   <span className={`text-[10px] font-medium ${darkMode?'text-gray-400':'text-gray-600'}`}>{r.member.username}</span>
                   <span className={`text-[10px] font-bold ${ahead?'text-red-400':'text-emerald-400'}`}>{r.pts}</span>
+                  {ms > 0 && <span className="text-[9px] text-orange-400 font-bold">🔗{ms}</span>}
                 </div>
               );
             })}
@@ -1655,6 +1716,7 @@ export default function VersaApp() {
             <select value={newHabit.category} onChange={e=>setNewHabit({...newHabit,category:e.target.value})} className={inputCls}>{allCatNames.map(c=><option key={c} value={c} className={darkMode?'bg-[#12121a]':'bg-white'}>{c}</option>)}</select>
             <input type="number" placeholder="Points" value={newHabit.points} onChange={e=>setNewHabit({...newHabit,points:e.target.value})} className={inputCls}/>
           </div>
+          <input type="text" placeholder="Time description (e.g. 30 min, per hour)" value={newHabit.unit} onChange={e=>setNewHabit({...newHabit,unit:e.target.value})} className={inputCls} maxLength={20}/>
           <label className="flex items-center gap-3 py-1 cursor-pointer"><input type="checkbox" checked={newHabit.isRepeatable} onChange={e=>setNewHabit({...newHabit,isRepeatable:e.target.checked,maxCompletions:e.target.checked?5:1})} className="w-4 h-4 rounded accent-blue-500"/><span className="text-sm text-gray-400">Repeatable</span></label>
           {newHabit.isRepeatable&&<input type="number" placeholder="Max per day" value={newHabit.maxCompletions} onChange={e=>setNewHabit({...newHabit,maxCompletions:e.target.value})} className={inputCls}/>}
           {error&&<p className="text-red-400 text-xs text-center">{error}</p>}
@@ -1671,6 +1733,7 @@ export default function VersaApp() {
             <select value={editHabitData.category||allCatNames[0]} onChange={e=>setEditHabitData({...editHabitData,category:e.target.value})} className={inputCls}>{allCatNames.map(c=><option key={c} value={c} className={darkMode?'bg-[#12121a]':'bg-white'}>{c}</option>)}</select>
             <input type="number" placeholder="Points" value={editHabitData.points||''} onChange={e=>setEditHabitData({...editHabitData,points:e.target.value})} className={inputCls}/>
           </div>
+          <input type="text" placeholder="Time description (e.g. 30 min, per hour)" value={editHabitData.unit||''} onChange={e=>setEditHabitData({...editHabitData,unit:e.target.value})} className={inputCls} maxLength={20}/>
           <label className="flex items-center gap-3 py-1 cursor-pointer"><input type="checkbox" checked={editHabitData.isRepeatable||false} onChange={e=>setEditHabitData({...editHabitData,isRepeatable:e.target.checked,maxCompletions:e.target.checked?5:1})} className="w-4 h-4 rounded accent-blue-500"/><span className="text-sm text-gray-400">Repeatable</span></label>
           {editHabitData.isRepeatable&&<input type="number" placeholder="Max per day" value={editHabitData.maxCompletions||''} onChange={e=>setEditHabitData({...editHabitData,maxCompletions:e.target.value})} className={inputCls}/>}
           <div className="flex gap-3 pt-2"><button onClick={()=>setShowEditHabit(null)} className={`flex-1 px-4 py-3 border ${T.border} rounded-xl text-sm ${T.textMuted} hover:${T.bgCardHover}`}>Cancel</button><button onClick={saveEditHabit} className="flex-1 px-4 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl text-sm font-bold shadow-lg shadow-blue-500/20 active:scale-[0.98]">Save</button></div>
@@ -1800,10 +1863,20 @@ export default function VersaApp() {
       <Modal show={showHelp} onClose={()=>setShowHelp(false)} dark={darkMode}>
         <ModalHeader title="How Versa Works" onClose={()=>setShowHelp(false)} dark={darkMode}/>
         <div className="space-y-3 text-sm text-gray-400">
-          {[{i:'&#x1F3AF;',t:'Track & Earn',d:'Use + and \u2212 to track habits. Max them out for neon glow.'},{i:'&#x1F525;',t:'Streak Multipliers',d:'Keep your streak alive for bonus points: 3d→1.1× · 7d→1.25× · 14d→1.5× · 30d→1.75× · 60d→2× (max). Break your streak and you reset to 1×.'},{i:'&#x1F3C6;',t:'Compete',d:'Invite friends and dominate the leaderboard.'},{i:'&#x26A1;',t:'Stakes',d:'Set real consequences for the weekly loser.'},{i:'&#x1F465;',t:'Solo Mode',d:'No friends yet? Compete against yesterday.'}].map((s,i)=>(
-            <div key={i} className="bg-white/[0.03] rounded-xl p-4 border border-white/[0.04]"><p className={`font-bold ${T.text} mb-1`} dangerouslySetInnerHTML={{__html:s.i+' '+s.t}}/><p>{s.d}</p></div>
+          {[
+            {i:'🎯',t:'Track & Earn',d:'Tap + to log habits. Each completion earns points. Hit 400pts for a perfect day.'},
+            {i:'🔥',t:'Streaks',d:'Log at least 80pts daily to maintain your streak. Tiers: 3d→1.1× · 7d→1.25× · 14d→1.5× · 30d→1.75× · 60d→2×. Miss a day and it resets.'},
+            {i:'🛡️',t:'Streak Freeze',d:'Hit 90% (360pts) in a day to bank a freeze. If you miss tomorrow, the freeze saves your streak. Max 1 at a time — unlog habits and you lose it.'},
+            {i:'🎰',t:'Mystery Bonus',d:'~10% chance on every tap: 1.25× (common), 1.5×, 2× (rare), 3× (epic), 5× (jackpot). Bonus points stack on top of streak multipliers.'},
+            {i:'💎',t:'Crystals',d:'Score the most points in a category (Study, Health, Focus) to earn a crystal for the day. Ties = no crystal.'},
+            {i:'🏆',t:'Compete',d:'Weekly leaderboard resets Sunday. Invite friends, set stakes, and see who actually follows through.'},
+            {i:'⚡',t:'Stakes',d:'Set what the weekly loser has to do. Spin the punishment wheel for random consequences.'},
+            {i:'🔥',t:'Reactions',d:'React to your rivals\' completions with 🔥 💀 👏 😤 in the activity feed.'},
+            {i:'👤',t:'Solo Mode',d:'No friends yet? Compete against your own yesterday score.'},
+          ].map((s,i)=>(
+            <div key={i} className={`${T.bgCard} rounded-xl p-4 border ${T.border}`}><p className={`font-bold ${T.text} mb-1`}>{s.i} {s.t}</p><p>{s.d}</p></div>
           ))}
-          <div className="bg-white/[0.03] rounded-xl p-4 border border-white/[0.04]"><p className={`font-bold ${T.text} mb-2`}>Categories</p><div className="space-y-1.5">{allCatNames.map(c=>{const ct=getCT(c);return(<div key={c} className="flex items-center gap-2"><div className={'w-3 h-3 rounded-full '+ct.bg+' shadow-sm '+ct.glow}/><span><strong className={ct.txt}>{c}</strong></span></div>);})}</div></div>
+          <div className={`${T.bgCard} rounded-xl p-4 border ${T.border}`}><p className={`font-bold ${T.text} mb-2`}>Categories</p><div className="space-y-1.5">{allCatNames.map(c=>{const ct=getCT(c);return(<div key={c} className="flex items-center gap-2"><div className={'w-3 h-3 rounded-full '+ct.bg+' shadow-sm '+ct.glow}/><span><strong className={ct.txt}>{c}</strong></span></div>);})}</div></div>
         </div>
       </Modal>
 
@@ -1886,7 +1959,8 @@ export default function VersaApp() {
                 const text = `🏆 Versa Weekly Recap\n${lastWeekData.dateRange}\n\n${lastWeekData.scores.map((s,i)=>((['🥇','🥈','🥉'][i]||`${i+1}.`)+' '+s.member.username+' — '+s.pts+'pts')).join('\n')}\n\nJoin us: ${window.location.origin}?join=${currentRoom?.code}`;
                 if(navigator.share){try{await navigator.share({title:'Versa Weekly Recap',text});}catch{}}else{navigator.clipboard.writeText(text);setCopied(true);setTimeout(()=>setCopied(false),2000);}
               }} className="flex-1 px-4 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl text-sm font-bold flex items-center justify-center gap-2 active:scale-[0.98]"><Copy size={14}/>{copied?'Copied!':'Share Recap'}</button>
-              {lastWeekData.scores.length>1&&<button onClick={()=>{setShowWeeklyRecap(false);setShowPunishmentWheel(true);setWheelResult(null);}} className="flex-1 px-4 py-3 bg-gradient-to-r from-red-600 to-pink-600 text-white rounded-xl text-sm font-bold flex items-center justify-center gap-2 active:scale-[0.98]">🎰 Spin the Wheel</button>}
+              <button onClick={()=>{setShowWeeklyRecap(false);setStoryCardIdx(0);setShowStoryCards(true);}} className="flex-1 px-4 py-3 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-xl text-sm font-bold flex items-center justify-center gap-2 active:scale-[0.98]">📸 Story</button>
+              {lastWeekData.scores.length>1&&<button onClick={()=>{setShowWeeklyRecap(false);setShowPunishmentWheel(true);setWheelResult(null);}} className="flex-1 px-4 py-3 bg-gradient-to-r from-red-600 to-pink-600 text-white rounded-xl text-sm font-bold flex items-center justify-center gap-2 active:scale-[0.98]">🎰 Wheel</button>}
             </div>
           </div>
         ) : (
@@ -1958,6 +2032,116 @@ export default function VersaApp() {
                 }} className="flex-1 px-4 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl text-sm font-bold active:scale-[0.98]">{copied?'Copied!':'Share'}</button>
               </div>
             )}
+          </div>
+        )}
+      </Modal>
+
+      {/* Weekly Story Cards */}
+      <Modal show={showStoryCards} onClose={()=>setShowStoryCards(false)} wide dark={darkMode}>
+        {lastWeekData && lastWeekData.scores.length > 0 && (
+          <div>
+            {/* Theme picker */}
+            <div className="flex justify-center gap-2 mb-4">
+              {[{id:'dark',label:'Dark',bg:'bg-gray-900'},{id:'neon',label:'Neon',bg:'bg-purple-900'},{id:'light',label:'Light',bg:'bg-white'}].map(th=>(
+                <button key={th.id} onClick={()=>setStoryTheme(th.id)} className={`w-8 h-8 rounded-full border-2 ${th.bg} ${storyTheme===th.id?'border-blue-500 scale-110':'border-gray-600'} transition-all`}/>
+              ))}
+            </div>
+
+            {/* Story Card */}
+            <div id="story-card" className={`mx-auto rounded-2xl overflow-hidden ${storyTheme==='dark'?'bg-[#0a0a0f] text-white':storyTheme==='neon'?'bg-gradient-to-b from-purple-900 via-indigo-900 to-black text-white':'bg-white text-gray-900'}`} style={{width:300,minHeight:440}}>
+              <div className="p-6 flex flex-col justify-between h-full" style={{minHeight:440}}>
+                {/* Card 0: Winner */}
+                {storyCardIdx === 0 && (
+                  <div className="flex-1 flex flex-col items-center justify-center text-center">
+                    <div className={`text-[10px] font-bold tracking-[0.3em] uppercase mb-6 ${storyTheme==='light'?'text-gray-400':'text-gray-500'}`}>VERSA WEEKLY RECAP</div>
+                    <div className="text-5xl mb-4">🏆</div>
+                    <div className={`text-2xl font-black mb-1 ${storyTheme==='neon'?'text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-pink-400':''}`}>{lastWeekData.scores[0].member.username}</div>
+                    <div className={`text-sm ${storyTheme==='light'?'text-gray-500':'text-gray-400'}`}>won the week</div>
+                    <div className={`text-4xl font-black mt-4 ${storyTheme==='neon'?'text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-blue-400':'text-blue-400'}`}>{lastWeekData.scores[0].pts}</div>
+                    <div className={`text-xs ${storyTheme==='light'?'text-gray-400':'text-gray-600'}`}>points · {lastWeekData.scores[0].activeDays} active days</div>
+                    <div className={`text-[10px] mt-6 ${storyTheme==='light'?'text-gray-300':'text-gray-700'}`}>{lastWeekData.dateRange}</div>
+                  </div>
+                )}
+
+                {/* Card 1: Standings */}
+                {storyCardIdx === 1 && (
+                  <div className="flex-1">
+                    <div className={`text-[10px] font-bold tracking-[0.3em] uppercase mb-5 text-center ${storyTheme==='light'?'text-gray-400':'text-gray-500'}`}>FINAL STANDINGS</div>
+                    <div className="space-y-3">
+                      {lastWeekData.scores.map((s,i) => {
+                        const medals = ['🥇','🥈','🥉'];
+                        return (
+                          <div key={s.member.id} className={`flex items-center justify-between p-3 rounded-xl ${i===0?(storyTheme==='neon'?'bg-purple-500/20 border border-purple-500/30':'bg-blue-500/10 border border-blue-500/20'):(storyTheme==='light'?'bg-gray-50':'bg-white/[0.03]')} ${i>0?'border '+(storyTheme==='light'?'border-gray-100':'border-white/[0.04]'):''}`}>
+                            <div className="flex items-center gap-3">
+                              <span className="text-lg">{i<3?medals[i]:(i+1)+'.'}</span>
+                              <div>
+                                <div className={`text-sm font-bold ${i===0&&storyTheme==='neon'?'text-purple-300':''}`}>{s.member.username}</div>
+                                <div className={`text-[10px] ${storyTheme==='light'?'text-gray-400':'text-gray-600'}`}>{s.activeDays}d active</div>
+                              </div>
+                            </div>
+                            <div className="text-right">
+                              <div className="text-sm font-black">{s.pts}</div>
+                              <div className={`text-[9px] ${storyTheme==='light'?'text-gray-400':'text-gray-600'}`}>pts</div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                    <div className={`text-[10px] mt-4 text-center ${storyTheme==='light'?'text-gray-300':'text-gray-700'}`}>{lastWeekData.dateRange}</div>
+                  </div>
+                )}
+
+                {/* Card 2: Highlights */}
+                {storyCardIdx === 2 && (
+                  <div className="flex-1 flex flex-col items-center justify-center text-center">
+                    <div className={`text-[10px] font-bold tracking-[0.3em] uppercase mb-6 ${storyTheme==='light'?'text-gray-400':'text-gray-500'}`}>HIGHLIGHTS</div>
+                    <div className="space-y-5 w-full">
+                      <div>
+                        <div className={`text-[10px] uppercase tracking-wider ${storyTheme==='light'?'text-gray-400':'text-gray-600'}`}>Most Consistent</div>
+                        <div className="text-lg font-black">{[...lastWeekData.scores].sort((a,b)=>b.activeDays-a.activeDays)[0]?.member.username}</div>
+                        <div className={`text-xs ${storyTheme==='neon'?'text-cyan-400':'text-blue-400'}`}>{[...lastWeekData.scores].sort((a,b)=>b.activeDays-a.activeDays)[0]?.activeDays}/7 days</div>
+                      </div>
+                      <div>
+                        <div className={`text-[10px] uppercase tracking-wider ${storyTheme==='light'?'text-gray-400':'text-gray-600'}`}>Top Category</div>
+                        <div className="text-lg font-black">{(()=>{let best='',bestPts=0;allCatNames.forEach(c=>{const p=lastWeekData.scores[0].catPts[c]||0;if(p>bestPts){bestPts=p;best=c;}});return best||'—';})()}</div>
+                        <div className={`text-xs ${storyTheme==='neon'?'text-purple-400':'text-emerald-400'}`}>for {lastWeekData.scores[0].member.username}</div>
+                      </div>
+                      {lastWeekData.scores.length>1&&<div>
+                        <div className={`text-[10px] uppercase tracking-wider ${storyTheme==='light'?'text-gray-400':'text-gray-600'}`}>Closest Race</div>
+                        <div className="text-lg font-black">{lastWeekData.scores[0].pts-lastWeekData.scores[1].pts} pts</div>
+                        <div className={`text-xs ${storyTheme==='light'?'text-gray-400':'text-gray-600'}`}>between 1st and 2nd</div>
+                      </div>}
+                    </div>
+                    <div className={`text-[10px] mt-6 ${storyTheme==='light'?'text-gray-300':'text-gray-700'}`}>VERSA</div>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Navigation dots */}
+            <div className="flex justify-center gap-2 mt-4">
+              {[0,1,2].map(i=>(
+                <button key={i} onClick={()=>setStoryCardIdx(i)} className={`w-2 h-2 rounded-full transition-all ${storyCardIdx===i?'bg-blue-500 w-5':'bg-gray-600'}`}/>
+              ))}
+            </div>
+
+            {/* Nav + Save */}
+            <div className="flex gap-2 mt-4">
+              <button onClick={()=>setStoryCardIdx(p=>Math.max(0,p-1))} disabled={storyCardIdx===0} className={`flex-1 py-2.5 rounded-xl text-sm font-medium transition-all disabled:opacity-20 ${darkMode?'text-gray-400 border border-white/[0.06]':'text-gray-500 border border-gray-200'}`}>← Prev</button>
+              <button onClick={()=>setStoryCardIdx(p=>Math.min(2,p+1))} disabled={storyCardIdx===2} className={`flex-1 py-2.5 rounded-xl text-sm font-medium transition-all disabled:opacity-20 ${darkMode?'text-gray-400 border border-white/[0.06]':'text-gray-500 border border-gray-200'}`}>Next →</button>
+            </div>
+            <button onClick={async()=>{
+              try{
+                const el=document.getElementById('story-card');
+                const {default:html2canvas}=await import('https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.esm.js');
+                const canvas=await html2canvas(el,{backgroundColor:null,scale:2});
+                const link=document.createElement('a');link.download='versa-recap.png';link.href=canvas.toDataURL();link.click();
+              }catch{
+                // Fallback: share as text
+                const text=`🏆 Versa Weekly Recap\n${lastWeekData.dateRange}\n\nWinner: ${lastWeekData.scores[0].member.username} — ${lastWeekData.scores[0].pts}pts`;
+                if(navigator.share){try{await navigator.share({title:'Versa Recap',text});}catch{}}else{navigator.clipboard.writeText(text);}
+              }
+            }} className="w-full mt-2 py-3 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-xl text-sm font-bold active:scale-[0.98]">📸 Save as Image</button>
           </div>
         )}
       </Modal>
