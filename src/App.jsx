@@ -76,9 +76,9 @@ const PUNISHMENTS = [
 function Modal({ show, onClose, children, wide, dark }) {
   if (!show) return null;
   const isDark = dark !== undefined ? dark : true;
-  const mbg = isDark ? 'bg-[#12121a] border-white/[0.06]' : 'bg-white border-gray-200';
+  const mbg = isDark ? 'bg-[#1e1b15] border-[#3a352a]' : 'bg-[#faf7f2] border-[#e2dbd0]';
   return (
-    <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 z-50" onClick={onClose}>
+    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50" onClick={onClose}>
       <div className={`rounded-2xl w-full p-6 border shadow-2xl max-h-[85vh] overflow-y-auto ${mbg} ` + (wide ? 'max-w-md' : 'max-w-sm')} onClick={e => e.stopPropagation()}>
         {children}
       </div>
@@ -90,8 +90,8 @@ function ModalHeader({ title, onClose, icon, dark }) {
   const isDark = dark !== undefined ? dark : true;
   return (
     <div className="flex items-center justify-between mb-5">
-      <div className="flex items-center gap-2">{icon}{typeof title === 'string' ? <h2 className={`text-lg font-bold ${isDark?'text-white':'text-gray-900'}`}>{title}</h2> : title}</div>
-      <button onClick={onClose} className={`${isDark?'text-gray-600 hover:text-white':'text-gray-400 hover:text-gray-900'} transition-colors`}><X size={20} /></button>
+      <div className="flex items-center gap-2">{icon}{typeof title === 'string' ? <h2 className={`text-lg font-bold ${isDark?'text-[#e8e0d4]':'text-[#3d3629]'}`}>{title}</h2> : title}</div>
+      <button onClick={onClose} className={`${isDark?'text-[#5a5244] hover:text-[#e8e0d4]':'text-[#c4b9a8] hover:text-[#3d3629]'} transition-colors`}><X size={20} /></button>
     </div>
   );
 }
@@ -1090,14 +1090,14 @@ export default function VersaApp() {
 
   // ─── CATEGORY SYSTEM ───
   const COLOR_PALETTE = [
-    { name:'Blue', neon:'#3b82f6', bg:'bg-blue-500', bgS:'bg-blue-500/10', bgM:'bg-blue-500/20', bdr:'border-blue-500/30', txt:'text-blue-400', txtB:'text-blue-300', pill:'bg-blue-500/20 text-blue-300', glow:'shadow-blue-500/30' },
-    { name:'Orange', neon:'#f97316', bg:'bg-orange-500', bgS:'bg-orange-500/10', bgM:'bg-orange-500/20', bdr:'border-orange-500/30', txt:'text-orange-400', txtB:'text-orange-300', pill:'bg-orange-500/20 text-orange-300', glow:'shadow-orange-500/30' },
-    { name:'Emerald', neon:'#10b981', bg:'bg-emerald-500', bgS:'bg-emerald-500/10', bgM:'bg-emerald-500/20', bdr:'border-emerald-500/30', txt:'text-emerald-400', txtB:'text-emerald-300', pill:'bg-emerald-500/20 text-emerald-300', glow:'shadow-emerald-500/30' },
-    { name:'Purple', neon:'#8b5cf6', bg:'bg-violet-500', bgS:'bg-violet-500/10', bgM:'bg-violet-500/20', bdr:'border-violet-500/30', txt:'text-violet-400', txtB:'text-violet-300', pill:'bg-violet-500/20 text-violet-300', glow:'shadow-violet-500/30' },
-    { name:'Pink', neon:'#ec4899', bg:'bg-pink-500', bgS:'bg-pink-500/10', bgM:'bg-pink-500/20', bdr:'border-pink-500/30', txt:'text-pink-400', txtB:'text-pink-300', pill:'bg-pink-500/20 text-pink-300', glow:'shadow-pink-500/30' },
-    { name:'Cyan', neon:'#06b6d4', bg:'bg-cyan-500', bgS:'bg-cyan-500/10', bgM:'bg-cyan-500/20', bdr:'border-cyan-500/30', txt:'text-cyan-400', txtB:'text-cyan-300', pill:'bg-cyan-500/20 text-cyan-300', glow:'shadow-cyan-500/30' },
-    { name:'Rose', neon:'#f43f5e', bg:'bg-rose-500', bgS:'bg-rose-500/10', bgM:'bg-rose-500/20', bdr:'border-rose-500/30', txt:'text-rose-400', txtB:'text-rose-300', pill:'bg-rose-500/20 text-rose-300', glow:'shadow-rose-500/30' },
-    { name:'Amber', neon:'#f59e0b', bg:'bg-amber-500', bgS:'bg-amber-500/10', bgM:'bg-amber-500/20', bdr:'border-amber-500/30', txt:'text-amber-400', txtB:'text-amber-300', pill:'bg-amber-500/20 text-amber-300', glow:'shadow-amber-500/30' },
+    { name:'Dusty Blue', neon:'#7b9eb8', bg:'bg-[#7b9eb8]', bgS:'bg-[#7b9eb8]/10', bgM:'bg-[#7b9eb8]/20', bdr:'border-[#7b9eb8]/30', txt:'text-[#7b9eb8]', txtB:'text-[#9bb8cc]', pill:'bg-[#7b9eb8]/20 text-[#7b9eb8]', glow:'shadow-[#7b9eb8]/20' },
+    { name:'Warm Tan', neon:'#b8936b', bg:'bg-[#b8936b]', bgS:'bg-[#b8936b]/10', bgM:'bg-[#b8936b]/20', bdr:'border-[#b8936b]/30', txt:'text-[#b8936b]', txtB:'text-[#c8a880]', pill:'bg-[#b8936b]/20 text-[#b8936b]', glow:'shadow-[#b8936b]/20' },
+    { name:'Sage', neon:'#8aab7f', bg:'bg-[#8aab7f]', bgS:'bg-[#8aab7f]/10', bgM:'bg-[#8aab7f]/20', bdr:'border-[#8aab7f]/30', txt:'text-[#8aab7f]', txtB:'text-[#a0be96]', pill:'bg-[#8aab7f]/20 text-[#8aab7f]', glow:'shadow-[#8aab7f]/20' },
+    { name:'Dusty Rose', neon:'#b87b8a', bg:'bg-[#b87b8a]', bgS:'bg-[#b87b8a]/10', bgM:'bg-[#b87b8a]/20', bdr:'border-[#b87b8a]/30', txt:'text-[#b87b8a]', txtB:'text-[#cc9ba6]', pill:'bg-[#b87b8a]/20 text-[#b87b8a]', glow:'shadow-[#b87b8a]/20' },
+    { name:'Slate', neon:'#8b8fa8', bg:'bg-[#8b8fa8]', bgS:'bg-[#8b8fa8]/10', bgM:'bg-[#8b8fa8]/20', bdr:'border-[#8b8fa8]/30', txt:'text-[#8b8fa8]', txtB:'text-[#a0a4b8]', pill:'bg-[#8b8fa8]/20 text-[#8b8fa8]', glow:'shadow-[#8b8fa8]/20' },
+    { name:'Clay', neon:'#b87b6b', bg:'bg-[#b87b6b]', bgS:'bg-[#b87b6b]/10', bgM:'bg-[#b87b6b]/20', bdr:'border-[#b87b6b]/30', txt:'text-[#b87b6b]', txtB:'text-[#cc9b8e]', pill:'bg-[#b87b6b]/20 text-[#b87b6b]', glow:'shadow-[#b87b6b]/20' },
+    { name:'Mauve', neon:'#a07ba8', bg:'bg-[#a07ba8]', bgS:'bg-[#a07ba8]/10', bgM:'bg-[#a07ba8]/20', bdr:'border-[#a07ba8]/30', txt:'text-[#a07ba8]', txtB:'text-[#b89bbe]', pill:'bg-[#a07ba8]/20 text-[#a07ba8]', glow:'shadow-[#a07ba8]/20' },
+    { name:'Ochre', neon:'#b8a06b', bg:'bg-[#b8a06b]', bgS:'bg-[#b8a06b]/10', bgM:'bg-[#b8a06b]/20', bdr:'border-[#b8a06b]/30', txt:'text-[#b8a06b]', txtB:'text-[#ccb880]', pill:'bg-[#b8a06b]/20 text-[#b8a06b]', glow:'shadow-[#b8a06b]/20' },
   ];
   const ICON_OPTIONS = ['🧠','💪','✨','⭐','📚','🎨','💼','🏃','🧘','💰','🎯','❤️','🌱','🔬','🎮','🍎'];
   const DEFAULT_CATEGORIES = [
@@ -1141,26 +1141,25 @@ export default function VersaApp() {
 
   // ─── THEME CLASSES ───
   const T = darkMode ? {
-    bg: 'bg-[#07070c]', bgCard: 'bg-white/[0.03]', bgCardHover: 'hover:bg-white/[0.04]', bgInput: 'bg-white/[0.04]',
-    border: 'border-white/[0.06]', borderInput: 'border-white/[0.08]', text: 'text-white', textMuted: 'text-gray-500',
-    textDim: 'text-gray-600', textFaint: 'text-gray-700', headerBg: 'bg-[#07070c]/90', modalBg: 'bg-[#0d0d14]',
-    selectBg: 'bg-[#0d0d14]', glowOrb: '/8', blurBg: 'backdrop-blur-xl'
+    bg: 'bg-[#1a1814]', bgCard: 'bg-[#242018]', bgCardHover: 'hover:bg-[#2a2520]', bgInput: 'bg-[#2a2520]',
+    border: 'border-[#3a352a]', borderInput: 'border-[#4a4438]', text: 'text-[#e8e0d4]', textMuted: 'text-[#8a7f6e]',
+    textDim: 'text-[#5a5244]', textFaint: 'text-[#3a352a]', headerBg: 'bg-[#1a1814]/95', modalBg: 'bg-[#1e1b15]',
+    selectBg: 'bg-[#1e1b15]', glowOrb: '/8', blurBg: 'backdrop-blur-xl'
   } : {
-    bg: 'bg-gray-50', bgCard: 'bg-white', bgCardHover: 'hover:bg-gray-50', bgInput: 'bg-gray-100',
-    border: 'border-gray-200', borderInput: 'border-gray-300', text: 'text-gray-900', textMuted: 'text-gray-500',
-    textDim: 'text-gray-400', textFaint: 'text-gray-300', headerBg: 'bg-white/80', modalBg: 'bg-white',
-    selectBg: 'bg-white', glowOrb: '/5', blurBg: 'backdrop-blur-xl'
+    bg: 'bg-[#f0ebe3]', bgCard: 'bg-[#faf7f2]', bgCardHover: 'hover:bg-[#f5f0e8]', bgInput: 'bg-[#f5f0e8]',
+    border: 'border-[#e2dbd0]', borderInput: 'border-[#d4cabb]', text: 'text-[#3d3629]', textMuted: 'text-[#9b917f]',
+    textDim: 'text-[#c4b9a8]', textFaint: 'text-[#ddd5c8]', headerBg: 'bg-[#f0ebe3]/95', modalBg: 'bg-[#faf7f2]',
+    selectBg: 'bg-[#faf7f2]', glowOrb: '/5', blurBg: 'backdrop-blur-xl'
   };
-  const inputCls = `w-full px-4 py-3 ${T.bgInput} border ${T.borderInput} rounded-xl focus:outline-none focus:border-blue-500/50 ${T.text} placeholder-gray-400 text-sm transition-all`;
+  const inputCls = `w-full px-4 py-3 ${T.bgInput} border ${T.borderInput} rounded-xl focus:outline-none focus:border-[#7b9eb8]/50 ${T.text} placeholder-[#c4b9a8] text-sm transition-all`;
   const btnPrimary = "w-full py-3.5 rounded-xl text-sm font-bold tracking-wide transition-all disabled:opacity-50 active:scale-[0.98]";
 
   // ─── LOADING ───
   if (authLoading) return (
-    <div className="min-h-screen bg-[#07070c] flex items-center justify-center relative overflow-hidden">
-      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[400px] h-[400px] bg-blue-600/8 rounded-full blur-[100px] -translate-y-1/2"/>
+    <div className="min-h-screen bg-[#f0ebe3] flex items-center justify-center relative overflow-hidden">
       <div className="text-center">
-        <h1 className="text-4xl font-black tracking-[0.4em] text-white mb-5">VERSA</h1>
-        <div className="flex justify-center gap-2">{['bg-blue-500','bg-orange-500','bg-emerald-500'].map((c,i)=><div key={i} className={`w-1.5 h-1.5 rounded-full ${c} animate-pulse`} style={{animationDelay:i*200+'ms'}} />)}</div>
+        <h1 className="text-4xl font-black tracking-[0.4em] text-[#3d3629] mb-5">VERSA</h1>
+        <div className="flex justify-center gap-2">{['bg-[#7b9eb8]','bg-[#b8936b]','bg-[#8aab7f]'].map((c,i)=><div key={i} className={`w-1.5 h-1.5 rounded-full ${c} animate-pulse`} style={{animationDelay:i*200+'ms'}} />)}</div>
       </div>
     </div>
   );
@@ -1199,10 +1198,10 @@ export default function VersaApp() {
           {/* Feature cards */}
           <div className="space-y-3 mb-8">
             {[
-              { icon: '📚', title: 'Track What Matters', desc: 'Studying, gym, screen time, sleep. Earn points for everything.', color: 'from-blue-500/10 to-blue-600/5' },
-              { icon: '🔥', title: 'Streak Multipliers', desc: 'Don\'t break the chain → earn up to 2× points.', color: 'from-orange-500/10 to-red-600/5' },
-              { icon: '🏆', title: 'Compete with Friends', desc: 'Real-time leaderboards. Set stakes. Loser pays.', color: 'from-amber-500/10 to-yellow-600/5' },
-              { icon: '💎', title: 'Win Crystals', desc: 'Top scorer in Study, Health, or Focus earns the crystal.', color: 'from-purple-500/10 to-indigo-600/5' },
+              { icon: '📚', title: 'Track What Matters', desc: 'Studying, gym, screen time, sleep. Earn points for everything.', color: 'from-[#7b9eb8]/10 to-[#7b9eb8]/5' },
+              { icon: '🔥', title: 'Streak Multipliers', desc: 'Don\'t break the chain → earn up to 2× points.', color: 'from-[#b8936b]/10 to-[#b8936b]/5' },
+              { icon: '🏆', title: 'Compete with Friends', desc: 'Real-time leaderboards. Set stakes. Loser pays.', color: 'from-[#b8a06b]/10 to-[#b8a06b]/5' },
+              { icon: '💎', title: 'Win Crystals', desc: 'Top scorer in Study, Health, or Focus earns the crystal.', color: 'from-[#a07ba8]/10 to-[#a07ba8]/5' },
             ].map((item,i) => (
               <div key={i} className={`bg-gradient-to-r ${item.color} backdrop-blur-sm border border-white/[0.06] rounded-2xl p-4 flex items-center gap-4`}>
                 <span className="text-2xl">{item.icon}</span>
@@ -1218,7 +1217,7 @@ export default function VersaApp() {
               Continue with Google
             </button>
             <div className="flex items-center gap-3"><div className="flex-1 h-px bg-white/[0.06]"/><span className="text-gray-600 text-[10px] tracking-wider uppercase">or</span><div className="flex-1 h-px bg-white/[0.06]"/></div>
-            <button onClick={()=>setView('signup')} className={btnPrimary + ' bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-lg shadow-blue-500/20 rounded-2xl'}>Create Account with Email</button>
+            <button onClick={()=>setView('signup')} className={btnPrimary + ' bg-[#7b9eb8] text-white shadow-lg shadow-[#7b9eb8]/20 rounded-2xl'}>Create Account with Email</button>
             <button onClick={()=>setView('login')} className="w-full text-gray-500 py-2 hover:text-white text-sm transition-colors text-center">Already have an account? <span className="text-blue-400">Sign in</span></button>
           </div>
         </div>
@@ -1246,7 +1245,7 @@ export default function VersaApp() {
                 <input type="email" placeholder="Email" value={email} onChange={e=>setEmail(e.target.value)} className={inputCls+' !rounded-xl'} required disabled={loading} />
                 {error && <p className="text-red-400 text-xs text-center">{error}</p>}
                 {successMsg && <p className="text-emerald-400 text-xs text-center">{successMsg}</p>}
-                <button type="submit" disabled={loading} className={btnPrimary+' bg-gradient-to-r from-blue-600 to-blue-500 text-white shadow-lg shadow-blue-500/20 !rounded-xl'}>{loading?'Sending...':'Send Reset Link'}</button>
+                <button type="submit" disabled={loading} className={btnPrimary+' bg-gradient-to-r from-blue-600 to-blue-500 text-white shadow-lg shadow-[#7b9eb8]/20 !rounded-xl'}>{loading?'Sending...':'Send Reset Link'}</button>
                 <button type="button" onClick={()=>{setView('login');setError('');setSuccessMsg('');}} className="w-full text-gray-500 py-2 hover:text-white text-sm transition-colors">← Back to Sign In</button>
               </form>
             ) : view === 'login' ? (
@@ -1262,7 +1261,7 @@ export default function VersaApp() {
                   <input type="email" placeholder="Email" value={email} onChange={e=>setEmail(e.target.value)} className={inputCls+' !rounded-xl'} required disabled={loading} />
                   <input type="password" placeholder="Password" value={password} onChange={e=>setPassword(e.target.value)} className={inputCls+' !rounded-xl'} required disabled={loading} />
                   {error && <p className="text-red-400 text-xs text-center">{error}</p>}
-                  <button type="submit" disabled={loading} className={btnPrimary+' bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-lg shadow-blue-500/20 !rounded-xl'}>{loading?'Signing in...':'Sign In'}</button>
+                  <button type="submit" disabled={loading} className={btnPrimary+' bg-[#7b9eb8] text-white shadow-lg shadow-[#7b9eb8]/20 !rounded-xl'}>{loading?'Signing in...':'Sign In'}</button>
                 </form>
                 <div className="flex justify-between pt-1">
                   <button type="button" onClick={()=>{setView('onboarding');setError('');}} className="text-gray-500 text-xs hover:text-white transition-colors">← Create Account</button>
@@ -1305,9 +1304,9 @@ export default function VersaApp() {
         <p className="text-gray-500 text-sm mb-6">The room creator has removed you from <span className="font-mono text-gray-400">{currentRoom.code}</span>.</p>
         <div className="space-y-3">
           {userRooms.filter(r=>r!==currentRoom.id).length > 0 ? (
-            <button onClick={()=>switchRoom(userRooms.find(r=>r!==currentRoom.id))} className="w-full py-3 rounded-xl text-sm font-bold bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-lg shadow-blue-500/20 active:scale-[0.98]">Switch to Another Room</button>
+            <button onClick={()=>switchRoom(userRooms.find(r=>r!==currentRoom.id))} className="w-full py-3 rounded-xl text-sm font-bold bg-[#7b9eb8] text-white shadow-lg shadow-[#7b9eb8]/20 active:scale-[0.98]">Switch to Another Room</button>
           ) : (
-            <button onClick={()=>{leaveRoom(currentRoom.id);}} className="w-full py-3 rounded-xl text-sm font-bold bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-lg shadow-blue-500/20 active:scale-[0.98]">Create or Join a Room</button>
+            <button onClick={()=>{leaveRoom(currentRoom.id);}} className="w-full py-3 rounded-xl text-sm font-bold bg-[#7b9eb8] text-white shadow-lg shadow-[#7b9eb8]/20 active:scale-[0.98]">Create or Join a Room</button>
           )}
         </div>
       </div>
@@ -1326,7 +1325,7 @@ export default function VersaApp() {
           <div className="text-center space-y-6">
             <div>
               <div className="text-5xl mb-4">👋</div>
-              <h1 className="text-2xl font-bold text-white mb-2">Welcome, <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-emerald-400">{currentUser.username}</span></h1>
+              <h1 className="text-2xl font-bold text-white mb-2">Welcome, <span className="text-[#7b9eb8]">{currentUser.username}</span></h1>
               <p className="text-gray-500 text-sm leading-relaxed">Compete with friends on real habits.<br/>Let's get you set up in 30 seconds.</p>
             </div>
             <div className="space-y-3">
@@ -1367,7 +1366,7 @@ export default function VersaApp() {
                 <span>Share the code with friends to start competing</span>
               </div>
             </div>
-            <button onClick={async()=>{await createRoom(); setShowInviteModal(false); setOnboardingStep(0); setShowOnboardingTour(true);}} disabled={loading} className={btnPrimary+' bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-lg shadow-blue-500/20 rounded-2xl'}>{loading?'Creating...':'Create Room'}</button>
+            <button onClick={async()=>{await createRoom(); setShowInviteModal(false); setOnboardingStep(0); setShowOnboardingTour(true);}} disabled={loading} className={btnPrimary+' bg-[#7b9eb8] text-white shadow-lg shadow-[#7b9eb8]/20 rounded-2xl'}>{loading?'Creating...':'Create Room'}</button>
             <button onClick={()=>setOnboardingStep(0)} className="w-full text-gray-600 text-xs hover:text-gray-400 transition-colors text-center">← Back</button>
             {error&&<p className="text-red-400 text-xs text-center">{error}</p>}
           </div>
@@ -1439,7 +1438,7 @@ export default function VersaApp() {
                     setOnboardingStep(0);
                     setShowInviteModal(true);
                   }
-                }} className="flex-1 py-3 rounded-xl text-sm font-bold bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-lg shadow-blue-500/20 active:scale-[0.98]">
+                }} className="flex-1 py-3 rounded-xl text-sm font-bold bg-[#7b9eb8] text-white shadow-lg shadow-[#7b9eb8]/20 active:scale-[0.98]">
                   {onboardingStep < tourSteps.length - 1 ? 'Next' : 'Start Tracking'}
                 </button>
               </div>
@@ -1480,7 +1479,7 @@ export default function VersaApp() {
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <h1 className="text-lg font-black tracking-[0.15em]">VERSA</h1>
-              {streakData.streak>0&&<div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full ${darkMode?'bg-orange-500/10':'bg-orange-50'}`}><Flame size={13} className="text-orange-400"/><span className="text-orange-400 text-sm font-bold">{streakData.streak}</span>{streakMulti.multi>1&&<span className={`text-[9px] font-bold ${streakMulti.color}`}>{streakMulti.label}</span>}{streakFreeze>0&&<span className="text-xs">🛡️</span>}</div>}
+              {streakData.streak>0&&<div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full ${darkMode?'bg-[#b8936b]/10':'bg-[#b8936b]/5'}`}><Flame size={13} className="text-orange-400"/><span className="text-orange-400 text-sm font-bold">{streakData.streak}</span>{streakMulti.multi>1&&<span className={`text-[9px] font-bold ${streakMulti.color}`}>{streakMulti.label}</span>}{streakFreeze>0&&<span className="text-xs">🛡️</span>}</div>}
             </div>
             <div className="flex items-center gap-2">
               <button onClick={toggleTheme} className={`p-2 rounded-xl ${darkMode?'hover:bg-white/[0.06]':'hover:bg-gray-100'} transition-colors`}>{darkMode?<Sun size={16} className="text-gray-500"/>:<Moon size={16} className="text-gray-400"/>}</button>
@@ -1498,11 +1497,11 @@ export default function VersaApp() {
             <svg width="140" height="140" className="transform -rotate-90">
               <circle cx="70" cy="70" r="60" stroke={darkMode?"rgba(255,255,255,0.06)":"rgba(0,0,0,0.08)"} strokeWidth="8" fill="none"/>
               <circle cx="70" cy="70" r="60" stroke="url(#scoreGrad)" strokeWidth="8" fill="none" strokeLinecap="round" strokeDasharray={`${dailyProg * 377} 377`} className="transition-all duration-700"/>
-              <defs><linearGradient id="scoreGrad" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stopColor="#3b82f6"/><stop offset="50%" stopColor="#8b5cf6"/><stop offset="100%" stopColor="#10b981"/></linearGradient></defs>
+              <defs><linearGradient id="scoreGrad" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stopColor="#7b9eb8"/><stop offset="50%" stopColor="#b8936b"/><stop offset="100%" stopColor="#8aab7f"/></linearGradient></defs>
             </svg>
             <div className="absolute inset-0 flex flex-col items-center justify-center">
               <span className={`text-3xl font-black ${T.text}`}>{myPts}</span>
-              <span className={`text-[10px] font-bold ${dailyProg>=1?'text-emerald-400':'text-blue-400'}`}>{Math.round(dailyProg*100)}%</span>
+              <span className={`text-[10px] font-bold ${dailyProg>=1?'text-[#8aab7f]':'text-[#7b9eb8]'}`}>{Math.round(dailyProg*100)}%</span>
             </div>
           </div>
           <div className="mt-2">
@@ -1617,7 +1616,7 @@ export default function VersaApp() {
             );
           })}
           {habits.length===0 ? (
-            <div className="text-center py-16"><div className="text-5xl mb-4">🎯</div><p className={`${T.textMuted} text-sm mb-5`}>No habits yet</p><button onClick={()=>setShowAddHabit(true)} className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-2xl shadow-lg shadow-blue-500/20 text-sm font-bold active:scale-[0.98]"><Plus size={18}/>Add Habits</button></div>
+            <div className="text-center py-16"><div className="text-5xl mb-4">🎯</div><p className={`${T.textMuted} text-sm mb-5`}>No habits yet</p><button onClick={()=>setShowAddHabit(true)} className="inline-flex items-center gap-2 px-6 py-3 bg-[#7b9eb8] text-white rounded-2xl shadow-lg shadow-[#7b9eb8]/20 text-sm font-bold active:scale-[0.98]"><Plus size={18}/>Add Habits</button></div>
           ) : devMode ? (
             <div className="flex gap-2 mt-2">
               <button onClick={()=>setShowAddHabit(true)} className={`flex-1 border border-dashed rounded-2xl p-4 hover:text-blue-400 hover:border-blue-500/30 hover:bg-blue-500/5 flex items-center justify-center gap-2 transition-all ${darkMode?'border-white/[0.08] text-gray-600':'border-gray-300 text-gray-400'}`}><Plus size={15}/><span className="text-xs font-medium">Add Habit</span></button>
@@ -1707,7 +1706,7 @@ export default function VersaApp() {
       {/* Add Habit */}
       <Modal show={showAddHabit} onClose={()=>setShowAddHabit(false)} dark={darkMode}>
         <ModalHeader title="Add Habit" onClose={()=>setShowAddHabit(false)} dark={darkMode}/>
-        <button onClick={loadDefaultHabits} disabled={loading} className="w-full mb-5 px-4 py-3 bg-gradient-to-r from-violet-600 to-purple-600 text-white rounded-xl shadow-lg shadow-violet-500/20 text-sm font-bold active:scale-[0.98] disabled:opacity-50">{loading?'Loading...':'⚡ Load Student Preset (12 habits)'}</button>
+        <button onClick={loadDefaultHabits} disabled={loading} className="w-full mb-5 px-4 py-3 bg-[#8b8fa8] text-white rounded-xl shadow-lg shadow-violet-500/20 text-sm font-bold active:scale-[0.98] disabled:opacity-50">{loading?'Loading...':'⚡ Load Student Preset (12 habits)'}</button>
         <div className="space-y-3">
           <input type="text" placeholder="Habit name" value={newHabit.name} onChange={e=>setNewHabit({...newHabit,name:e.target.value})} className={inputCls} maxLength={30}/>
           <div className="grid grid-cols-2 gap-3">
@@ -1719,7 +1718,7 @@ export default function VersaApp() {
           <label className="flex items-center gap-3 py-1 cursor-pointer"><input type="checkbox" checked={newHabit.isRepeatable} onChange={e=>setNewHabit({...newHabit,isRepeatable:e.target.checked,maxCompletions:e.target.checked?5:1})} className="w-4 h-4 rounded accent-blue-500"/><span className="text-sm text-gray-400">Repeatable</span></label>
           {newHabit.isRepeatable&&<input type="number" placeholder="Max per day" value={newHabit.maxCompletions} onChange={e=>setNewHabit({...newHabit,maxCompletions:e.target.value})} className={inputCls}/>}
           {error&&<p className="text-red-400 text-xs text-center">{error}</p>}
-          <div className="flex gap-3 pt-2"><button onClick={()=>setShowAddHabit(false)} className={`flex-1 px-4 py-3 border ${T.border} rounded-xl text-sm ${T.textMuted} hover:${T.bgCardHover}`}>Cancel</button><button onClick={addHabit} className="flex-1 px-4 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl text-sm font-bold shadow-lg shadow-blue-500/20 active:scale-[0.98]">Add</button></div>
+          <div className="flex gap-3 pt-2"><button onClick={()=>setShowAddHabit(false)} className={`flex-1 px-4 py-3 border ${T.border} rounded-xl text-sm ${T.textMuted} hover:${T.bgCardHover}`}>Cancel</button><button onClick={addHabit} className="flex-1 px-4 py-3 bg-[#7b9eb8] text-white rounded-xl text-sm font-bold shadow-lg shadow-[#7b9eb8]/20 active:scale-[0.98]">Add</button></div>
         </div>
       </Modal>
 
@@ -1736,7 +1735,7 @@ export default function VersaApp() {
           <input type="text" placeholder="Description (e.g. what counts?)" value={editHabitData.description||''} onChange={e=>setEditHabitData({...editHabitData,description:e.target.value})} className={inputCls} maxLength={60}/>
           <label className="flex items-center gap-3 py-1 cursor-pointer"><input type="checkbox" checked={editHabitData.isRepeatable||false} onChange={e=>setEditHabitData({...editHabitData,isRepeatable:e.target.checked,maxCompletions:e.target.checked?5:1})} className="w-4 h-4 rounded accent-blue-500"/><span className="text-sm text-gray-400">Repeatable</span></label>
           {editHabitData.isRepeatable&&<input type="number" placeholder="Max per day" value={editHabitData.maxCompletions||''} onChange={e=>setEditHabitData({...editHabitData,maxCompletions:e.target.value})} className={inputCls}/>}
-          <div className="flex gap-3 pt-2"><button onClick={()=>setShowEditHabit(null)} className={`flex-1 px-4 py-3 border ${T.border} rounded-xl text-sm ${T.textMuted} hover:${T.bgCardHover}`}>Cancel</button><button onClick={saveEditHabit} className="flex-1 px-4 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl text-sm font-bold shadow-lg shadow-blue-500/20 active:scale-[0.98]">Save</button></div>
+          <div className="flex gap-3 pt-2"><button onClick={()=>setShowEditHabit(null)} className={`flex-1 px-4 py-3 border ${T.border} rounded-xl text-sm ${T.textMuted} hover:${T.bgCardHover}`}>Cancel</button><button onClick={saveEditHabit} className="flex-1 px-4 py-3 bg-[#7b9eb8] text-white rounded-xl text-sm font-bold shadow-lg shadow-[#7b9eb8]/20 active:scale-[0.98]">Save</button></div>
         </div>
       </Modal>
 
@@ -1816,7 +1815,7 @@ export default function VersaApp() {
             ))}</div>
             <input type="text" placeholder={stakePresets.find(s=>s.type===newStake.type)?.ph||'Describe the stake...'} value={newStake.description} onChange={e=>setNewStake({...newStake,description:e.target.value})} className={inputCls+' mb-3'} maxLength={60}/>
             <div className="flex gap-2 mb-4">{['weekly','monthly'].map(d=><button key={d} onClick={()=>setNewStake({...newStake,duration:d})} className={'flex-1 py-2.5 text-xs font-bold rounded-xl transition-all uppercase tracking-wider '+(newStake.duration===d?(darkMode?'bg-white/[0.1] text-white':'bg-gray-200 text-gray-900'):(darkMode?'bg-white/[0.02] text-gray-600':'bg-gray-100 text-gray-400'))}>{d}</button>)}</div>
-            <button onClick={saveStake} disabled={!newStake.description.trim()||loading} className="w-full px-4 py-4 bg-gradient-to-r from-red-600 to-pink-600 text-white rounded-xl text-base font-bold shadow-lg shadow-red-500/20 active:scale-[0.98] disabled:opacity-30 transition-all">{loading?'Saving...':!newStake.description.trim()?'Type a stake above':'⚡ Set Stakes'}</button>
+            <button onClick={saveStake} disabled={!newStake.description.trim()||loading} className="w-full px-4 py-4 bg-[#b87b6b] text-white rounded-xl text-base font-bold shadow-lg shadow-red-500/20 active:scale-[0.98] disabled:opacity-30 transition-all">{loading?'Saving...':!newStake.description.trim()?'Type a stake above':'⚡ Set Stakes'}</button>
             {error&&<p className="text-red-400 text-xs text-center mt-2">{error}</p>}
           </div>
         )}
@@ -1832,7 +1831,7 @@ export default function VersaApp() {
           const medals=['\u{1F947}','\u{1F948}','\u{1F949}'];
           const ms = !isMe ? (mutualStreaks[item.member.id] || 0) : 0;
           return (
-            <div key={item.member.id} className={'rounded-xl p-4 border transition-all '+(isMe?'bg-gradient-to-r from-blue-600/20 to-indigo-600/20 border-blue-500/30 shadow-lg shadow-blue-500/10':i===0?'bg-amber-500/5 border-amber-500/20':(darkMode?'bg-white/[0.02] border-white/[0.04] hover:bg-white/[0.04]':'bg-gray-50 border-gray-200 hover:bg-gray-100'))}>
+            <div key={item.member.id} className={'rounded-xl p-4 border transition-all '+(isMe?'bg-gradient-to-r from-blue-600/20 to-indigo-600/20 border-blue-500/30 shadow-lg shadow-[#7b9eb8]/10':i===0?'bg-amber-500/5 border-amber-500/20':(darkMode?'bg-white/[0.02] border-white/[0.04] hover:bg-white/[0.04]':'bg-gray-50 border-gray-200 hover:bg-gray-100'))}>
               <div className="flex items-center justify-between"><div className="flex items-center gap-3"><div className="text-lg w-8 text-center">{i<3?medals[i]:<span className="text-sm text-gray-600">{i+1}</span>}</div><Avatar user={item.member} size={28} className={isMe?'bg-blue-500/20 text-blue-400':(darkMode?'bg-white/[0.06] text-gray-400':'bg-gray-100 text-gray-500')}/><div><div className={'text-sm font-semibold flex items-center gap-1.5 '+(isMe?'text-blue-300':(darkMode?'text-gray-300':'text-gray-700'))}>{item.member.username}{isMe&&<span className="text-[10px] text-gray-600">(you)</span>}{getRoomRole(item.member.id)&&<span className={`text-[9px] font-bold ${getRoomRole(item.member.id).color}`}>{getRoomRole(item.member.id).icon}</span>}{ms>0&&<span className={`text-[9px] font-bold ${ms>=7?'text-orange-400':'text-amber-400'}`}>🔗{ms}</span>}</div><div className="text-xs text-gray-600">{pts} pts{leaderboardTab==='week'?' \u00b7 '+item.weeklyCrystals+' crystals':''}</div></div></div>
                 <div className="flex items-center gap-3">{leaderboardTab==='today'&&<div className="flex items-center gap-1.5">{allCatNames.map(c=><div key={c} className={'w-2.5 h-2.5 rounded-full '+(item.crystals[c]?getCT(c).bg+' shadow-sm':(isMe?'bg-white/10':(darkMode?'bg-white/[0.06]':'bg-gray-200')))}/>)}</div>}{!isMe&&<button onClick={()=>{setShowLeaderboard(false);setShowCompetitor(item.member);}} className={`text-[10px] uppercase tracking-wider font-medium ${darkMode?'text-gray-600 hover:text-white':'text-gray-400 hover:text-gray-700'}`}>View</button>}</div>
               </div>
@@ -1890,7 +1889,7 @@ export default function VersaApp() {
           <p className="text-xs text-gray-500 mb-3 tracking-wider uppercase">Share this room code</p>
           <div className="mb-4 relative inline-block"><code className={`inline-block px-8 py-4 ${darkMode?'bg-gradient-to-b from-white/[0.08] to-white/[0.03] border-white/[0.1] text-white':'bg-gradient-to-b from-gray-100 to-gray-50 border-gray-200 text-gray-900'} border text-3xl font-mono rounded-xl tracking-[0.4em] shadow-2xl`}>{currentRoom?.code}</code><div className="absolute -inset-3 bg-gradient-to-r from-blue-500/10 via-purple-500/10 to-emerald-500/10 blur-xl rounded-xl -z-10"/></div>
           <div className="flex gap-2">
-            <button onClick={copyCode} className="flex-1 px-4 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl shadow-lg shadow-blue-500/20 flex items-center justify-center gap-2 text-sm font-bold active:scale-[0.98]">{copied?<Check size={14}/>:<Copy size={14}/>}{copied?'Copied!':'Copy Code'}</button>
+            <button onClick={copyCode} className="flex-1 px-4 py-2.5 bg-[#7b9eb8] text-white rounded-xl shadow-lg shadow-[#7b9eb8]/20 flex items-center justify-center gap-2 text-sm font-bold active:scale-[0.98]">{copied?<Check size={14}/>:<Copy size={14}/>}{copied?'Copied!':'Copy Code'}</button>
             {navigator.share && <button onClick={async()=>{try{await navigator.share({title:'Join me on Versa',text:`Join my room on Versa! Code: ${currentRoom?.code}`,url:`${window.location.origin}?join=${currentRoom?.code}`});}catch{}}} className={`flex-1 px-4 py-2.5 border ${darkMode?'border-white/[0.08] text-white hover:bg-white/[0.04]':'border-gray-200 text-gray-700 hover:bg-gray-50'} rounded-xl flex items-center justify-center gap-2 text-sm font-medium active:scale-[0.98]`}><UserPlus size={14}/>Share</button>}
           </div>
         </div>
@@ -1911,7 +1910,7 @@ export default function VersaApp() {
         {/* Join / Create */}
         <div className={`border-t ${T.border} pt-4 mt-4`}>
           <p className={`text-xs ${T.textMuted} mb-2`}>Join another room</p>
-          <div className="flex gap-2"><input type="text" placeholder="CODE" value={roomCode} onChange={e=>setRoomCode(e.target.value.toUpperCase())} className={`flex-1 px-3 py-2.5 ${T.bgInput} border ${T.borderInput} rounded-xl ${T.text} placeholder-gray-400 text-sm font-mono tracking-[0.2em] text-center`} maxLength={6}/><button onClick={()=>{joinRoom();setShowInviteModal(false);setShowSwitchRoom(false);}} className="px-5 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl text-sm font-bold shadow-lg shadow-blue-500/20 active:scale-[0.98]">Join</button></div>
+          <div className="flex gap-2"><input type="text" placeholder="CODE" value={roomCode} onChange={e=>setRoomCode(e.target.value.toUpperCase())} className={`flex-1 px-3 py-2.5 ${T.bgInput} border ${T.borderInput} rounded-xl ${T.text} placeholder-gray-400 text-sm font-mono tracking-[0.2em] text-center`} maxLength={6}/><button onClick={()=>{joinRoom();setShowInviteModal(false);setShowSwitchRoom(false);}} className="px-5 py-2.5 bg-[#7b9eb8] text-white rounded-xl text-sm font-bold shadow-lg shadow-[#7b9eb8]/20 active:scale-[0.98]">Join</button></div>
           {error&&<p className="text-red-400 text-xs mt-2 text-center">{error}</p>}
           <button onClick={()=>{createRoom();setShowInviteModal(false);setShowSwitchRoom(false);}} className={`w-full mt-3 px-4 py-2.5 border ${T.border} ${T.textMuted} rounded-xl hover:${T.bgCardHover} text-sm transition-all`}>+ Create New Room</button>
         </div>
@@ -1959,9 +1958,9 @@ export default function VersaApp() {
               <button onClick={async()=>{
                 const text = `🏆 Versa Weekly Recap\n${lastWeekData.dateRange}\n\n${lastWeekData.scores.map((s,i)=>((['🥇','🥈','🥉'][i]||`${i+1}.`)+' '+s.member.username+' — '+s.pts+'pts')).join('\n')}\n\nJoin us: ${window.location.origin}?join=${currentRoom?.code}`;
                 if(navigator.share){try{await navigator.share({title:'Versa Weekly Recap',text});}catch{}}else{navigator.clipboard.writeText(text);setCopied(true);setTimeout(()=>setCopied(false),2000);}
-              }} className="flex-1 px-4 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl text-sm font-bold flex items-center justify-center gap-2 active:scale-[0.98]"><Copy size={14}/>{copied?'Copied!':'Share Recap'}</button>
-              <button onClick={()=>{setShowWeeklyRecap(false);setStoryCardIdx(0);setShowStoryCards(true);}} className="flex-1 px-4 py-3 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-xl text-sm font-bold flex items-center justify-center gap-2 active:scale-[0.98]">📸 Story</button>
-              {lastWeekData.scores.length>1&&<button onClick={()=>{setShowWeeklyRecap(false);setShowPunishmentWheel(true);setWheelResult(null);}} className="flex-1 px-4 py-3 bg-gradient-to-r from-red-600 to-pink-600 text-white rounded-xl text-sm font-bold flex items-center justify-center gap-2 active:scale-[0.98]">🎰 Wheel</button>}
+              }} className="flex-1 px-4 py-3 bg-[#7b9eb8] text-white rounded-xl text-sm font-bold flex items-center justify-center gap-2 active:scale-[0.98]"><Copy size={14}/>{copied?'Copied!':'Share Recap'}</button>
+              <button onClick={()=>{setShowWeeklyRecap(false);setStoryCardIdx(0);setShowStoryCards(true);}} className="flex-1 px-4 py-3 bg-[#a07ba8] text-white rounded-xl text-sm font-bold flex items-center justify-center gap-2 active:scale-[0.98]">📸 Story</button>
+              {lastWeekData.scores.length>1&&<button onClick={()=>{setShowWeeklyRecap(false);setShowPunishmentWheel(true);setWheelResult(null);}} className="flex-1 px-4 py-3 bg-[#b87b6b] text-white rounded-xl text-sm font-bold flex items-center justify-center gap-2 active:scale-[0.98]">🎰 Wheel</button>}
             </div>
           </div>
         ) : (
@@ -2021,7 +2020,7 @@ export default function VersaApp() {
                   setWheelResult(result);
                   setWheelSpinning(false);
                 },4200);
-              }} disabled={wheelSpinning} className="w-full px-6 py-3 bg-gradient-to-r from-red-600 to-pink-600 text-white rounded-xl text-sm font-bold active:scale-[0.98] disabled:opacity-60">
+              }} disabled={wheelSpinning} className="w-full px-6 py-3 bg-[#b87b6b] text-white rounded-xl text-sm font-bold active:scale-[0.98] disabled:opacity-60">
                 {wheelSpinning?'Spinning...':'Spin the Wheel'}
               </button>
             ) : (
@@ -2030,7 +2029,7 @@ export default function VersaApp() {
                 <button onClick={async()=>{
                   const text = `🎰 Versa Punishment Wheel\n\n${lastWeekData.scores[lastWeekData.scores.length-1].member.username} lost and has to:\n${wheelResult}\n\nJoin us: ${window.location.origin}?join=${currentRoom?.code}`;
                   if(navigator.share){try{await navigator.share({title:'Versa Punishment',text});}catch{}}else{navigator.clipboard.writeText(text);setCopied(true);setTimeout(()=>setCopied(false),2000);}
-                }} className="flex-1 px-4 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl text-sm font-bold active:scale-[0.98]">{copied?'Copied!':'Share'}</button>
+                }} className="flex-1 px-4 py-3 bg-[#7b9eb8] text-white rounded-xl text-sm font-bold active:scale-[0.98]">{copied?'Copied!':'Share'}</button>
               </div>
             )}
           </div>
@@ -2143,7 +2142,7 @@ export default function VersaApp() {
                 const text=`🏆 Versa Weekly Recap\n${lastWeekData.dateRange}\n\nWinner: ${lastWeekData.scores[0].member.username} — ${lastWeekData.scores[0].pts}pts`;
                 if(navigator.share){try{await navigator.share({title:'Versa Recap',text});}catch{}}else{navigator.clipboard.writeText(text);}
               }
-            }} className="w-full mt-2 py-3 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-xl text-sm font-bold active:scale-[0.98]">📸 Save as Image</button>
+            }} className="w-full mt-2 py-3 bg-[#a07ba8] text-white rounded-xl text-sm font-bold active:scale-[0.98]">📸 Save as Image</button>
           </div>
         )}
       </Modal>
@@ -2157,10 +2156,10 @@ export default function VersaApp() {
           const today = new Date();
           // 5 tiers: 0%, 10% (40pts), 30% (120pts), 50% (200pts), 80% (320pts)
           const getColor = (pts) => {
-            if (pts >= 320) return 'rgba(16,185,129,1)';
-            if (pts >= 200) return 'rgba(16,185,129,0.7)';
-            if (pts >= 120) return 'rgba(16,185,129,0.45)';
-            if (pts >= 40) return 'rgba(16,185,129,0.25)';
+            if (pts >= 320) return 'rgba(123,158,184,1)';
+            if (pts >= 200) return 'rgba(123,158,184,0.7)';
+            if (pts >= 120) return 'rgba(123,158,184,0.45)';
+            if (pts >= 40) return 'rgba(123,158,184,0.25)';
             return null;
           };
           for (let i = 89; i >= 0; i--) {
@@ -2180,10 +2179,10 @@ export default function VersaApp() {
           <div className="flex items-center gap-1">
             <span className={`text-[10px] ${T.textDim} mr-1`}>0</span>
             <div className="w-[10px] h-[10px] rounded-[2px]" style={{backgroundColor:darkMode?'rgba(255,255,255,0.04)':'#f3f4f6'}}/>
-            <div className="w-[10px] h-[10px] rounded-[2px]" style={{backgroundColor:'rgba(16,185,129,0.25)'}}/>
-            <div className="w-[10px] h-[10px] rounded-[2px]" style={{backgroundColor:'rgba(16,185,129,0.45)'}}/>
-            <div className="w-[10px] h-[10px] rounded-[2px]" style={{backgroundColor:'rgba(16,185,129,0.7)'}}/>
-            <div className="w-[10px] h-[10px] rounded-[2px]" style={{backgroundColor:'rgba(16,185,129,1)'}}/>
+            <div className="w-[10px] h-[10px] rounded-[2px]" style={{backgroundColor:'rgba(123,158,184,0.25)'}}/>
+            <div className="w-[10px] h-[10px] rounded-[2px]" style={{backgroundColor:'rgba(123,158,184,0.45)'}}/>
+            <div className="w-[10px] h-[10px] rounded-[2px]" style={{backgroundColor:'rgba(123,158,184,0.7)'}}/>
+            <div className="w-[10px] h-[10px] rounded-[2px]" style={{backgroundColor:'rgba(123,158,184,1)'}}/>
             <span className={`text-[10px] ${T.textDim} ml-1`}>400</span>
           </div>
           <span className={`text-[10px] ${T.textDim}`}>Today</span>
@@ -2198,7 +2197,7 @@ export default function VersaApp() {
           {v: streakData.streak||0, l: 'Current Streak'}
         ].map((s,i)=>(
           <div key={i} className={`text-center p-3 rounded-xl ${darkMode?'bg-white/[0.03] border border-white/[0.04]':'bg-gray-50 border border-gray-200'}`}>
-            <div className="text-lg font-black text-emerald-400">{s.v}</div>
+            <div className="text-lg font-black text-[#7b9eb8]">{s.v}</div>
             <div className={`text-[9px] ${T.textDim} tracking-wider uppercase`}>{s.l}</div>
           </div>
         ))}</div>
@@ -2338,7 +2337,7 @@ export default function VersaApp() {
                 setCustomBoardHabits(prev=>[...prev,hid]);
                 setNewHabit({name:'',category:newHabit.category,points:10,isRepeatable:false,maxCompletions:1});
               }catch{setError('Failed to add');}
-            }} disabled={!newHabit.name.trim()} className="w-full py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl text-xs font-bold active:scale-[0.98] disabled:opacity-40">Add & Select</button>
+            }} disabled={!newHabit.name.trim()} className="w-full py-2.5 bg-[#7b9eb8] text-white rounded-xl text-xs font-bold active:scale-[0.98] disabled:opacity-40">Add & Select</button>
           </div>
         </details>
         <div className={`text-xs ${T.textDim} mb-3`}>{customBoardHabits.length} habit{customBoardHabits.length!==1?'s':''} selected</div>
