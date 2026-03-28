@@ -234,21 +234,21 @@ export default function VersaApp() {
   const loadDefaultHabits = async () => {
     const defaultHabits = [
       // STUDY — time-based
-      { name: 'Deep work', category: 'Study', points: 10, isRepeatable: true, maxCompletions: 20, unit: 'per 30 min' },
-      { name: 'Read', category: 'Study', points: 10, isRepeatable: true, maxCompletions: 6, unit: 'per 30 min' },
+      { name: 'Deep work', category: 'Study', points: 10, isRepeatable: true, maxCompletions: 99, unit: 'per 30 min' },
+      { name: 'Read', category: 'Study', points: 10, isRepeatable: true, maxCompletions: 99, unit: 'per 30 min' },
       // STUDY — completion-based
-      { name: 'Small task', category: 'Study', points: 10, isRepeatable: true, maxCompletions: 5 },
-      { name: 'Big task', category: 'Study', points: 30, isRepeatable: true, maxCompletions: 2 },
+      { name: 'Small task', category: 'Study', points: 10, isRepeatable: true, maxCompletions: 99 },
+      { name: 'Big task', category: 'Study', points: 30, isRepeatable: true, maxCompletions: 99 },
       // HEALTH — gym, sleep, nutrition
-      { name: 'Hit the gym', category: 'Health', points: 20, isRepeatable: true, maxCompletions: 4, unit: 'per 30 min' },
+      { name: 'Hit the gym', category: 'Health', points: 20, isRepeatable: true, maxCompletions: 99, unit: 'per 30 min' },
       { name: 'Slept 7+ hours', category: 'Health', points: 30, isRepeatable: false, maxCompletions: 1 },
       { name: 'Woke up before 7', category: 'Health', points: 30, isRepeatable: false, maxCompletions: 1 },
-      { name: 'Clean eating', category: 'Health', points: 10, isRepeatable: true, maxCompletions: 3, unit: 'per meal' },
+      { name: 'Clean eating', category: 'Health', points: 10, isRepeatable: true, maxCompletions: 99, unit: 'per meal' },
       // FOCUS — screen time, substances, mindset
       { name: 'Screen time under 2.5hrs', category: 'Focus', points: 30, isRepeatable: false, maxCompletions: 1 },
       { name: 'No vaping / substances', category: 'Focus', points: 30, isRepeatable: false, maxCompletions: 1 },
       { name: 'Work done before 9pm', category: 'Focus', points: 30, isRepeatable: false, maxCompletions: 1 },
-      { name: 'Journaled', category: 'Focus', points: 10, isRepeatable: true, maxCompletions: 3, unit: 'per 5 min' },
+      { name: 'Journaled', category: 'Focus', points: 10, isRepeatable: true, maxCompletions: 99, unit: 'per 5 min' },
     ];
     try {
       setLoading(true);
