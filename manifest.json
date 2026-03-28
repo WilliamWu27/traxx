@@ -1,11 +1,11 @@
 {
-  "name": "Versa",
-  "short_name": "Versa",
+  "name": "Vers",
+  "short_name": "Vers",
   "description": "Compete with friends on daily habits",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#07070c",
-  "theme_color": "#3b82f6",
+  "background_color": "#0f1b2d",
+  "theme_color": "#0f1b2d",
   "orientation": "portrait",
   "icons": [
     {
