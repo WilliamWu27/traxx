@@ -1282,8 +1282,126 @@ function VersaAppMain() {
   const inputCls = `w-full px-4 py-3 ${T.bgInput} border ${T.borderInput} rounded-xl focus:outline-none focus:border-[#4a90e8]/50 ${T.text} placeholder-[#4a6080] text-sm transition-all`;
   const btnPrimary = "w-full py-3.5 rounded-xl text-sm font-bold tracking-wide transition-all disabled:opacity-50 active:scale-[0.98]";
 
+  // ─── NOTIFICATIONS STATE ───
+  const [notifPermission, setNotifPermission] = useState(() => ('Notification' in window) ? Notification.permission : 'default');
+  const prevCompletionsRef = useRef([]);
+  const prevActivityRef = useRef([]);
+  const notifThrottleRef = useRef({});
+  const weekWinNotifiedRef = useRef(false);
+  const duoMilestoneRef = useRef({});
 
+  const throttledNotify = (title, body, tag) => {
+    const now = Date.now();
+    if (now - (notifThrottleRef.current[tag]||0) < 300000) return;
+    notifThrottleRef.current[tag] = now;
+    sendLocalNotification(title, body, tag);
+  };
 
+  // Setup service worker
+  useEffect(() => {
+    if (!currentUser) return;
+    registerServiceWorker().then(reg => {
+      if (reg && 'Notification' in window) setNotifPermission(Notification.permission);
+    });
+  }, [currentUser]);
+
+  // Competition: rival passed you, rival on a tear, rival grinding
+  useEffect(() => {
+    if (!currentUser || !currentRoom || notifPermission !== 'granted') return;
+    const prev = prevCompletionsRef.current;
+    if (prev.length === 0) { prevCompletionsRef.current = completions; return; }
+    const prevIds = new Set(prev.map(c => c.id + '_' + c.count));
+    const newOnes = completions.filter(c => c.userId !== currentUser.id && !prevIds.has(c.id + '_' + c.count));
+    if (newOnes.length > 0) {
+      const latest = newOnes[newOnes.length - 1];
+      const member = activeMembers.find(m => m.id === latest.userId);
+      const habit = habits.find(h => h.id === latest.habitId);
+      if (member) {
+        const rivalPts = completions.filter(c => c.userId === latest.userId).reduce((s, c) => s + ((c.habitPoints||0) * (c.count||1)) + (c.bonusPoints||0), 0);
+        const prevRivalPts = prev.filter(c => c.userId === latest.userId).reduce((s, c) => s + ((c.habitPoints||0) * (c.count||1)) + (c.bonusPoints||0), 0);
+        const rivalCount = completions.filter(c => c.userId === latest.userId).reduce((s, c) => s + (c.count||1), 0);
+        if (rivalPts > myPts && prevRivalPts <= myPts && myPts > 0) {
+          throttledNotify('🔥 '+member.username+' passed you!', rivalPts+' pts vs your '+myPts+'. Time to grind.', 'rival-pass-'+latest.userId);
+        } else if (rivalCount >= 5 && rivalCount % 5 === 0) {
+          throttledNotify(member.username+' is on a tear 💪', rivalCount+' habits logged today.', 'rival-tear-'+latest.userId);
+        } else if (document.hidden && habit) {
+          throttledNotify(member.username+' is grinding', habit.name+' (+'+(habit.points||10)+')', 'rival-log');
+        }
+      }
+    }
+    prevCompletionsRef.current = completions;
+  }, [completions, notifPermission]);
+
+  // Reactions on your activity
+  useEffect(() => {
+    if (!currentUser || notifPermission !== 'granted' || !activityFeed.length) return;
+    const prev = prevActivityRef.current;
+    if (!prev.length) { prevActivityRef.current = activityFeed; return; }
+    activityFeed.forEach(a => {
+      if (a.userId !== currentUser.id) return;
+      const prevA = prev.find(p => p.id === a.id);
+      Object.entries(a.reactions||{}).forEach(([uid, emoji]) => {
+        if (!(prevA?.reactions||{})[uid] && uid !== currentUser.id) {
+          const reactor = activeMembers.find(m => m.id === uid);
+          if (reactor) throttledNotify(reactor.username+' reacted '+emoji, 'to your '+(a.text||'activity'), 'reaction-'+a.id);
+        }
+      });
+    });
+    prevActivityRef.current = activityFeed;
+  }, [activityFeed, notifPermission]);
+
+  // Protection: streak warnings, daily nudge, last place
+  useEffect(() => {
+    if (!currentUser || notifPermission !== 'granted') return;
+    const check = () => {
+      const hour = new Date().getHours();
+      const today = getToday();
+      if (hour === 18 && myPts === 0) {
+        const k = 'vers-nudge-'+today;
+        if (!sessionStorage.getItem(k)) { sendLocalNotification('📋 Don\'t forget to log today', 'Your rivals might already be ahead.', 'daily-nudge'); sessionStorage.setItem(k,'1'); }
+      }
+      if (hour === 20 && myPts < 80 && streakData.streak > 0) {
+        const k = 'vers-s8-'+today;
+        if (!sessionStorage.getItem(k)) { sendLocalNotification('⚠️ Your '+streakData.streak+'-day streak is at risk', 'Log 80pts before midnight.', 'streak-8pm'); sessionStorage.setItem(k,'1'); }
+      }
+      if (hour === 22 && myPts < 80 && streakData.streak > 0) {
+        const k = 'vers-s10-'+today;
+        if (!sessionStorage.getItem(k)) { sendLocalNotification('🚨 2 hours left!', (streakFreeze>0?'Freeze will save you.':'No freeze — this is it.'), 'streak-10pm'); sessionStorage.setItem(k,'1'); }
+      }
+      if (new Date().getDay()===0 && hour===18 && activeMembers.length>1) {
+        const k = 'vers-lp-'+today;
+        if (!sessionStorage.getItem(k)) {
+          const lb = activeMembers.map(m=>({id:m.id,pts:allCompletions.filter(c=>c.userId===m.id).reduce((s,c)=>s+((c.habitPoints||0)*(c.count||1))+(c.bonusPoints||0),0)})).sort((a,b)=>b.pts-a.pts);
+          if (lb.length>0 && lb[lb.length-1].id===currentUser.id) { sendLocalNotification('😬 You\'re in last place','The week resets tonight.',  'last-place'); sessionStorage.setItem(k,'1'); }
+        }
+      }
+    };
+    check();
+    const iv = setInterval(check, 300000);
+    return () => clearInterval(iv);
+  }, [notifPermission, myPts, streakData.streak]);
+
+  // Celebration: won the week
+  useEffect(() => {
+    if (!currentUser || !lastWeekData || weekWinNotifiedRef.current || notifPermission !== 'granted') return;
+    if (lastWeekData.scores.length > 0 && lastWeekData.scores[0].member.id === currentUser.id) {
+      weekWinNotifiedRef.current = true;
+      throttledNotify('🏆 You won the week!', lastWeekData.scores[0].pts+' pts — you dominated.', 'week-win');
+    }
+  }, [lastWeekData, notifPermission]);
+
+  // Celebration: duo streak milestones
+  useEffect(() => {
+    if (!currentUser || notifPermission !== 'granted') return;
+    Object.entries(mutualStreaks).forEach(([uid, days]) => {
+      const last = duoMilestoneRef.current[uid]||0;
+      const crossed = [3,7,14,30].find(m => days >= m && last < m);
+      if (crossed) {
+        const rival = activeMembers.find(m => m.id === uid);
+        if (rival) { duoMilestoneRef.current[uid] = crossed; throttledNotify('🔗 '+crossed+'-day duo streak!', 'You and '+rival.username+' — '+crossed+' days.', 'duo-'+uid); }
+      }
+    });
+  }, [mutualStreaks, notifPermission]);
 
   // ─── LOADING ───
   if (authLoading) return (
@@ -1970,6 +2088,7 @@ function VersaAppMain() {
         <div className="grid grid-cols-2 gap-3 mb-4"><div className={`text-center p-3 ${T.bgCard} rounded-xl border ${T.border}`}><div className="text-lg font-black text-purple-400">{streakData.activeDays||0}</div><div className="text-[9px] text-gray-600 tracking-wider uppercase mt-0.5">Active Days</div></div><div className={`text-center p-3 ${T.bgCard} rounded-xl border ${T.border}`}><div className="text-lg font-black text-cyan-400">{streakData.totalCompletions||0}</div><div className="text-[9px] text-gray-600 tracking-wider uppercase mt-0.5">Completions</div></div></div>
         <div className={`p-3 ${T.bgCard} rounded-xl border ${T.border}`}><div className="text-[9px] text-gray-600 tracking-wider uppercase mb-2">Crystals</div><div className="flex justify-center gap-4">{allCatNames.map(c=><div key={c} className="text-center"><div className={'w-6 h-6 rounded-full mx-auto mb-1 transition-all '+(myCr[c]?getCT(c).bg+' shadow-md '+getCT(c).glow:'bg-white/[0.06]')}/><span className="text-[9px] text-gray-600">{c}</span></div>)}</div></div>
         <div className={`mt-4 p-3 ${T.bgCard} rounded-xl border ${T.border} flex items-center justify-between`}><div><div className={`text-sm font-medium ${T.text}`}>Email Reminders</div><div className="text-[10px] text-gray-500">Daily nudges at 12pm & 6pm</div></div><button onClick={async()=>{const newVal=currentUser.emailReminders===false?true:false;try{await supabase.from('users').update({email_reminders:!newVal}).eq('id',currentUser.id);setCurrentUser(p=>({...p,emailReminders:!newVal}));}catch{}}} className={'relative w-11 h-6 rounded-full transition-all '+(currentUser.emailReminders!==false?'bg-blue-500':(darkMode?'bg-white/[0.08]':'bg-gray-200'))}><div className={'absolute top-1 w-4 h-4 rounded-full bg-white transition-all shadow-sm '+(currentUser.emailReminders!==false?'left-6':'left-1')}/></button></div>
+        <div className={`mt-2 p-3 ${T.bgCard} rounded-xl border ${T.border} flex items-center justify-between`}><div><div className={`text-sm font-medium ${T.text}`}>Push Notifications</div><div className="text-[10px] text-gray-500">{notifPermission==='granted'?'Rivals, streaks, reminders':notifPermission==='denied'?'Blocked in browser settings':'Get notified when rivals log habits'}</div></div>{notifPermission==='granted'?<div className="text-[#4aba7a] text-sm font-bold">✓ On</div>:notifPermission==='denied'?<div className="text-red-400 text-xs">Check browser settings</div>:<button onClick={async()=>{try{const p=await Notification.requestPermission();setNotifPermission(p);if(p==='granted'){const r=await registerServiceWorker();if(r)await subscribeToPush(r);}}catch{}}} className="px-3 py-1.5 bg-[#5b7cf5] text-white text-xs font-bold rounded-lg active:scale-[0.97]">Enable</button>}</div>
 
         {/* Quick actions */}
         <div className="mt-5 space-y-2">
