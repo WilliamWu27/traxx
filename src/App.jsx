@@ -923,35 +923,42 @@ export default function VersaApp() {
   // ─── HABITS (CREATE, EDIT, DELETE) ───
   const addHabit = async () => {
     if (!newHabit.name.trim()) return;
+    const hid = currentRoom.id+'_'+Date.now()+'_'+Math.random().toString(36).slice(2,8);
+    // Optimistic update
+    setHabits(prev => [...prev, { id: hid, name: newHabit.name.trim(), category: newHabit.category, points: parseInt(newHabit.points)||10, isRepeatable: newHabit.isRepeatable, unit: newHabit.unit?.trim()||null, description: newHabit.description?.trim()||null, roomId: currentRoom.id, createdBy: currentUser.id }]);
+    setNewHabit({ name:'', category:'Study', points:10, isRepeatable:false, maxCompletions:1, unit:'', description:'' }); setShowAddHabit(false);
     try {
-      const hid = currentRoom.id+'_'+Date.now()+'_'+Math.random().toString(36).slice(2,8);
       await supabase.from('habits').insert({
         id: hid, name: newHabit.name.trim(), category: newHabit.category, points: parseInt(newHabit.points)||10,
         is_repeatable: newHabit.isRepeatable,
         unit: newHabit.unit?.trim() || null, description: newHabit.description?.trim() || null,
         room_id: currentRoom.id, created_by: currentUser.id
       });
-      // Auto-add to personal board if one exists
       if (myBoardIds) {
         const boardDocId = currentUser.id+'_'+currentRoom.id;
         await supabase.from('my_board').upsert({ id: boardDocId, habit_ids: [...myBoardIds, hid], user_id: currentUser.id, room_id: currentRoom.id });
       }
-      setNewHabit({ name:'', category:'Study', points:10, isRepeatable:false, maxCompletions:1, unit:'', description:'' }); setShowAddHabit(false);
     } catch { setError('Failed to add'); }
   };
   const saveEditHabit = async () => {
     if (!showEditHabit || !editHabitData.name?.trim()) return;
+    const hid = showEditHabit;
+    // Optimistic update
+    setHabits(prev => prev.map(h => h.id === hid ? { ...h, name: editHabitData.name.trim(), category: editHabitData.category, points: parseInt(editHabitData.points)||10, isRepeatable: editHabitData.isRepeatable, unit: editHabitData.unit?.trim()||null, description: editHabitData.description?.trim()||null } : h));
+    setShowEditHabit(null);
     try {
       await supabase.from('habits').update({
         name: editHabitData.name.trim(), category: editHabitData.category,
         points: parseInt(editHabitData.points)||10, is_repeatable: editHabitData.isRepeatable,
         unit: editHabitData.unit?.trim() || null, description: editHabitData.description?.trim() || null
-      }).eq('id', showEditHabit);
-      setShowEditHabit(null);
+      }).eq('id', hid);
     } catch { setError('Failed to save'); }
   };
   const deleteHabit = async (hid) => {
     if (!confirm('Delete this habit?')) return;
+    // Optimistic update
+    setHabits(prev => prev.filter(h => h.id !== hid));
+    setCompletions(prev => prev.filter(c => c.habitId !== hid));
     try {
       await supabase.from('habits').delete().eq('id', hid);
       await supabase.from('completions').delete().eq('habit_id', hid).eq('room_id', currentRoom.id);
