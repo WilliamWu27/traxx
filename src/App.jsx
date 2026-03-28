@@ -40,7 +40,7 @@ async function sendLocalNotification(title, body, tag) {
   if (reg) {
     reg.showNotification(title, {
       body, icon: '/icon-192.png', badge: '/icon-192.png',
-      tag: tag || 'vers-' + Date.now(), renotify: true
+      tag: tag || 'versa-' + Date.now(), renotify: true
     });
   }
 }
@@ -1357,19 +1357,19 @@ function VersaAppMain() {
       const hour = new Date().getHours();
       const today = getToday();
       if (hour === 18 && myPts === 0) {
-        const k = 'vers-nudge-'+today;
+        const k = 'versa-nudge-'+today;
         if (!sessionStorage.getItem(k)) { sendLocalNotification('📋 Don\'t forget to log today', 'Your rivals might already be ahead.', 'daily-nudge'); sessionStorage.setItem(k,'1'); }
       }
       if (hour === 20 && myPts < 80 && streakData.streak > 0) {
-        const k = 'vers-s8-'+today;
+        const k = 'versa-s8-'+today;
         if (!sessionStorage.getItem(k)) { sendLocalNotification('⚠️ Your '+streakData.streak+'-day streak is at risk', 'Log 80pts before midnight.', 'streak-8pm'); sessionStorage.setItem(k,'1'); }
       }
       if (hour === 22 && myPts < 80 && streakData.streak > 0) {
-        const k = 'vers-s10-'+today;
+        const k = 'versa-s10-'+today;
         if (!sessionStorage.getItem(k)) { sendLocalNotification('🚨 2 hours left!', (streakFreeze>0?'Freeze will save you.':'No freeze — this is it.'), 'streak-10pm'); sessionStorage.setItem(k,'1'); }
       }
       if (new Date().getDay()===0 && hour===18 && activeMembers.length>1) {
-        const k = 'vers-lp-'+today;
+        const k = 'versa-lp-'+today;
         if (!sessionStorage.getItem(k)) {
           const lb = activeMembers.map(m=>({id:m.id,pts:allCompletions.filter(c=>c.userId===m.id).reduce((s,c)=>s+((c.habitPoints||0)*(c.count||1))+(c.bonusPoints||0),0)})).sort((a,b)=>b.pts-a.pts);
           if (lb.length>0 && lb[lb.length-1].id===currentUser.id) { sendLocalNotification('😬 You\'re in last place','The week resets tonight.',  'last-place'); sessionStorage.setItem(k,'1'); }
@@ -1407,7 +1407,7 @@ function VersaAppMain() {
   if (authLoading) return (
     <div className="min-h-screen bg-[#0f1b2d] flex items-center justify-center relative overflow-hidden">
       <div className="text-center">
-        <h1 className="text-4xl font-black tracking-[0.4em] text-white mb-2">VERS</h1>
+        <h1 className="text-4xl font-black tracking-[0.4em] text-white mb-2">VERSA</h1>
         <p className="text-[#4a6080] text-[10px] tracking-[0.25em] uppercase mb-6">Keep yourself accountable.</p>
         <div className="flex justify-center gap-2">{['bg-[#5b7cf5]','bg-[#e8864a]','bg-[#4aba7a]'].map((c,i)=><div key={i} className={`w-1.5 h-1.5 rounded-full ${c} animate-pulse`} style={{animationDelay:i*200+'ms'}} />)}</div>
       </div>
