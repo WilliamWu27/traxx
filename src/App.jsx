@@ -1297,12 +1297,25 @@ function VersaAppMain() {
     sendLocalNotification(title, body, tag);
   };
 
-  // Setup service worker
+  // Setup service worker + save subscription
   useEffect(() => {
     if (!currentUser) return;
-    registerServiceWorker().then(reg => {
-      if (reg && 'Notification' in window) setNotifPermission(Notification.permission);
-    });
+    const setup = async () => {
+      const reg = await registerServiceWorker();
+      if (!reg || !('Notification' in window)) return;
+      setNotifPermission(Notification.permission);
+      if (Notification.permission === 'granted') {
+        const sub = await subscribeToPush(reg);
+        if (sub) {
+          await supabase.from('push_subscriptions').upsert({
+            id: currentUser.id + '_push',
+            user_id: currentUser.id,
+            subscription: sub.toJSON()
+          });
+        }
+      }
+    };
+    setup();
   }, [currentUser]);
 
   // Competition: rival passed you, rival on a tear, rival grinding
@@ -2088,7 +2101,7 @@ function VersaAppMain() {
         <div className="grid grid-cols-2 gap-3 mb-4"><div className={`text-center p-3 ${T.bgCard} rounded-xl border ${T.border}`}><div className="text-lg font-black text-purple-400">{streakData.activeDays||0}</div><div className="text-[9px] text-gray-600 tracking-wider uppercase mt-0.5">Active Days</div></div><div className={`text-center p-3 ${T.bgCard} rounded-xl border ${T.border}`}><div className="text-lg font-black text-cyan-400">{streakData.totalCompletions||0}</div><div className="text-[9px] text-gray-600 tracking-wider uppercase mt-0.5">Completions</div></div></div>
         <div className={`p-3 ${T.bgCard} rounded-xl border ${T.border}`}><div className="text-[9px] text-gray-600 tracking-wider uppercase mb-2">Crystals</div><div className="flex justify-center gap-4">{allCatNames.map(c=><div key={c} className="text-center"><div className={'w-6 h-6 rounded-full mx-auto mb-1 transition-all '+(myCr[c]?getCT(c).bg+' shadow-md '+getCT(c).glow:'bg-white/[0.06]')}/><span className="text-[9px] text-gray-600">{c}</span></div>)}</div></div>
         <div className={`mt-4 p-3 ${T.bgCard} rounded-xl border ${T.border} flex items-center justify-between`}><div><div className={`text-sm font-medium ${T.text}`}>Email Reminders</div><div className="text-[10px] text-gray-500">Daily nudges at 12pm & 6pm</div></div><button onClick={async()=>{const current=currentUser.emailReminders!==false;const next=!current;try{await supabase.from('users').update({email_reminders:next}).eq('id',currentUser.id);setCurrentUser(p=>({...p,emailReminders:next}));}catch(e){console.error(e);}}} className={'relative w-11 h-6 rounded-full transition-all '+(currentUser.emailReminders!==false?'bg-[#5b7cf5]':(darkMode?'bg-white/[0.08]':'bg-gray-200'))}><div className={'absolute top-1 w-4 h-4 rounded-full bg-white transition-all shadow-sm '+(currentUser.emailReminders!==false?'left-6':'left-1')}/></button></div>
-        <div className={`mt-2 p-3 ${T.bgCard} rounded-xl border ${T.border} flex items-center justify-between`}><div><div className={`text-sm font-medium ${T.text}`}>Push Notifications</div><div className="text-[10px] text-gray-500">{notifPermission==='granted'?'Rivals, streaks, reminders':notifPermission==='denied'?'Blocked in browser settings':'Get notified when rivals log habits'}</div></div>{notifPermission==='granted'?<div className="text-[#4aba7a] text-sm font-bold">✓ On</div>:notifPermission==='denied'?<div className="text-red-400 text-xs">Check browser settings</div>:<button onClick={async()=>{try{const p=await Notification.requestPermission();setNotifPermission(p);if(p==='granted'){const r=await registerServiceWorker();if(r)await subscribeToPush(r);}}catch{}}} className="px-3 py-1.5 bg-[#5b7cf5] text-white text-xs font-bold rounded-lg active:scale-[0.97]">Enable</button>}</div>
+        <div className={`mt-2 p-3 ${T.bgCard} rounded-xl border ${T.border} flex items-center justify-between`}><div><div className={`text-sm font-medium ${T.text}`}>Push Notifications</div><div className="text-[10px] text-gray-500">{notifPermission==='granted'?'Rivals, streaks, reminders':notifPermission==='denied'?'Blocked in browser settings':'Get notified when rivals log habits'}</div></div>{notifPermission==='granted'?<div className="text-[#4aba7a] text-sm font-bold">✓ On</div>:notifPermission==='denied'?<div className="text-red-400 text-xs">Check browser settings</div>:<button onClick={async()=>{try{const p=await Notification.requestPermission();setNotifPermission(p);if(p==='granted'){const r=await registerServiceWorker();if(r){const sub=await subscribeToPush(r);if(sub&&currentUser){await supabase.from('push_subscriptions').upsert({id:currentUser.id+'_'+Date.now(),user_id:currentUser.id,subscription:sub.toJSON()});}}}}catch(e){console.error('Push setup error:',e);}}} className="px-3 py-1.5 bg-[#5b7cf5] text-white text-xs font-bold rounded-lg active:scale-[0.97]">Enable</button>}</div>
 
         {/* Quick actions */}
         <div className="mt-5 space-y-2">
