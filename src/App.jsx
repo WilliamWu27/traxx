@@ -563,7 +563,7 @@ export default function VersaApp() {
       const ago = new Date(); ago.setDate(ago.getDate()-90);
       const snap = await getDocs(query(collection(db,'completions'),where('userId','==',currentUser.id),where('date','>=',formatDateStr(ago))));
       const map = {};
-      snap.docs.forEach(d => { const dt = d.data(); const pts = (dt.habitPoints||0)*(dt.count||1); map[dt.date] = (map[dt.date]||0) + pts; });
+      snap.docs.forEach(d => { const dt = d.data(); const pts = ((dt.habitPoints||dt.points||0)*(dt.count||1))+(dt.bonusPoints||0); if(pts>0) map[dt.date] = (map[dt.date]||0) + pts; });
       setHeatMapData(map);
       setShowHeatMap(true);
     } catch { setShowHeatMap(true); }
@@ -2133,23 +2133,26 @@ export default function VersaApp() {
       {/* Heat Map Calendar */}
       <Modal show={showHeatMap} onClose={()=>setShowHeatMap(false)} wide dark={darkMode}>
         <ModalHeader title="90-Day Heat Map" onClose={()=>setShowHeatMap(false)} icon={<Calendar size={18} className="text-emerald-400"/>} dark={darkMode}/>
-        <div className="mb-3"><p className={`text-xs ${T.textDim}`}>Points per day · darker = more active</p></div>
+        <div className="mb-3"><p className={`text-xs ${T.textDim}`}>Based on daily points out of 400</p></div>
         <div className="flex flex-wrap gap-[3px]">{(() => {
           const cells = [];
           const today = new Date();
-          const maxPts = Math.max(1, ...Object.values(heatMapData));
+          // 5 tiers: 0%, 10% (40pts), 30% (120pts), 50% (200pts), 80% (320pts)
+          const getColor = (pts) => {
+            if (pts >= 320) return 'rgba(16,185,129,1)';
+            if (pts >= 200) return 'rgba(16,185,129,0.7)';
+            if (pts >= 120) return 'rgba(16,185,129,0.45)';
+            if (pts >= 40) return 'rgba(16,185,129,0.25)';
+            return null;
+          };
           for (let i = 89; i >= 0; i--) {
             const d = new Date(today); d.setDate(d.getDate()-i);
             const ds = formatDateStr(d);
             const pts = heatMapData[ds] || 0;
-            const intensity = pts / maxPts;
+            const color = getColor(pts);
             const isToday = ds === getToday();
-            const bg = pts === 0
-              ? (darkMode ? 'bg-white/[0.04]' : 'bg-gray-100')
-              : '';
-            const style = pts > 0 ? {backgroundColor:`rgba(16,185,129,${0.2+intensity*0.8})`} : {};
             cells.push(
-              <div key={ds} className={`w-[10px] h-[10px] rounded-[2px] ${bg} ${isToday?'ring-1 ring-white/30':''}`} style={style} title={`${formatDate(ds)}: ${pts} pts`}/>
+              <div key={ds} className={`w-[10px] h-[10px] rounded-[2px] ${!color?(darkMode?'bg-white/[0.04]':'bg-gray-100'):''} ${isToday?'ring-1 ring-white/30':''}`} style={color?{backgroundColor:color}:{}} title={`${formatDate(ds)}: ${pts} pts`}/>
             );
           }
           return cells;
@@ -2157,11 +2160,18 @@ export default function VersaApp() {
         <div className="flex items-center justify-between mt-3">
           <span className={`text-[10px] ${T.textDim}`}>90 days ago</span>
           <div className="flex items-center gap-1">
-            <span className={`text-[10px] ${T.textDim} mr-1`}>Less</span>
-            {[0,0.25,0.5,0.75,1].map((v,i)=><div key={i} className="w-[10px] h-[10px] rounded-[2px]" style={{backgroundColor:v===0?(darkMode?'rgba(255,255,255,0.04)':'#f3f4f6'):`rgba(16,185,129,${0.2+v*0.8})`}}/>)}
-            <span className={`text-[10px] ${T.textDim} ml-1`}>More</span>
+            <span className={`text-[10px] ${T.textDim} mr-1`}>0</span>
+            <div className="w-[10px] h-[10px] rounded-[2px]" style={{backgroundColor:darkMode?'rgba(255,255,255,0.04)':'#f3f4f6'}}/>
+            <div className="w-[10px] h-[10px] rounded-[2px]" style={{backgroundColor:'rgba(16,185,129,0.25)'}}/>
+            <div className="w-[10px] h-[10px] rounded-[2px]" style={{backgroundColor:'rgba(16,185,129,0.45)'}}/>
+            <div className="w-[10px] h-[10px] rounded-[2px]" style={{backgroundColor:'rgba(16,185,129,0.7)'}}/>
+            <div className="w-[10px] h-[10px] rounded-[2px]" style={{backgroundColor:'rgba(16,185,129,1)'}}/>
+            <span className={`text-[10px] ${T.textDim} ml-1`}>400</span>
           </div>
           <span className={`text-[10px] ${T.textDim}`}>Today</span>
+        </div>
+        <div className={`flex justify-center gap-4 mt-2 text-[9px] ${T.textDim}`}>
+          <span>10%=40</span><span>30%=120</span><span>50%=200</span><span>80%=320</span>
         </div>
         {/* Stats summary */}
         <div className="grid grid-cols-3 gap-3 mt-4">{[
