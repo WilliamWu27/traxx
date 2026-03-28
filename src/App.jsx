@@ -1213,13 +1213,37 @@ function VersaAppMain() {
   const getDailyProgress = () => { if(!currentUser||!currentRoom)return 0; const pts=getTodayPts(currentUser.id); return Math.min(pts/DAILY_TARGET,1); };
   const getLeaderboard = () => activeMembers.map(m=>({member:m,todayPts:getTodayPts(m.id),weeklyPts:getWeeklyPts(m.id),crystals:getTodayCrystals(m.id),weeklyCrystals:getWeeklyCrystals(m.id)})).sort((a,b)=>leaderboardTab==='today'?b.todayPts-a.todayPts:b.weeklyPts-a.weeklyPts);
 
+  const DEFAULT_CATEGORIES = [
+    { name:'Study', colorIdx:0, icon:'📚' },
+    { name:'Health', colorIdx:1, icon:'💪' },
+    { name:'Focus', colorIdx:2, icon:'🎯' },
+  ];
+  const activeCategories = roomCategories.length > 0 ? roomCategories : DEFAULT_CATEGORIES;
+  const allCatNames = activeCategories.map(c=>c.name);
+  const COLOR_PALETTE = [
+    { name:'Dusty Blue', neon:'#5b7cf5', bg:'bg-[#5b7cf5]', bgS:'bg-[#5b7cf5]/10', bgM:'bg-[#5b7cf5]/20', bdr:'border-[#5b7cf5]/30', txt:'text-[#5b7cf5]', txtB:'text-[#7b9cf7]', pill:'bg-[#5b7cf5]/20 text-[#5b7cf5]', glow:'shadow-[#5b7cf5]/20' },
+    { name:'Warm Tan', neon:'#e8864a', bg:'bg-[#e8864a]', bgS:'bg-[#e8864a]/10', bgM:'bg-[#e8864a]/20', bdr:'border-[#e8864a]/30', txt:'text-[#e8864a]', txtB:'text-[#eba06a]', pill:'bg-[#e8864a]/20 text-[#e8864a]', glow:'shadow-[#e8864a]/20' },
+    { name:'Sage', neon:'#4aba7a', bg:'bg-[#4aba7a]', bgS:'bg-[#4aba7a]/10', bgM:'bg-[#4aba7a]/20', bdr:'border-[#4aba7a]/30', txt:'text-[#4aba7a]', txtB:'text-[#6ace92]', pill:'bg-[#4aba7a]/20 text-[#4aba7a]', glow:'shadow-[#4aba7a]/20' },
+    { name:'Dusty Rose', neon:'#e05d8c', bg:'bg-[#e05d8c]', bgS:'bg-[#e05d8c]/10', bgM:'bg-[#e05d8c]/20', bdr:'border-[#e05d8c]/30', txt:'text-[#e05d8c]', txtB:'text-[#e87da6]', pill:'bg-[#e05d8c]/20 text-[#e05d8c]', glow:'shadow-[#e05d8c]/20' },
+    { name:'Slate', neon:'#7c82a8', bg:'bg-[#7c82a8]', bgS:'bg-[#7c82a8]/10', bgM:'bg-[#7c82a8]/20', bdr:'border-[#7c82a8]/30', txt:'text-[#7c82a8]', txtB:'text-[#9498be]', pill:'bg-[#7c82a8]/20 text-[#7c82a8]', glow:'shadow-[#7c82a8]/20' },
+    { name:'Clay', neon:'#d06b4a', bg:'bg-[#d06b4a]', bgS:'bg-[#d06b4a]/10', bgM:'bg-[#d06b4a]/20', bdr:'border-[#d06b4a]/30', txt:'text-[#d06b4a]', txtB:'text-[#e08b6a]', pill:'bg-[#d06b4a]/20 text-[#d06b4a]', glow:'shadow-[#d06b4a]/20' },
+    { name:'Mauve', neon:'#9b6bc8', bg:'bg-[#9b6bc8]', bgS:'bg-[#9b6bc8]/10', bgM:'bg-[#9b6bc8]/20', bdr:'border-[#9b6bc8]/30', txt:'text-[#9b6bc8]', txtB:'text-[#b58be0]', pill:'bg-[#9b6bc8]/20 text-[#9b6bc8]', glow:'shadow-[#9b6bc8]/20' },
+    { name:'Ochre', neon:'#d4a04a', bg:'bg-[#d4a04a]', bgS:'bg-[#d4a04a]/10', bgM:'bg-[#d4a04a]/20', bdr:'border-[#d4a04a]/30', txt:'text-[#d4a04a]', txtB:'text-[#e0b86a]', pill:'bg-[#d4a04a]/20 text-[#d4a04a]', glow:'shadow-[#d4a04a]/20' },
+  ];
+  const ICON_OPTIONS = ['🧠','💪','✨','⭐','📚','🎨','💼','🏃','🧘','💰','🎯','❤️','🌱','🔬','🎮','🍎'];
+  const getCT = (catName) => {
+    const cat = activeCategories.find(c=>c.name===catName);
+    const idx = cat?.colorIdx ?? 0;
+    return COLOR_PALETTE[idx % COLOR_PALETTE.length];
+  };
+  const CT = {};
+  activeCategories.forEach(c => { CT[c.name] = getCT(c.name); });
+
   const myCr = currentUser&&currentRoom ? getTodayCrystals(currentUser.id) : {};
   const myPts = currentUser&&currentRoom ? getTodayPts(currentUser.id) : 0;
   const isPerfect = allCatNames.length > 0 && allCatNames.every(c => myCr[c]);
   const dailyProg = currentUser&&currentRoom ? getDailyProgress() : 0;
   const displayHabits = (myBoardIds && !editMode) ? habits.filter(h => myBoardIds.includes(h.id)) : habits;
-
-  const allCatNames = activeCategories.map(c=>c.name);
 
   const addCategory = async () => {
     if (!newCatName.trim() || activeCategories.find(c=>c.name.toLowerCase()===newCatName.trim().toLowerCase())) return;
