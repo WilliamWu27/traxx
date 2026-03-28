@@ -1,12 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Clock, Plus, X, LogOut, Copy, Check, UserPlus, HelpCircle, Trophy, User, Flame, Zap, Star, TrendingUp, ArrowLeftRight, Edit3, Calendar, ChevronLeft, ChevronRight, Crown, Target, ArrowUp, ArrowDown, Minus as MinusIcon, GripVertical, BarChart3, Sun, Moon, ChevronDown, Trash2 } from 'lucide-react';
-import { auth, db } from './firebase';
-import {
-  createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, sendPasswordResetEmail, signInWithPopup, GoogleAuthProvider
-} from 'firebase/auth';
-import {
-  collection, doc, setDoc, getDoc, onSnapshot, deleteDoc, updateDoc, query, where, getDocs, arrayUnion, arrayRemove, orderBy, limit
-} from 'firebase/firestore';
+import { supabase } from './supabase';
 
 // ─── CONFETTI ───
 function ConfettiCanvas({ trigger }) {
@@ -222,7 +216,7 @@ export default function VersaApp() {
     const allOrdered = [];
     allCatNames.forEach(c=>{if(c===cat)allOrdered.push(...newIds);else{const catIds=otherIds.filter(id=>{const h=habits.find(x=>x.id===id);return h?.category===c;});const unordered=habits.filter(h=>h.category===c&&!catIds.includes(h.id)).map(h=>h.id);allOrdered.push(...catIds,...unordered);}});
     setHabitOrder(allOrdered);
-    try{await setDoc(doc(db,'habitOrder',orderId),{order:allOrdered,userId:currentUser.id,roomId:currentRoom.id});}catch(err){console.error(err);}
+    try{await supabase.from('habit_order').upsert({id:orderId,order_ids:allOrdered,user_id:currentUser.id,room_id:currentRoom.id});}catch(err){console.error(err);}
   };
   const getGreeting = () => { const h = new Date().getHours(); if(h<5) return 'Burning the midnight oil'; if(h<12) return 'Good morning'; if(h<17) return 'Good afternoon'; if(h<21) return 'Good evening'; return 'Night owl mode'; };
   const getMotivation = () => {
@@ -254,7 +248,7 @@ export default function VersaApp() {
       setLoading(true);
       for (const habit of defaultHabits) {
         const id = currentRoom.id + '_' + Date.now() + '_' + Math.random().toString(36).slice(2,8);
-        await setDoc(doc(db, 'habits', id), { ...habit, roomId: currentRoom.id, createdBy: currentUser.id, createdAt: new Date().toISOString() });
+        await supabase.from('habits').upsert({ id, ...habit, room_id: currentRoom.id, created_by: currentUser.id });
       }
       setShowAddHabit(false);
       setConfettiTrigger(v=>v+1);
@@ -268,87 +262,130 @@ export default function VersaApp() {
     const joinCode = params.get('join');
     if (joinCode) { setRoomCode(joinCode.toUpperCase()); window.history.replaceState({}, '', window.location.pathname); }
 
-    const unsub = onAuthStateChanged(auth, async (user) => {
-      if (user) {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (session?.user) {
+        const user = session.user;
         try {
-          const ud = await getDoc(doc(db, 'users', user.uid));
-          if (ud.exists()) {
-            const data = { id: user.uid, ...ud.data() };
+          const { data: ud } = await supabase.from('users').select('*').eq('id', user.id).single();
+          if (ud) {
+            const data = { id: user.id, ...ud, photoURL: ud.photo_url || user.user_metadata?.avatar_url };
             setCurrentUser(data);
-            const rooms = data.rooms || (data.roomId ? [data.roomId] : []);
+            const rooms = data.rooms || [];
             setUserRooms(rooms);
-            const active = data.activeRoom || data.roomId || (rooms.length > 0 ? rooms[0] : null);
+            const active = data.active_room || (rooms.length > 0 ? rooms[0] : null);
             if (active) {
-              const rd = await getDoc(doc(db, 'rooms', active));
-              if (rd.exists()) { setCurrentRoom({ id: rd.id, ...rd.data() }); setView('dashboard'); }
+              const { data: rd } = await supabase.from('rooms').select('*').eq('id', active).single();
+              if (rd) { setCurrentRoom({ id: rd.id, ...rd, code: rd.code || rd.id }); setView('dashboard'); }
               else setShowRoomModal(true);
             } else setShowRoomModal(true);
+          } else {
+            // New user — create profile
+            const username = user.user_metadata?.full_name || user.email?.split('@')[0] || 'User';
+            await supabase.from('users').upsert({ id: user.id, username, email: user.email, photo_url: user.user_metadata?.avatar_url, rooms: [], streak_freeze: 0 });
+            setCurrentUser({ id: user.id, username, email: user.email, photoURL: user.user_metadata?.avatar_url, rooms: [] });
+            setShowRoomModal(true);
           }
         } catch (err) { console.error(err); setError(err.message); }
       } else setCurrentUser(null);
       setAuthLoading(false);
     });
-    return unsub;
+    return () => subscription?.unsubscribe();
   }, []);
 
   // ─── REALTIME DATA ───
   useEffect(() => {
     if (!currentUser || !currentRoom) return;
-    const u1 = onSnapshot(query(collection(db, 'habits'), where('roomId', '==', currentRoom.id)), s => setHabits(s.docs.map(d => ({id:d.id,...d.data()}))));
+    const subs = [];
+    
+    // Fetch habits
+    const fetchHabits = async () => {
+      const { data } = await supabase.from('habits').select('*').eq('room_id', currentRoom.id);
+      if (data) setHabits(data.map(h => ({ ...h, id: h.id, roomId: h.room_id, isRepeatable: h.is_repeatable, maxCompletions: h.max_completions, createdBy: h.created_by })));
+    };
+    fetchHabits();
+    subs.push(supabase.channel('habits-'+currentRoom.id).on('postgres_changes', { event: '*', schema: 'public', table: 'habits', filter: 'room_id=eq.'+currentRoom.id }, fetchHabits).subscribe());
+
+    // Fetch today's completions
     const today = getToday();
-    const u2 = onSnapshot(query(collection(db, 'completions'), where('roomId', '==', currentRoom.id), where('date', '==', today)), s => setCompletions(s.docs.map(d => ({id:d.id,...d.data()}))));
-    // Weekly: fetch each day individually to avoid needing a composite index
-    const ws = getWeekStart();
-    const we = getWeekEnd();
-    const weekDays = [];
-    { const d = new Date(ws+'T12:00:00'); const end = new Date(today+'T12:00:00'); while (d <= end) { weekDays.push(formatDateStr(d)); d.setDate(d.getDate()+1); } }
-    // Stale-proof: capture the weekStart this effect was created for
-    const effectWeekStart = ws;
-    let cancelled = false;
-    const weekData = {};
-    setAllCompletions([]); // clear immediately
-    const weekUnsubs = weekDays.map(day =>
-      onSnapshot(query(collection(db, 'completions'), where('roomId', '==', currentRoom.id), where('date', '==', day)), s => {
-        if (cancelled) return; // reject callbacks from stale effect
-        weekData[day] = s.docs.map(d => ({id:d.id,...d.data()}));
-        // Flatten + strict date filter: only this week's data
-        const all = Object.values(weekData).flat();
-        setAllCompletions(all.filter(c => c.date >= effectWeekStart && c.date <= today));
-      })
-    );    // Members: support both new rooms array and old roomId
-    const u4 = onSnapshot(query(collection(db, 'users'), where('rooms', 'array-contains', currentRoom.id)), s => setRoomMembers(s.docs.map(d => ({id:d.id,...d.data()}))));
-    const u5 = onSnapshot(query(collection(db, 'users'), where('roomId', '==', currentRoom.id)), s => {
-      setRoomMembers(prev => { const ids = new Set(prev.map(m=>m.id)); const nw = s.docs.map(d=>({id:d.id,...d.data()})).filter(m=>!ids.has(m.id)); return [...prev,...nw]; });
-    });
-    const u6 = onSnapshot(doc(db, 'stakes', currentRoom.id), s => { if(s.exists()) setRoomStakes({id:s.id,...s.data()}); else setRoomStakes(null); });
-    // Habit order listener
-    const u7 = onSnapshot(doc(db, 'habitOrder', currentUser.id+'_'+currentRoom.id), s => { if(s.exists()) setHabitOrder(s.data().order||[]); else setHabitOrder([]); });
-    // Room categories listener
-    const u8 = onSnapshot(doc(db, 'roomCategories', currentRoom.id), s => { if(s.exists()) setRoomCategories(s.data().categories||[]); else setRoomCategories([]); });
-    // Activity feed - today's completions from ALL room members (no composite index needed)
-    let u9 = ()=>{}, u10 = ()=>{}, u11 = ()=>{};
-    try {
-      u9 = onSnapshot(query(collection(db, 'activity'), where('roomId', '==', currentRoom.id), where('date', '==', today)), s => {
-        const items = s.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>(b.ts||'').localeCompare(a.ts||''));
-        setActivityFeed(items);
-      }, err => console.warn('Activity feed:', err));
-    } catch(e) { console.warn('Activity listener failed:', e); }
-    // Personal board listener
-    try {
-      u10 = onSnapshot(doc(db, 'myBoard', currentUser.id+'_'+currentRoom.id), s => {
-        if (s.exists() && s.data().habitIds) setMyBoardIds(s.data().habitIds);
-        else setMyBoardIds(null);
-      }, err => console.warn('Board:', err));
-    } catch(e) { console.warn('Board listener failed:', e); }
-    // Custom board proposals listener
-    try {
-      u11 = onSnapshot(query(collection(db, 'customBoards'), where('roomId', '==', currentRoom.id)), s => {
-        const boards = s.docs.map(d=>({id:d.id,...d.data()}));
+    const fetchCompletions = async () => {
+      const { data } = await supabase.from('completions').select('*').eq('room_id', currentRoom.id).eq('date', today);
+      if (data) setCompletions(data.map(c => ({ ...c, id: c.id, userId: c.user_id, habitId: c.habit_id, roomId: c.room_id, habitName: c.habit_name, habitCategory: c.habit_category, habitPoints: c.habit_points, bonusPoints: c.bonus_points, streakMultiplier: c.streak_multiplier })));
+    };
+    fetchCompletions();
+    subs.push(supabase.channel('completions-today-'+currentRoom.id).on('postgres_changes', { event: '*', schema: 'public', table: 'completions', filter: 'room_id=eq.'+currentRoom.id }, fetchCompletions).subscribe());
+
+    // Fetch weekly completions
+    const ws = getWeekStart(), we = getWeekEnd();
+    const fetchWeekly = async () => {
+      const { data } = await supabase.from('completions').select('*').eq('room_id', currentRoom.id).gte('date', ws).lte('date', we);
+      if (data) setAllCompletions(data.map(c => ({ ...c, id: c.id, userId: c.user_id, habitId: c.habit_id, roomId: c.room_id, habitName: c.habit_name, habitCategory: c.habit_category, habitPoints: c.habit_points, bonusPoints: c.bonus_points })));
+    };
+    fetchWeekly();
+    // Weekly updates via same completions channel
+
+    // Fetch members (users who have this room in their rooms array)
+    const fetchMembers = async () => {
+      const { data } = await supabase.from('users').select('*').contains('rooms', [currentRoom.id]);
+      if (data) setRoomMembers(data.map(u => ({ ...u, id: u.id, username: u.username, email: u.email, photoURL: u.photo_url, roomId: u.active_room, streakFreeze: u.streak_freeze, emailReminders: u.email_reminders })));
+    };
+    fetchMembers();
+    subs.push(supabase.channel('members-'+currentRoom.id).on('postgres_changes', { event: '*', schema: 'public', table: 'users' }, fetchMembers).subscribe());
+
+    // Fetch stakes
+    const fetchStakes = async () => {
+      const { data } = await supabase.from('stakes').select('*').eq('id', currentRoom.id).single();
+      if (data) setRoomStakes({ ...data, id: data.id, roomId: data.room_id, createdBy: data.created_by });
+      else setRoomStakes(null);
+    };
+    fetchStakes();
+    subs.push(supabase.channel('stakes-'+currentRoom.id).on('postgres_changes', { event: '*', schema: 'public', table: 'stakes', filter: 'id=eq.'+currentRoom.id }, fetchStakes).subscribe());
+
+    // Fetch room categories
+    const fetchCats = async () => {
+      const { data } = await supabase.from('room_categories').select('*').eq('room_id', currentRoom.id).single();
+      if (data?.categories) setRoomCategories(data.categories);
+      else setRoomCategories([]);
+    };
+    fetchCats();
+
+    // Fetch activity feed
+    const fetchActivity = async () => {
+      const { data } = await supabase.from('activity').select('*').eq('room_id', currentRoom.id).eq('date', today).order('ts', { ascending: false }).limit(20);
+      if (data) setActivityFeed(data.map(a => ({ ...a, id: a.id, userId: a.user_id, roomId: a.room_id })));
+    };
+    fetchActivity();
+    subs.push(supabase.channel('activity-'+currentRoom.id).on('postgres_changes', { event: '*', schema: 'public', table: 'activity', filter: 'room_id=eq.'+currentRoom.id }, () => { fetchActivity(); fetchWeekly(); }).subscribe());
+
+    // Fetch personal board
+    const fetchBoard = async () => {
+      const boardId = currentUser.id+'_'+currentRoom.id;
+      const { data } = await supabase.from('my_board').select('*').eq('id', boardId).single();
+      if (data?.habit_ids) setMyBoardIds(data.habit_ids);
+      else setMyBoardIds(null);
+    };
+    fetchBoard();
+
+    // Fetch habit order
+    const fetchOrder = async () => {
+      const orderId = currentUser.id+'_'+currentRoom.id;
+      const { data } = await supabase.from('habit_order').select('*').eq('id', orderId).single();
+      if (data?.order_ids) setHabitOrder(data.order_ids);
+      else setHabitOrder([]);
+    };
+    fetchOrder();
+
+    // Fetch board proposals
+    const fetchProposals = async () => {
+      const { data } = await supabase.from('board_proposals').select('*').eq('room_id', currentRoom.id);
+      if (data) {
+        const boards = data.map(b => ({ ...b, id: b.id, userId: b.user_id, roomId: b.room_id, habitIds: b.habit_ids }));
         setPendingBoards(boards);
         setBoardRequests(boards.filter(b=>b.status==='pending'&&b.userId!==currentUser.id&&!(b.approvals||[]).includes(currentUser.id)&&!(b.rejections||[]).includes(currentUser.id)));
-      }, err => console.warn('Custom boards:', err));
-    } catch(e) { console.warn('Board proposals listener failed:', e); }
-    return () => { cancelled = true; u1(); u2(); u4(); u5(); u6(); u7(); u8(); u9(); u10(); u11(); weekUnsubs.forEach(u=>u()); };
+      }
+    };
+    fetchProposals();
+
+    return () => { subs.forEach(s => supabase.removeChannel(s)); };
   }, [currentUser, currentRoom, dateKey]);
 
   // ─── LOAD ROOM KICKED LIST ───
@@ -356,10 +393,10 @@ export default function VersaApp() {
     if (!currentRoom) { setRoomKicked([]); setRoomCreatedBy(null); return; }
     const load = async () => {
       try {
-        const rd = await getDoc(doc(db, 'rooms', currentRoom.id));
-        if (rd.exists()) {
-          setRoomKicked(rd.data().kicked || []);
-          setRoomCreatedBy(rd.data().createdBy || null);
+        const { data: rd } = await supabase.from('rooms').select('*').eq('id', currentRoom.id).single();
+        if (rd) {
+          setRoomKicked(rd.kicked || []);
+          setRoomCreatedBy(rd.created_by || null);
         }
       } catch {}
     };
@@ -372,8 +409,8 @@ export default function VersaApp() {
     const loadLastWeek = async () => {
       try {
         const lws = getLastWeekStart(), lwe = getLastWeekEnd();
-        const snap = await getDocs(query(collection(db,'completions'), where('roomId','==',currentRoom.id), where('date','>=',lws), where('date','<=',lwe)));
-        const comps = snap.docs.map(d=>({id:d.id,...d.data()}));
+        const { data: snapData } = await supabase.from('completions').select('*').eq('room_id', currentRoom.id).gte('date', lws).lte('date', lwe);
+        const comps = (snapData || []).map(d=>({id:d.id,...d,userId:d.user_id,habitId:d.habit_id,habitPoints:d.habit_points,bonusPoints:d.bonus_points,habitCategory:d.habit_category}));
         if (!comps.length) { setLastWeekData(null); return; }
         const scores = activeMembers.map(m => {
           const mc = comps.filter(c=>c.userId===m.id);
@@ -395,8 +432,8 @@ export default function VersaApp() {
     const calc = async () => {
       try {
         const ago = new Date(); ago.setDate(ago.getDate()-60);
-        const snap = await getDocs(query(collection(db, 'completions'), where('userId', '==', currentUser.id), where('date', '>=', formatDateStr(ago))));
-        const allDocs = snap.docs.map(d => d.data());
+        const { data: snapData } = await supabase.from('completions').select('*').eq('user_id', currentUser.id).gte('date', formatDateStr(ago));
+        const allDocs = (snapData || []).map(d => ({ ...d, habitPoints: d.habit_points, bonusPoints: d.bonus_points, habitId: d.habit_id, userId: d.user_id }));
 
         // Calculate which dates hit 20% of daily target (60pts)
         const qualifyingDates = new Set();
@@ -414,8 +451,8 @@ export default function VersaApp() {
         const today = getToday(), yStr = getYesterday();
 
         // Load freeze from user doc
-        const userSnap = await getDoc(doc(db, 'users', currentUser.id));
-        const savedFreeze = userSnap.exists() ? (userSnap.data().streakFreeze || 0) : 0;
+        const { data: userSnap } = await supabase.from('users').select('streak_freeze').eq('id', currentUser.id).single();
+        const savedFreeze = userSnap?.streak_freeze || 0;
         setStreakFreeze(savedFreeze);
 
         if (dates.includes(today) || dates.includes(yStr)) {
@@ -434,7 +471,7 @@ export default function VersaApp() {
             }
           }
           if (freezeUsed && savedFreeze > 0) {
-            await updateDoc(doc(db, 'users', currentUser.id), { streakFreeze: 0 });
+            await supabase.from('users').update({ streak_freeze: 0 }).eq('id', currentUser.id);
             setStreakFreeze(0);
             setFreezeMsg('🛡️ Streak freeze saved your streak!');
             setTimeout(() => setFreezeMsg(null), 4000);
@@ -474,8 +511,8 @@ export default function VersaApp() {
     const calc = async () => {
       try {
         const ago = new Date(); ago.setDate(ago.getDate() - 60);
-        const snap = await getDocs(query(collection(db, 'completions'), where('roomId', '==', currentRoom.id), where('date', '>=', formatDateStr(ago))));
-        const allDocs = snap.docs.map(d => d.data());
+        const { data: snapData2 } = await supabase.from('completions').select('*').eq('room_id', currentRoom.id).gte('date', formatDateStr(ago));
+        const allDocs = (snapData2 || []).map(d => ({ ...d, userId: d.user_id, habitPoints: d.habit_points, bonusPoints: d.bonus_points }));
 
         // Build a map of userId -> Set of qualifying dates (80+ pts)
         const userDates = {};
@@ -563,7 +600,8 @@ export default function VersaApp() {
       const ago = new Date(); ago.setDate(ago.getDate()-90);
       const agoStr = formatDateStr(ago);
       // Use single where to avoid needing a composite index
-      const snap = await getDocs(query(collection(db,'completions'),where('userId','==',currentUser.id)));
+      const { data: heatData2 } = await supabase.from('completions').select('*').eq('user_id',currentUser.id);
+      const snap = { docs: (heatData2||[]).map(d=>({data:()=>({...d,habitId:d.habit_id,habitPoints:d.habit_points,bonusPoints:d.bonus_points})})) };
       const map = {};
       snap.docs.forEach(d => {
         const dt = d.data();
@@ -599,7 +637,8 @@ export default function VersaApp() {
     if (!currentUser || !currentRoom) return;
     try {
       const ago = new Date(); ago.setDate(ago.getDate()-60);
-      const snap = await getDocs(query(collection(db,'completions'),where('userId','==',currentUser.id),where('roomId','==',currentRoom.id),where('date','>=',formatDateStr(ago))));
+      const { data: insightData2 } = await supabase.from('completions').select('*').eq('user_id',currentUser.id).eq('room_id',currentRoom.id).gte('date',formatDateStr(ago));
+      const snap = { docs: (insightData2||[]).map(d=>({data:()=>({...d,habitId:d.habit_id,habitCategory:d.habit_category})})) };
       const comps = snap.docs.map(d=>({id:d.id,...d.data()}));
       if (!comps.length) { setInsightsData({ empty: true }); setShowInsights(true); return; }
       const dayMap = {};
@@ -646,12 +685,12 @@ export default function VersaApp() {
       : [...current, habitId];
     if (updated.length === 0) return; // can't have empty board
     try {
-      await setDoc(doc(db, 'myBoard', boardDocId), { habitIds: updated, userId: currentUser.id, roomId: currentRoom.id });
+      await supabase.from('my_board').upsert({ id: boardDocId, habit_ids: updated, user_id: currentUser.id, room_id: currentRoom.id });
     } catch {}
   };
   const resetBoard = async () => {
     if (!currentUser || !currentRoom) return;
-    try { await deleteDoc(doc(db, 'myBoard', currentUser.id+'_'+currentRoom.id)); } catch {}
+    try { await supabase.from('my_board').delete().eq('id', currentUser.id+'_'+currentRoom.id); } catch {}
   };
   const isOnBoard = (habitId) => !myBoardIds || myBoardIds.includes(habitId);
   const boardActive = myBoardIds !== null;
@@ -664,25 +703,18 @@ export default function VersaApp() {
       const otherMembers = activeMembers.filter(m=>m.id!==currentUser.id).length;
       if (otherMembers === 0) {
         // Solo mode: apply directly, no approval needed
-        await setDoc(doc(db, 'myBoard', boardId), { habitIds: selectedHabitIds, userId: currentUser.id, roomId: currentRoom.id });
-        await setDoc(doc(db, 'customBoards', boardId), {
-          userId: currentUser.id, username: currentUser.username, roomId: currentRoom.id,
-          habitIds: selectedHabitIds, status: 'approved', createdAt: new Date().toISOString(), approvals: [], rejections: []
-        });
+        await supabase.from('my_board').upsert({ id: boardId, habit_ids: selectedHabitIds, user_id: currentUser.id, room_id: currentRoom.id });
+        await supabase.from('board_proposals').upsert({ id: boardId, room_id: currentRoom.id, user_id: currentUser.id, username: currentUser.username, habit_ids: selectedHabitIds, status: 'pending' });
         setShowCustomBoard(false); setSuccessMsg('Board applied!'); setTimeout(()=>setSuccessMsg(''),2000);
       } else {
-        await setDoc(doc(db, 'customBoards', boardId), {
-          userId: currentUser.id, username: currentUser.username, roomId: currentRoom.id,
-          habitIds: selectedHabitIds, status: 'pending',
-          createdAt: new Date().toISOString(), approvals: [], rejections: []
-        });
+        await supabase.from('board_proposals').upsert({ id: boardId, room_id: currentRoom.id, user_id: currentUser.id, username: currentUser.username, habit_ids: customBoardHabits, status: 'pending' });
         setShowCustomBoard(false); setSuccessMsg('Board submitted for approval!'); setTimeout(()=>setSuccessMsg(''),3000);
       }
     } catch { setError('Failed to submit board'); }
   };
   const voteOnBoard = async (boardDoc, approve) => {
     try {
-      const ref = doc(db, 'customBoards', boardDoc.id);
+      const boardRef = boardDoc.id;
       const field = approve ? 'approvals' : 'rejections';
       const other = approve ? 'rejections' : 'approvals';
       const updList = [...(boardDoc[field]||[]).filter(id=>id!==currentUser.id), currentUser.id];
@@ -692,10 +724,10 @@ export default function VersaApp() {
       let status = boardDoc.status;
       if (approve && updList.length >= needed) status = 'approved';
       if (!approve && updList.length >= needed) status = 'rejected';
-      await updateDoc(ref, { [field]: updList, [other]: otherList, status });
+      await supabase.from('board_proposals').update({ [field]: updList, [other]: otherList, status }).eq('id', boardRef);
       // If approved, apply to the user's personal board
       if (status === 'approved') {
-        await setDoc(doc(db, 'myBoard', boardDoc.userId+'_'+currentRoom.id), { habitIds: boardDoc.habitIds, userId: boardDoc.userId, roomId: currentRoom.id });
+        await supabase.from('my_board').upsert({ id: boardDoc.userId+'_'+currentRoom.id, habit_ids: boardDoc.habitIds, user_id: boardDoc.userId, room_id: currentRoom.id });
       }
     } catch {}
   };
@@ -726,7 +758,7 @@ export default function VersaApp() {
       freezeEarnedRef.current = true;
       const award = async () => {
         try {
-          await updateDoc(doc(db, 'users', currentUser.id), { streakFreeze: 1 });
+          await supabase.from('users').update({ streak_freeze: 1 }).eq('id', currentUser.id);
           setStreakFreeze(1);
           setFreezeMsg('🛡️ Streak freeze earned! Complete 90% tomorrow to earn another.');
           setTimeout(() => setFreezeMsg(null), 4000);
@@ -738,7 +770,7 @@ export default function VersaApp() {
       freezeEarnedRef.current = false;
       const revoke = async () => {
         try {
-          await updateDoc(doc(db, 'users', currentUser.id), { streakFreeze: 0 });
+          await supabase.from('users').update({ streak_freeze: 0 }).eq('id', currentUser.id);
           setStreakFreeze(0);
         } catch {}
       };
@@ -752,36 +784,39 @@ export default function VersaApp() {
     e.preventDefault(); setError(''); setLoading(true);
     if (!username.trim()) { setError('Username required'); setLoading(false); return; }
     try {
-      const cred = await createUserWithEmailAndPassword(auth, email, password);
-      await setDoc(doc(db, 'users', cred.user.uid), { username: username.trim(), email, rooms: [], createdAt: new Date().toISOString() });
+      const { data, error: authErr } = await supabase.auth.signUp({ email, password });
+      if (authErr) throw authErr;
+      if (data?.user) {
+        await supabase.from('users').upsert({ id: data.user.id, username: username.trim(), email, rooms: [], streak_freeze: 0 });
+      }
     } catch (err) { setError(err.message); } finally { setLoading(false); }
   };
   const handleLogin = async (e) => {
     e.preventDefault(); setError(''); setLoading(true);
-    try { await signInWithEmailAndPassword(auth, email, password); }
-    catch { setError('Invalid email or password'); } finally { setLoading(false); }
+    try {
+      const { error: authErr } = await supabase.auth.signInWithPassword({ email, password });
+      if (authErr) throw authErr;
+    } catch (err) { setError(err.message || 'Invalid email or password'); } finally { setLoading(false); }
   };
   const handleForgotPassword = async (e) => {
     e.preventDefault(); setError(''); setSuccessMsg(''); setLoading(true);
-    try { await sendPasswordResetEmail(auth, email); setSuccessMsg('Reset link sent! Check your email.'); }
-    catch { setError('Could not send reset email. Check the address.'); } finally { setLoading(false); }
+    try {
+      const { error: authErr } = await supabase.auth.resetPasswordForEmail(email);
+      if (authErr) throw authErr;
+      setSuccessMsg('Reset link sent! Check your email.');
+    } catch (err) { setError(err.message || 'Could not send reset email.'); } finally { setLoading(false); }
   };
   const handleGoogleSignIn = async () => {
     setError(''); setLoading(true);
     try {
-      const cred = await signInWithPopup(auth, new GoogleAuthProvider());
-      // Check if user doc exists
-      const userDoc = await getDoc(doc(db, 'users', cred.user.uid));
-      if (!userDoc.exists()) {
-        // New Google user — create their profile
-        const displayName = cred.user.displayName || cred.user.email.split('@')[0];
-        await setDoc(doc(db, 'users', cred.user.uid), {
-          username: displayName, email: cred.user.email, photoURL: cred.user.photoURL || null,
-          rooms: [], createdAt: new Date().toISOString()
-        });
-      }
+      const { error: authErr } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: { redirectTo: window.location.origin }
+      });
+      if (authErr) throw authErr;
+      // After redirect, the onAuthStateChange handler will create the user profile
     } catch (err) {
-      if (err.code !== 'auth/popup-closed-by-user') setError(err.message);
+      setError(err.message);
     } finally { setLoading(false); }
   };
 
@@ -790,8 +825,8 @@ export default function VersaApp() {
     setError(''); setLoading(true);
     try {
       const code = genCode();
-      await setDoc(doc(db, 'rooms', code), { code, createdBy: currentUser.id, createdAt: new Date().toISOString() });
-      await updateDoc(doc(db, 'users', currentUser.id), { rooms: arrayUnion(code), activeRoom: code, roomId: code });
+      await supabase.from('rooms').insert({ id: code, code, created_by: currentUser.id, kicked: [] });
+      const nr2 = [...new Set([...(userRooms||[]),code])]; await supabase.from('users').update({ rooms: nr2, active_room: code }).eq('id', currentUser.id);
       setUserRooms(p=>[...p,code]); setCurrentRoom({id:code,code}); setShowRoomModal(false); setShowInviteModal(true); setView('dashboard');
     } catch (err) { setError('Failed: '+err.message); } finally { setLoading(false); }
   };
@@ -800,25 +835,26 @@ export default function VersaApp() {
     const code = roomCode.trim().toUpperCase();
     if (!code) { setError('Enter room code'); setLoading(false); return; }
     try {
-      const rd = await getDoc(doc(db, 'rooms', code));
-      if (!rd.exists()) { setError('Room not found'); setLoading(false); return; }
-      await updateDoc(doc(db, 'users', currentUser.id), { rooms: arrayUnion(code), activeRoom: code, roomId: code });
+      const { data: rd2 } = await supabase.from('rooms').select('*').eq('id', code).single();
+      if (!rd2) { setError('Room not found'); setLoading(false); return; }
+      const nr2 = [...new Set([...(userRooms||[]),code])]; await supabase.from('users').update({ rooms: nr2, active_room: code }).eq('id', currentUser.id);
       setUserRooms(p=>p.includes(code)?p:[...p,code]); setCurrentRoom({id:code,...rd.data()}); setShowRoomModal(false); setShowSwitchRoom(false); setView('dashboard'); setRoomCode('');
     } catch (err) { setError('Failed: '+err.message); } finally { setLoading(false); }
   };
   const switchRoom = async (rid) => {
     setLoading(true);
     try {
-      const rd = await getDoc(doc(db, 'rooms', rid));
-      if (rd.exists()) { await updateDoc(doc(db, 'users', currentUser.id), { activeRoom: rid, roomId: rid }); setCurrentRoom({id:rd.id,...rd.data()}); setRoomKicked(rd.data().kicked||[]); setRoomCreatedBy(rd.data().createdBy||null); setShowSwitchRoom(false); }
+      const { data: rd3 } = await supabase.from('rooms').select('*').eq('id', rid).single();
+      if (rd3) { await supabase.from('users').update({ active_room: rid }).eq('id', currentUser.id); setCurrentRoom({id:rd3.id,...rd3,code:rd3.code||rd3.id}); setRoomKicked(rd3.kicked||[]); setRoomCreatedBy(rd3.created_by||null); setShowSwitchRoom(false); }
     } catch { setError('Failed to switch'); } finally { setLoading(false); }
   };
   const leaveRoom = async (rid) => {
     if (!confirm('Leave this room?')) return;
     try {
-      await updateDoc(doc(db, 'users', currentUser.id), { rooms: arrayRemove(rid) });
+      const newRooms = (userRooms || []).filter(r => r !== rid);
+      await supabase.from('users').update({ rooms: newRooms }).eq('id', currentUser.id);
       const nr = userRooms.filter(r=>r!==rid); setUserRooms(nr);
-      if (currentRoom?.id === rid) { if (nr.length > 0) switchRoom(nr[0]); else { await updateDoc(doc(db, 'users', currentUser.id), { activeRoom: null, roomId: null }); setCurrentRoom(null); setShowRoomModal(true); } }
+      if (currentRoom?.id === rid) { if (nr.length > 0) switchRoom(nr[0]); else { await supabase.from('users').update({ active_room: null }).eq('id', currentUser.id); setCurrentRoom(null); setShowRoomModal(true); } }
     } catch (err) { console.error(err); }
   };
   const copyCode = () => { navigator.clipboard.writeText(currentRoom.code); setCopied(true); setTimeout(()=>setCopied(false),2000); };
@@ -832,7 +868,7 @@ export default function VersaApp() {
     const m = activeMembers.find(x=>x.id===uid);
     if (!confirm(`Remove ${m?.username||'this member'} from the room?`)) return;
     try {
-      await updateDoc(doc(db, 'rooms', currentRoom.id), { kicked: arrayUnion(uid) });
+      const kickedList = [...(roomKicked||[]), uid]; await supabase.from('rooms').update({ kicked: kickedList }).eq('id', currentRoom.id);
       setRoomKicked(prev => [...prev, uid]);
       setSuccessMsg(`${m?.username||'Member'} removed`); setTimeout(()=>setSuccessMsg(''),2000);
     } catch (err) { console.error(err); setError('Failed to remove member'); }
@@ -841,8 +877,7 @@ export default function VersaApp() {
     if (!isRoomCreator) return;
     if (!confirm('Delete ALL habits in this room? This cannot be undone.')) return;
     try {
-      const snap = await getDocs(query(collection(db, 'habits'), where('roomId', '==', currentRoom.id)));
-      for (const d of snap.docs) await deleteDoc(doc(db, 'habits', d.id));
+      await supabase.from('habits').delete().eq('room_id', currentRoom.id);
       setSuccessMsg('All habits cleared'); setTimeout(()=>setSuccessMsg(''),2000);
     } catch { setError('Failed to clear habits'); }
   };
@@ -851,7 +886,7 @@ export default function VersaApp() {
     const m = activeMembers.find(x=>x.id===uid);
     if (!confirm(`Transfer room ownership to ${m?.username||'this member'}? You will lose creator permissions.`)) return;
     try {
-      await updateDoc(doc(db, 'rooms', currentRoom.id), { createdBy: uid });
+      await supabase.from('rooms').update({ created_by: uid }).eq('id', currentRoom.id);
       setRoomCreatedBy(uid);
       setSuccessMsg('Ownership transferred'); setTimeout(()=>setSuccessMsg(''),2000);
     } catch { setError('Failed to transfer'); }
@@ -863,30 +898,29 @@ export default function VersaApp() {
     if (!currentRoom?.id || !currentUser?.id) { setError('No room selected'); return; }
     setLoading(true); setError('');
     try {
-      await setDoc(doc(db, 'stakes', currentRoom.id), { type: newStake.type, description: newStake.description.trim(), duration: newStake.duration, createdBy: currentUser.id, createdAt: new Date().toISOString(), roomId: currentRoom.id, active: true });
+      await supabase.from('stakes').upsert({ id: currentRoom.id, room_id: currentRoom.id, type: newStake.type, description: newStake.description.trim(), duration: newStake.duration, created_by: currentUser.id, active: true });
       setNewStake({ type: 'custom', description: '', duration: 'weekly' });
       setShowStakes(false);
     } catch (err) { console.error('Stakes error:', err); setError(err.message || 'Failed to save'); }
     finally { setLoading(false); }
   };
-  const clearStake = async () => { if (!isRoomCreator && roomStakes?.createdBy !== currentUser?.id) return; if (!confirm('Remove stake?')) return; try { await deleteDoc(doc(db, 'stakes', currentRoom.id)); } catch {} };
+  const clearStake = async () => { if (!isRoomCreator && roomStakes?.createdBy !== currentUser?.id) return; if (!confirm('Remove stake?')) return; try { await supabase.from('stakes').delete().eq('id', currentRoom.id); setRoomStakes(null); } catch {} };
 
   // ─── HABITS (CREATE, EDIT, DELETE) ───
   const addHabit = async () => {
     if (!newHabit.name.trim()) return;
     try {
       const hid = currentRoom.id+'_'+Date.now()+'_'+Math.random().toString(36).slice(2,8);
-      await setDoc(doc(db, 'habits', hid), {
-        name: newHabit.name.trim(), category: newHabit.category, points: parseInt(newHabit.points)||10,
-        isRepeatable: newHabit.isRepeatable, maxCompletions: parseInt(newHabit.maxCompletions)||1,
-        ...(newHabit.unit?.trim() ? { unit: newHabit.unit.trim() } : {}),
-        ...(newHabit.description?.trim() ? { description: newHabit.description.trim() } : {}),
-        roomId: currentRoom.id, createdBy: currentUser.id, createdAt: new Date().toISOString()
+      await supabase.from('habits').insert({
+        id: hid, name: newHabit.name.trim(), category: newHabit.category, points: parseInt(newHabit.points)||10,
+        is_repeatable: newHabit.isRepeatable, max_completions: parseInt(newHabit.maxCompletions)||1,
+        unit: newHabit.unit?.trim() || null, description: newHabit.description?.trim() || null,
+        room_id: currentRoom.id, created_by: currentUser.id
       });
       // Auto-add to personal board if one exists
       if (myBoardIds) {
         const boardDocId = currentUser.id+'_'+currentRoom.id;
-        await setDoc(doc(db, 'myBoard', boardDocId), { habitIds: [...myBoardIds, hid], userId: currentUser.id, roomId: currentRoom.id });
+        await supabase.from('my_board').upsert({ id: boardDocId, habit_ids: [...myBoardIds, hid], user_id: currentUser.id, room_id: currentRoom.id });
       }
       setNewHabit({ name:'', category:'Study', points:10, isRepeatable:false, maxCompletions:1, unit:'', description:'' }); setShowAddHabit(false);
     } catch { setError('Failed to add'); }
@@ -894,25 +928,20 @@ export default function VersaApp() {
   const saveEditHabit = async () => {
     if (!showEditHabit || !editHabitData.name?.trim()) return;
     try {
-      await updateDoc(doc(db, 'habits', showEditHabit), {
+      await supabase.from('habits').update({
         name: editHabitData.name.trim(), category: editHabitData.category,
-        points: parseInt(editHabitData.points)||10, isRepeatable: editHabitData.isRepeatable,
-        maxCompletions: parseInt(editHabitData.maxCompletions)||1,
-        unit: editHabitData.unit?.trim() || null,
-        description: editHabitData.description?.trim() || null
-      });
+        points: parseInt(editHabitData.points)||10, is_repeatable: editHabitData.isRepeatable,
+        max_completions: parseInt(editHabitData.maxCompletions)||1,
+        unit: editHabitData.unit?.trim() || null, description: editHabitData.description?.trim() || null
+      }).eq('id', showEditHabit);
       setShowEditHabit(null);
     } catch { setError('Failed to save'); }
   };
   const deleteHabit = async (hid) => {
     if (!confirm('Delete this habit?')) return;
     try {
-      await deleteDoc(doc(db, 'habits', hid));
-      // Delete all completions for this habit in this room
-      const snap = await getDocs(query(collection(db, 'completions'), where('habitId', '==', hid), where('roomId', '==', currentRoom.id)));
-      const batch = [];
-      snap.docs.forEach(d => batch.push(deleteDoc(doc(db, 'completions', d.id))));
-      await Promise.all(batch);
+      await supabase.from('habits').delete().eq('id', hid);
+      await supabase.from('completions').delete().eq('habit_id', hid).eq('room_id', currentRoom.id);
     } catch (err) { console.error('Delete habit error:', err); }
   };
   const openEditHabit = (habit) => { setEditHabitData({ name: habit.name, category: habit.category, points: habit.points, isRepeatable: habit.isRepeatable, maxCompletions: habit.maxCompletions, unit: habit.unit||'', description: habit.description||'' }); setShowEditHabit(habit.id); };
@@ -946,9 +975,9 @@ export default function VersaApp() {
   const postActivity = async (text, bonus) => {
     try {
       const aid = Date.now()+'_'+Math.random().toString(36).slice(2,6);
-      await setDoc(doc(db,'activity',aid),{
-        userId: currentUser.id, username: currentUser.username, roomId: currentRoom.id,
-        text, bonus: bonus?.type||null, ts: new Date().toISOString(), date: getToday()
+      await supabase.from('activity').insert({
+        id: aid, user_id: currentUser.id, username: currentUser.username, room_id: currentRoom.id,
+        text, bonus: bonus?.type||null, date: getToday()
       });
     } catch {}
   };
@@ -957,16 +986,15 @@ export default function VersaApp() {
   const reactToActivity = async (activityId, emoji) => {
     if (!currentUser) return;
     try {
-      const ref = doc(db, 'activity', activityId);
-      const snap = await getDoc(ref);
-      if (!snap.exists()) return;
-      const reactions = snap.data().reactions || {};
+      const { data } = await supabase.from('activity').select('reactions').eq('id', activityId).single();
+      if (!data) return;
+      const reactions = data.reactions || {};
       if (reactions[currentUser.id] === emoji) {
         delete reactions[currentUser.id];
       } else {
         reactions[currentUser.id] = emoji;
       }
-      await updateDoc(ref, { reactions });
+      await supabase.from('activity').update({ reactions }).eq('id', activityId);
     } catch (err) { console.error('Reaction error:', err); }
   };
 
@@ -985,21 +1013,21 @@ export default function VersaApp() {
     try {
       if (ex) {
         if (ex.count < max) {
-          await updateDoc(doc(db, 'completions', ex.id), {
+          await supabase.from('completions').update({
             count: ex.count+1,
-            habitPoints: baseWithStreak,
-            ...(bonus ? { bonusPoints: (ex.bonusPoints||0) + (finalPts - baseWithStreak) } : {}),
-            streakMultiplier: streakMulti.multi
-          });
+            habit_points: baseWithStreak,
+            ...(bonus ? { bonus_points: (ex.bonusPoints||0) + (finalPts - baseWithStreak) } : {}),
+            streak_multiplier: streakMulti.multi
+          }).eq('id', ex.id);
           if(ex.count+1>=max) triggerMaxed();
         }
       } else {
         const cid = currentUser.id+'_'+hid+'_'+t;
-        await setDoc(doc(db, 'completions', cid), {
-          userId: currentUser.id, habitId: hid, roomId: currentRoom.id, date: t, count: 1,
-          habitName: h.name, habitPoints: baseWithStreak, habitCategory: h.category,
-          streakMultiplier: streakMulti.multi,
-          ...(bonus ? { bonusPoints: finalPts - baseWithStreak } : {})
+        await supabase.from('completions').insert({
+          id: cid, user_id: currentUser.id, habit_id: hid, room_id: currentRoom.id, date: t, count: 1,
+          habit_name: h.name, habit_points: baseWithStreak, habit_category: h.category,
+          streak_multiplier: streakMulti.multi,
+          ...(bonus ? { bonus_points: finalPts - baseWithStreak } : {})
         });
         if (max===1) triggerMaxed();
       }
@@ -1026,15 +1054,14 @@ export default function VersaApp() {
     const ex = getExisting(hid); if(!ex) return;
     try {
       if (ex.count > 1) {
-        // Proportionally reduce bonus: bonusPoints scales with count
         const newCount = ex.count - 1;
         const newBonus = ex.bonusPoints ? Math.round((ex.bonusPoints / ex.count) * newCount) : 0;
-        await updateDoc(doc(db, 'completions', ex.id), {
+        await supabase.from('completions').update({
           count: newCount,
-          ...(ex.bonusPoints ? { bonusPoints: newBonus } : {})
-        });
+          ...(ex.bonusPoints ? { bonus_points: newBonus } : {})
+        }).eq('id', ex.id);
       } else {
-        await deleteDoc(doc(db, 'completions', ex.id));
+        await supabase.from('completions').delete().eq('id', ex.id);
       }
     } catch(err) { console.error(err); }
   };
@@ -1043,7 +1070,8 @@ export default function VersaApp() {
   const loadHistoryDate = async (dateStr) => {
     setHistoryDate(dateStr);
     try {
-      const snap = await getDocs(query(collection(db,'completions'), where('roomId','==',currentRoom.id), where('date','==',dateStr)));
+      const { data: histSnap } = await supabase.from('completions').select('*').eq('room_id', currentRoom.id).eq('date', dateStr);
+      const snap = { docs: (histSnap||[]).map(d=>({id:d.id,data:()=>({...d,userId:d.user_id,habitId:d.habit_id,habitPoints:d.habit_points,bonusPoints:d.bonus_points,habitName:d.habit_name,habitCategory:d.habit_category})})) };
       setHistoryCompletions(snap.docs.map(d=>({id:d.id,...d.data()})));
     } catch { setHistoryCompletions([]); }
   };
@@ -1121,7 +1149,7 @@ export default function VersaApp() {
     if (!newCatName.trim() || activeCategories.find(c=>c.name.toLowerCase()===newCatName.trim().toLowerCase())) return;
     const updated = [...activeCategories, { name: newCatName.trim(), colorIdx: newCatColor, icon: newCatIcon }];
     try {
-      await setDoc(doc(db, 'roomCategories', currentRoom.id), { categories: updated });
+      await supabase.from('room_categories').upsert({ room_id: currentRoom.id, categories: updated });
       setNewCatName(''); setNewCatColor(0); setNewCatIcon('⭐'); setShowAddCategory(false);
     } catch { setError('Failed to add category'); }
   };
@@ -1130,7 +1158,7 @@ export default function VersaApp() {
     if (catHabits.length > 0) { setError('Delete habits in this category first'); setTimeout(()=>setError(''),2000); return; }
     if (['Study','Health','Focus'].includes(catName)) { setError("Can't delete default categories"); setTimeout(()=>setError(''),2000); return; }
     const updated = activeCategories.filter(c=>c.name!==catName);
-    try { await setDoc(doc(db, 'roomCategories', currentRoom.id), { categories: updated }); } catch {}
+    try { await supabase.from('room_categories').upsert({ room_id: currentRoom.id, categories: updated }); } catch {}
   };
   const stakePresets = [
     { type:'custom', label:'Custom', desc:'Set your own', ph:'e.g. Loser does 50 pushups' },
@@ -1340,7 +1368,7 @@ export default function VersaApp() {
                 </button>
               ))}
             </div>
-            <button onClick={()=>signOut(auth)} className="text-gray-700 text-xs hover:text-gray-400 transition-colors">Sign out</button>
+            <button onClick={()=>supabase.auth.signOut()} className="text-gray-700 text-xs hover:text-gray-400 transition-colors">Sign out</button>
           </div>
         )}
 
@@ -1572,7 +1600,7 @@ export default function VersaApp() {
             <div className="flex items-center justify-between"><span className={`text-xs ${T.textMuted}`}>{br.username} proposed a board</span><div className="flex gap-1"><button onClick={()=>voteBoardRequest(br,true)} className="text-[10px] text-emerald-400 font-bold px-2 py-1 bg-emerald-500/10 rounded-lg">✓</button><button onClick={()=>voteBoardRequest(br,false)} className="text-[10px] text-red-400 font-bold px-2 py-1 bg-red-500/10 rounded-lg">✗</button></div></div>
           </div>
         ))}
-        {myBoardIds && <div className={`mb-3 px-3 py-1.5 rounded-xl text-center text-[10px] font-medium ${darkMode?'bg-indigo-500/10 text-indigo-300 border border-indigo-500/15':'bg-indigo-50 text-indigo-600 border border-indigo-200'}`}>Custom board active · <button onClick={()=>{setMyBoardIds(null);try{deleteDoc(doc(db,'myBoard',currentUser.id+'_'+currentRoom.id));}catch{}}} className="underline">Show All</button></div>}
+        {myBoardIds && <div className={`mb-3 px-3 py-1.5 rounded-xl text-center text-[10px] font-medium ${darkMode?'bg-indigo-500/10 text-indigo-300 border border-indigo-500/15':'bg-indigo-50 text-indigo-600 border border-indigo-200'}`}>Custom board active · <button onClick={()=>{setMyBoardIds(null);try{supabase.from('my_board').delete().eq('id',currentUser.id+'_'+currentRoom.id);}catch{}}} className="underline">Show All</button></div>}
 
         {/* ═══ HABITS ═══ */}
         <div className="space-y-2 mb-6">
@@ -1848,14 +1876,14 @@ export default function VersaApp() {
         <div className="grid grid-cols-4 gap-2 mb-4">{[{v:streakData.streak||0,l:'Streak',c:'text-[#e8864a]',i:<Flame size={16} className="text-[#e8864a] mx-auto mb-1"/>},{v:streakFreeze>0?'🛡️':'—',l:'Freeze',c:streakFreeze>0?'text-cyan-400':'text-gray-600',i:null},{v:myPts,l:'Today',c:'text-blue-400',i:<Star size={16} className="text-blue-400 mx-auto mb-1"/>},{v:getWeeklyPts(currentUser.id),l:'Week',c:'text-emerald-400',i:<TrendingUp size={16} className="text-emerald-400 mx-auto mb-1"/>}].map((s,i)=><div key={i} className={`text-center p-3 ${T.bgCard} rounded-xl border ${T.border}`}>{s.i}<div className={'text-xl font-black '+s.c}>{s.v}</div><div className="text-[9px] text-gray-600 tracking-wider uppercase mt-0.5">{s.l}</div></div>)}</div>
         <div className="grid grid-cols-2 gap-3 mb-4"><div className={`text-center p-3 ${T.bgCard} rounded-xl border ${T.border}`}><div className="text-lg font-black text-purple-400">{streakData.activeDays||0}</div><div className="text-[9px] text-gray-600 tracking-wider uppercase mt-0.5">Active Days</div></div><div className={`text-center p-3 ${T.bgCard} rounded-xl border ${T.border}`}><div className="text-lg font-black text-cyan-400">{streakData.totalCompletions||0}</div><div className="text-[9px] text-gray-600 tracking-wider uppercase mt-0.5">Completions</div></div></div>
         <div className={`p-3 ${T.bgCard} rounded-xl border ${T.border}`}><div className="text-[9px] text-gray-600 tracking-wider uppercase mb-2">Crystals</div><div className="flex justify-center gap-4">{allCatNames.map(c=><div key={c} className="text-center"><div className={'w-6 h-6 rounded-full mx-auto mb-1 transition-all '+(myCr[c]?getCT(c).bg+' shadow-md '+getCT(c).glow:'bg-white/[0.06]')}/><span className="text-[9px] text-gray-600">{c}</span></div>)}</div></div>
-        <div className={`mt-4 p-3 ${T.bgCard} rounded-xl border ${T.border} flex items-center justify-between`}><div><div className={`text-sm font-medium ${T.text}`}>Email Reminders</div><div className="text-[10px] text-gray-500">Daily nudges at 12pm & 6pm</div></div><button onClick={async()=>{const newVal=currentUser.emailReminders===false?true:false;try{await updateDoc(doc(db,'users',currentUser.id),{emailReminders:!newVal});setCurrentUser(p=>({...p,emailReminders:!newVal}));}catch{}}} className={'relative w-11 h-6 rounded-full transition-all '+(currentUser.emailReminders!==false?'bg-blue-500':(darkMode?'bg-white/[0.08]':'bg-gray-200'))}><div className={'absolute top-1 w-4 h-4 rounded-full bg-white transition-all shadow-sm '+(currentUser.emailReminders!==false?'left-6':'left-1')}/></button></div>
+        <div className={`mt-4 p-3 ${T.bgCard} rounded-xl border ${T.border} flex items-center justify-between`}><div><div className={`text-sm font-medium ${T.text}`}>Email Reminders</div><div className="text-[10px] text-gray-500">Daily nudges at 12pm & 6pm</div></div><button onClick={async()=>{const newVal=currentUser.emailReminders===false?true:false;try{await supabase.from('users').update({email_reminders:!newVal}).eq('id',currentUser.id);setCurrentUser(p=>({...p,emailReminders:!newVal}));}catch{}}} className={'relative w-11 h-6 rounded-full transition-all '+(currentUser.emailReminders!==false?'bg-blue-500':(darkMode?'bg-white/[0.08]':'bg-gray-200'))}><div className={'absolute top-1 w-4 h-4 rounded-full bg-white transition-all shadow-sm '+(currentUser.emailReminders!==false?'left-6':'left-1')}/></button></div>
         {/* Quick actions */}
         <div className="mt-5 space-y-2">
           <button onClick={()=>{setShowProfile(false);setShowInviteModal(true);}} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border transition-all ${darkMode?'border-white/[0.06] bg-white/[0.02] hover:bg-white/[0.04] text-gray-300':'border-gray-200 bg-gray-50 hover:bg-gray-100 text-gray-700'}`}><UserPlus size={16} className="text-blue-400"/><span className="text-sm">Invite to Room</span></button>
           <button onClick={()=>{setShowProfile(false);setShowStakes(true);}} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border transition-all ${darkMode?'border-white/[0.06] bg-white/[0.02] hover:bg-white/[0.04] text-gray-300':'border-gray-200 bg-gray-50 hover:bg-gray-100 text-gray-700'}`}><Zap size={16} className="text-red-400"/><span className="text-sm">Stakes</span></button>
           {lastWeekData&&<button onClick={()=>{setShowProfile(false);setShowWeeklyRecap(true);}} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border transition-all ${darkMode?'border-white/[0.06] bg-white/[0.02] hover:bg-white/[0.04] text-gray-300':'border-gray-200 bg-gray-50 hover:bg-gray-100 text-gray-700'}`}><BarChart3 size={16} className="text-purple-400"/><span className="text-sm">Weekly Recap</span></button>}
           <button onClick={()=>{setShowProfile(false);setShowHelp(true);}} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border transition-all ${darkMode?'border-white/[0.06] bg-white/[0.02] hover:bg-white/[0.04] text-gray-300':'border-gray-200 bg-gray-50 hover:bg-gray-100 text-gray-700'}`}><HelpCircle size={16} className="text-gray-400"/><span className="text-sm">How Versa Works</span></button>
-          <button onClick={()=>signOut(auth)} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border transition-all ${darkMode?'border-white/[0.06] bg-white/[0.02] hover:bg-red-500/5 text-red-400':'border-gray-200 bg-gray-50 hover:bg-red-50 text-red-500'}`}><LogOut size={16}/><span className="text-sm">Sign Out</span></button>
+          <button onClick={()=>supabase.auth.signOut()} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border transition-all ${darkMode?'border-white/[0.06] bg-white/[0.02] hover:bg-red-500/5 text-red-400':'border-gray-200 bg-gray-50 hover:bg-red-50 text-red-500'}`}><LogOut size={16}/><span className="text-sm">Sign Out</span></button>
         </div>
       </Modal>
 
@@ -2329,7 +2357,7 @@ export default function VersaApp() {
               if(!newHabit.name.trim())return;
               try{
                 const hid=currentRoom.id+'_'+Date.now()+'_'+Math.random().toString(36).slice(2,8);
-                await setDoc(doc(db,'habits',hid),{
+                await supabase.from('habits').upsert({id:hid,
                   name:newHabit.name.trim(),category:newHabit.category,points:parseInt(newHabit.points)||10,
                   isRepeatable:newHabit.isRepeatable,maxCompletions:parseInt(newHabit.maxCompletions)||1,
                   roomId:currentRoom.id,createdBy:currentUser.id,createdAt:new Date().toISOString()
@@ -2396,7 +2424,7 @@ export default function VersaApp() {
                       <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-black bg-red-500/20 text-red-400">{m.username?.charAt(0)?.toUpperCase()}</div>
                       <span className={`text-sm font-medium ${darkMode?'text-gray-400':'text-gray-500'}`}>{m.username}</span>
                     </div>
-                    <button onClick={async()=>{try{await updateDoc(doc(db,'rooms',currentRoom.id),{kicked:arrayRemove(m.id)});setRoomKicked(prev=>prev.filter(x=>x!==m.id));}catch{}}} className={`text-[9px] px-2 py-1 rounded-lg font-medium transition-all ${darkMode?'text-gray-600 hover:text-emerald-400 hover:bg-emerald-500/10':'text-gray-400 hover:text-emerald-600 hover:bg-emerald-50'}`}>Restore</button>
+                    <button onClick={async()=>{try{await supabase.from('rooms').update({kicked:(roomKicked||[]).filter(x=>x!==m.id)}).eq('id',currentRoom.id);setRoomKicked(prev=>prev.filter(x=>x!==m.id));}catch{}}} className={`text-[9px] px-2 py-1 rounded-lg font-medium transition-all ${darkMode?'text-gray-600 hover:text-emerald-400 hover:bg-emerald-500/10':'text-gray-400 hover:text-emerald-600 hover:bg-emerald-50'}`}>Restore</button>
                   </div>
                 ))}
               </div>
