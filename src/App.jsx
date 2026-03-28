@@ -264,38 +264,46 @@ export default function VersaApp() {
     const joinCode = params.get('join');
     if (joinCode) { setRoomCode(joinCode.toUpperCase()); window.history.replaceState({}, '', window.location.pathname); }
 
-    // Safety timeout — if auth never fires, stop loading
-    const timeout = setTimeout(() => setAuthLoading(false), 5000);
+    let mounted = true;
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      clearTimeout(timeout);
+    const handleUser = async (user) => {
+      if (!mounted) return;
+      if (!user) { setCurrentUser(null); setAuthLoading(false); return; }
       try {
-        if (session?.user) {
-          const user = session.user;
-          const { data: ud, error: udErr } = await supabase.from('users').select('*').eq('id', user.id).maybeSingle();
-          if (ud) {
-            const data = { id: user.id, ...ud, photoURL: ud.photo_url || user.user_metadata?.avatar_url };
-            setCurrentUser(data);
-            const rooms = data.rooms || [];
-            setUserRooms(rooms);
-            const active = data.active_room || (rooms.length > 0 ? rooms[0] : null);
-            if (active) {
-              const { data: rd } = await supabase.from('rooms').select('*').eq('id', active).maybeSingle();
-              if (rd) { setCurrentRoom({ id: rd.id, ...rd, code: rd.code || rd.id }); setView('dashboard'); }
-              else setShowRoomModal(true);
-            } else setShowRoomModal(true);
-          } else {
-            // New user — create profile
-            const username = user.user_metadata?.full_name || user.email?.split('@')[0] || 'User';
-            await supabase.from('users').upsert({ id: user.id, username, email: user.email, photo_url: user.user_metadata?.avatar_url, rooms: [], streak_freeze: 0 });
-            setCurrentUser({ id: user.id, username, email: user.email, photoURL: user.user_metadata?.avatar_url, rooms: [] });
-            setShowRoomModal(true);
-          }
-        } else { setCurrentUser(null); }
+        const { data: ud } = await supabase.from('users').select('*').eq('id', user.id).maybeSingle();
+        if (!mounted) return;
+        if (ud) {
+          const data = { id: user.id, ...ud, photoURL: ud.photo_url || user.user_metadata?.avatar_url };
+          setCurrentUser(data);
+          const rooms = data.rooms || [];
+          setUserRooms(rooms);
+          const active = data.active_room || (rooms.length > 0 ? rooms[0] : null);
+          if (active) {
+            const { data: rd } = await supabase.from('rooms').select('*').eq('id', active).maybeSingle();
+            if (rd) { setCurrentRoom({ id: rd.id, ...rd, code: rd.code || rd.id }); setView('dashboard'); }
+            else setShowRoomModal(true);
+          } else setShowRoomModal(true);
+        } else {
+          const username = user.user_metadata?.full_name || user.email?.split('@')[0] || 'User';
+          await supabase.from('users').upsert({ id: user.id, username, email: user.email, photo_url: user.user_metadata?.avatar_url, rooms: [], streak_freeze: 0 });
+          setCurrentUser({ id: user.id, username, email: user.email, photoURL: user.user_metadata?.avatar_url, rooms: [] });
+          setShowRoomModal(true);
+        }
       } catch (err) { console.error('Auth error:', err); }
-      setAuthLoading(false);
+      if (mounted) setAuthLoading(false);
+    };
+
+    // Check existing session immediately
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      handleUser(session?.user || null);
+    }).catch(() => { if (mounted) setAuthLoading(false); });
+
+    // Listen for changes (login, logout, token refresh)
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      handleUser(session?.user || null);
     });
-    return () => { clearTimeout(timeout); subscription?.unsubscribe(); };
+
+    return () => { mounted = false; subscription?.unsubscribe(); };
   }, []);
 
   // ─── REALTIME DATA ───
