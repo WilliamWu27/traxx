@@ -317,7 +317,7 @@ export default function VersaApp() {
       if (data) setHabits(data.map(h => ({ ...h, id: h.id, roomId: h.room_id, isRepeatable: h.is_repeatable, maxCompletions: h.max_completions, createdBy: h.created_by })));
     };
     fetchHabits();
-    subs.push(supabase.channel('habits-'+currentRoom.id).on('postgres_changes', { event: '*', schema: 'public', table: 'habits', filter: 'room_id=eq.'+currentRoom.id }, fetchHabits).subscribe());
+    subs.push(supabase.channel('habits-'+currentRoom.id).on('postgres_changes', { event: '*', schema: 'public', table: 'habits', filter: 'room_id=eq.'+currentRoom.id }, ()=>setTimeout(fetchHabits,300)).subscribe());
 
     // Fetch today's completions
     const today = getToday();
@@ -326,7 +326,7 @@ export default function VersaApp() {
       if (data) setCompletions(data.map(c => ({ ...c, id: c.id, userId: c.user_id, habitId: c.habit_id, roomId: c.room_id, habitName: c.habit_name, habitCategory: c.habit_category, habitPoints: c.habit_points, bonusPoints: c.bonus_points, streakMultiplier: c.streak_multiplier })));
     };
     fetchCompletions();
-    subs.push(supabase.channel('completions-today-'+currentRoom.id).on('postgres_changes', { event: '*', schema: 'public', table: 'completions', filter: 'room_id=eq.'+currentRoom.id }, fetchCompletions).subscribe());
+    subs.push(supabase.channel('completions-today-'+currentRoom.id).on('postgres_changes', { event: '*', schema: 'public', table: 'completions' }, ()=>setTimeout(fetchCompletions,300)).subscribe());
 
     // Fetch weekly completions
     const ws = getWeekStart(), we = getWeekEnd();
@@ -335,7 +335,7 @@ export default function VersaApp() {
       if (data) setAllCompletions(data.map(c => ({ ...c, id: c.id, userId: c.user_id, habitId: c.habit_id, roomId: c.room_id, habitName: c.habit_name, habitCategory: c.habit_category, habitPoints: c.habit_points, bonusPoints: c.bonus_points })));
     };
     fetchWeekly();
-    // Weekly updates via same completions channel
+    subs.push(supabase.channel('completions-week-'+currentRoom.id).on('postgres_changes', { event: '*', schema: 'public', table: 'completions' }, ()=>setTimeout(fetchWeekly,500)).subscribe());
 
     // Fetch members (users who have this room in their rooms array)
     const fetchMembers = async () => {
@@ -343,20 +343,20 @@ export default function VersaApp() {
       if (data) setRoomMembers(data.map(u => ({ ...u, id: u.id, username: u.username, email: u.email, photoURL: u.photo_url, roomId: u.active_room, streakFreeze: u.streak_freeze, emailReminders: u.email_reminders })));
     };
     fetchMembers();
-    subs.push(supabase.channel('members-'+currentRoom.id).on('postgres_changes', { event: '*', schema: 'public', table: 'users' }, fetchMembers).subscribe());
+    subs.push(supabase.channel('members-'+currentRoom.id).on('postgres_changes', { event: '*', schema: 'public', table: 'users' }, ()=>setTimeout(fetchMembers,300)).subscribe());
 
     // Fetch stakes
     const fetchStakes = async () => {
-      const { data } = await supabase.from('stakes').select('*').eq('id', currentRoom.id).single();
+      const { data } = await supabase.from('stakes').select('*').eq('room_id', currentRoom.id).eq('active', true).maybeSingle();
       if (data) setRoomStakes({ ...data, id: data.id, roomId: data.room_id, createdBy: data.created_by });
       else setRoomStakes(null);
     };
     fetchStakes();
-    subs.push(supabase.channel('stakes-'+currentRoom.id).on('postgres_changes', { event: '*', schema: 'public', table: 'stakes', filter: 'id=eq.'+currentRoom.id }, fetchStakes).subscribe());
+    subs.push(supabase.channel('stakes-'+currentRoom.id).on('postgres_changes', { event: '*', schema: 'public', table: 'stakes' }, ()=>setTimeout(fetchStakes,300)).subscribe());
 
     // Fetch room categories
     const fetchCats = async () => {
-      const { data } = await supabase.from('room_categories').select('*').eq('room_id', currentRoom.id).single();
+      const { data } = await supabase.from('room_categories').select('*').eq('room_id', currentRoom.id).maybeSingle();
       if (data?.categories) setRoomCategories(data.categories);
       else setRoomCategories([]);
     };
@@ -368,6 +368,7 @@ export default function VersaApp() {
       if (data) setActivityFeed(data.map(a => ({ ...a, id: a.id, userId: a.user_id, roomId: a.room_id })));
     };
     fetchActivity();
+    subs.push(supabase.channel('activity-'+currentRoom.id).on('postgres_changes', { event: '*', schema: 'public', table: 'activity' }, ()=>setTimeout(fetchActivity,300)).subscribe());
     subs.push(supabase.channel('activity-'+currentRoom.id).on('postgres_changes', { event: '*', schema: 'public', table: 'activity', filter: 'room_id=eq.'+currentRoom.id }, () => { fetchActivity(); fetchWeekly(); }).subscribe());
 
     // Fetch personal board
@@ -1020,9 +1021,19 @@ export default function VersaApp() {
 
     // Roll for mystery bonus
     const bonus = rollBonus();
-    // Apply streak multiplier to base points, then bonus on top
     const baseWithStreak = Math.round(h.points * streakMulti.multi);
     const finalPts = bonus ? baseWithStreak * bonus.multi : baseWithStreak;
+
+    // Optimistic update — immediately update local state
+    if (ex) {
+      if (ex.count >= max) return;
+      setCompletions(prev => prev.map(c => c.id === ex.id ? { ...c, count: c.count + 1, habitPoints: baseWithStreak, bonusPoints: bonus ? (c.bonusPoints||0) + (finalPts - baseWithStreak) : c.bonusPoints||0 } : c));
+      if (ex.count + 1 >= max) triggerMaxed();
+    } else {
+      const cid = currentUser.id+'_'+hid+'_'+t;
+      setCompletions(prev => [...prev, { id: cid, userId: currentUser.id, habitId: hid, roomId: currentRoom.id, date: t, count: 1, habitName: h.name, habitPoints: baseWithStreak, habitCategory: h.category, streakMultiplier: streakMulti.multi, bonusPoints: bonus ? finalPts - baseWithStreak : 0 }]);
+      if (max === 1) triggerMaxed();
+    }
 
     try {
       if (ex) {
@@ -1033,7 +1044,6 @@ export default function VersaApp() {
             ...(bonus ? { bonus_points: (ex.bonusPoints||0) + (finalPts - baseWithStreak) } : {}),
             streak_multiplier: streakMulti.multi
           }).eq('id', ex.id);
-          if(ex.count+1>=max) triggerMaxed();
         }
       } else {
         const cid = currentUser.id+'_'+hid+'_'+t;
@@ -1043,7 +1053,6 @@ export default function VersaApp() {
           streak_multiplier: streakMulti.multi,
           ...(bonus ? { bonus_points: finalPts - baseWithStreak } : {})
         });
-        if (max===1) triggerMaxed();
       }
       // Show bonus notification
       if (bonus) {
@@ -1066,6 +1075,16 @@ export default function VersaApp() {
   };
   const handleDecrement = async (hid) => {
     const ex = getExisting(hid); if(!ex) return;
+
+    // Optimistic update
+    if (ex.count > 1) {
+      const newCount = ex.count - 1;
+      const newBonus = ex.bonusPoints ? Math.round((ex.bonusPoints / ex.count) * newCount) : 0;
+      setCompletions(prev => prev.map(c => c.id === ex.id ? { ...c, count: newCount, bonusPoints: newBonus } : c));
+    } else {
+      setCompletions(prev => prev.filter(c => c.id !== ex.id));
+    }
+
     try {
       if (ex.count > 1) {
         const newCount = ex.count - 1;
