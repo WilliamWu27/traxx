@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Clock, Plus, X, LogOut, Copy, Check, UserPlus, HelpCircle, Trophy, User, Flame, Zap, Star, TrendingUp, ArrowLeftRight, Edit3, Calendar, ChevronLeft, ChevronRight, Crown, Target, ArrowUp, ArrowDown, Minus as MinusIcon, GripVertical, BarChart3, Sun, Moon, ChevronDown, Trash2, Bell } from 'lucide-react';
+import { Clock, Plus, X, LogOut, Copy, Check, UserPlus, HelpCircle, Trophy, User, Flame, Zap, Star, TrendingUp, ArrowLeftRight, Edit3, Calendar, ChevronLeft, ChevronRight, Crown, Target, ArrowUp, ArrowDown, Minus as MinusIcon, GripVertical, BarChart3, Sun, Moon, ChevronDown, Trash2 } from 'lucide-react';
 import { supabase } from './supabase';
 
 // ─── PUSH NOTIFICATIONS ───
@@ -133,7 +133,24 @@ function ModalHeader({ title, onClose, icon, dark }) {
   );
 }
 
-export default function VersaApp() {
+
+class ErrorBoundary extends React.Component {
+  constructor(props) { super(props); this.state = { error: null }; }
+  static getDerivedStateFromError(error) { return { error }; }
+  render() {
+    if (this.state.error) return (
+      <div style={{padding:40,fontFamily:'monospace',background:'#0f1b2d',color:'#ff6b6b',minHeight:'100vh'}}>
+        <h1 style={{fontSize:24,marginBottom:16}}>App Error</h1>
+        <pre style={{whiteSpace:'pre-wrap',fontSize:12,color:'#ccc'}}>{this.state.error.toString()}</pre>
+        <pre style={{whiteSpace:'pre-wrap',fontSize:10,color:'#888',marginTop:8}}>{this.state.error.stack}</pre>
+        <button onClick={()=>window.location.reload()} style={{marginTop:20,padding:'10px 20px',background:'#5b7cf5',color:'white',border:'none',borderRadius:8,cursor:'pointer'}}>Reload</button>
+      </div>
+    );
+    return this.props.children;
+  }
+}
+
+function VersaAppMain() {
   // ─── DATE HELPERS (must be before state that uses them) ───
   const formatDateStr = (d) => d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
   const getToday = () => { const d = new Date(); return formatDateStr(d); };
@@ -2498,3 +2515,6 @@ export default function VersaApp() {
     </div>
   );
 }
+
+
+export default function VersaApp() { return <ErrorBoundary><VersaAppMain/></ErrorBoundary>; }
