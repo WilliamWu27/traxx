@@ -804,168 +804,6 @@ export default function VersaApp() {
     update(); const iv = setInterval(update, 30000); return () => clearInterval(iv);
   }, []);
 
-  // ─── PUSH NOTIFICATIONS SETUP ───
-  useEffect(() => {
-    if (!currentUser) return;
-    const setup = async () => {
-      const reg = await registerServiceWorker();
-      if (!reg) return;
-      if ('Notification' in window) {
-        setNotifPermission(Notification.permission);
-      }
-    };
-    setup();
-  }, [currentUser]);
-
-  // Helper: throttle notifications (max 1 per tag per 5 min)
-  const notifThrottleRef = useRef({});
-  const throttledNotify = (title, body, tag) => {
-    const now = Date.now();
-    const lastSent = notifThrottleRef.current[tag] || 0;
-    if (now - lastSent < 300000) return; // 5 min cooldown per tag
-    notifThrottleRef.current[tag] = now;
-    sendLocalNotification(title, body, tag);
-  };
-
-  // ─── COMPETITION NOTIFICATIONS ───
-  useEffect(() => {
-    if (!currentUser || !currentRoom || notifPermission !== 'granted') return;
-    const prev = prevCompletionsRef.current;
-    if (prev.length === 0) { prevCompletionsRef.current = completions; return; }
-    
-    const prevIds = new Set(prev.map(c => c.id + '_' + c.count));
-    const newOnes = completions.filter(c => c.userId !== currentUser.id && !prevIds.has(c.id + '_' + c.count));
-    
-    if (newOnes.length > 0) {
-      const latest = newOnes[newOnes.length - 1];
-      const member = activeMembers.find(m => m.id === latest.userId);
-      const habit = habits.find(h => h.id === latest.habitId);
-      if (member) {
-        const rivalPts = completions.filter(c => c.userId === latest.userId).reduce((s, c) => s + ((c.habitPoints || 0) * (c.count || 1)) + (c.bonusPoints || 0), 0);
-        const rivalCompletionCount = completions.filter(c => c.userId === latest.userId).reduce((s, c) => s + (c.count || 1), 0);
-
-        // 1. Rival passed you
-        const prevRivalPts = prev.filter(c => c.userId === latest.userId).reduce((s, c) => s + ((c.habitPoints || 0) * (c.count || 1)) + (c.bonusPoints || 0), 0);
-        if (rivalPts > myPts && prevRivalPts <= myPts && myPts > 0) {
-          throttledNotify('🔥 ' + member.username + ' passed you!', rivalPts + ' pts vs your ' + myPts + '. Time to grind.', 'rival-pass-' + latest.userId);
-        }
-        // 2. Rival on a tear (5+ completions)
-        else if (rivalCompletionCount >= 5 && rivalCompletionCount % 5 === 0) {
-          throttledNotify(member.username + ' is on a tear 💪', rivalCompletionCount + ' habits logged today. Don\'t fall behind.', 'rival-tear-' + latest.userId);
-        }
-        // 3. General rival activity (only when app is in background, less frequent)
-        else if (document.hidden && habit) {
-          throttledNotify(member.username + ' is grinding', habit.name + ' (+' + (habit.points || 10) + ')', 'rival-log');
-        }
-      }
-    }
-    prevCompletionsRef.current = completions;
-  }, [completions]);
-
-  // ─── REACTION NOTIFICATIONS ───
-  const prevActivityRef = useRef([]);
-  useEffect(() => {
-    if (!currentUser || notifPermission !== 'granted' || activityFeed.length === 0) return;
-    const prev = prevActivityRef.current;
-    if (prev.length === 0) { prevActivityRef.current = activityFeed; return; }
-
-    // Check for new reactions on MY activities
-    activityFeed.forEach(a => {
-      if (a.userId !== currentUser.id) return;
-      const prevA = prev.find(p => p.id === a.id);
-      const prevReactions = prevA?.reactions || {};
-      const newReactions = a.reactions || {};
-      Object.entries(newReactions).forEach(([uid, emoji]) => {
-        if (!prevReactions[uid] && uid !== currentUser.id) {
-          const reactor = activeMembers.find(m => m.id === uid);
-          if (reactor) {
-            throttledNotify(reactor.username + ' reacted ' + emoji, 'to your ' + (a.text || 'activity'), 'reaction-' + a.id);
-          }
-        }
-      });
-    });
-    prevActivityRef.current = activityFeed;
-  }, [activityFeed]);
-
-  // ─── PROTECTION NOTIFICATIONS (streak, logging reminders) ───
-  useEffect(() => {
-    if (!currentUser || notifPermission !== 'granted') return;
-    const checkReminders = () => {
-      const hour = new Date().getHours();
-      const today = getToday();
-
-      // Streak at risk — 8pm warning
-      if (hour === 20 && myPts < 80 && streakData.streak > 0) {
-        const key = 'vers-streak8-' + today;
-        if (!sessionStorage.getItem(key)) {
-          sendLocalNotification('⚠️ Your ' + streakData.streak + '-day streak is at risk', 'You need 80pts to keep it alive. Log some habits before midnight.', 'streak-8pm');
-          sessionStorage.setItem(key, '1');
-        }
-      }
-
-      // Last chance — 10pm warning
-      if (hour === 22 && myPts < 80 && streakData.streak > 0) {
-        const key = 'vers-streak10-' + today;
-        if (!sessionStorage.getItem(key)) {
-          sendLocalNotification('🚨 2 hours left!', 'Your ' + streakData.streak + '-day streak breaks at midnight. ' + (streakFreeze > 0 ? 'Freeze will save you, but you won\'t earn a new one.' : 'No freeze banked — this is it.'), 'streak-10pm');
-          sessionStorage.setItem(key, '1');
-        }
-      }
-
-      // Don't forget to log — 6pm gentle nudge if nothing logged
-      if (hour === 18 && myPts === 0) {
-        const key = 'vers-nudge-' + today;
-        if (!sessionStorage.getItem(key)) {
-          sendLocalNotification('📋 Don\'t forget to log today', 'Your rivals might already be ahead. Open Vers and start tracking.', 'daily-nudge');
-          sessionStorage.setItem(key, '1');
-        }
-      }
-
-      // Last place weekly warning — Sunday 6pm
-      if (new Date().getDay() === 0 && hour === 18) {
-        const key = 'vers-lastplace-' + today;
-        if (!sessionStorage.getItem(key) && weeklyWinner && activeMembers.length > 1) {
-          const lb = activeMembers.map(m => ({ id: m.id, pts: allCompletions.filter(c => c.userId === m.id).reduce((s, c) => s + ((c.habitPoints || 0) * (c.count || 1)) + (c.bonusPoints || 0), 0) })).sort((a, b) => b.pts - a.pts);
-          if (lb.length > 0 && lb[lb.length - 1].id === currentUser.id) {
-            sendLocalNotification('😬 You\'re in last place', 'The week resets tonight. Still time to make a push.', 'last-place');
-            sessionStorage.setItem(key, '1');
-          }
-        }
-      }
-    };
-    checkReminders();
-    const iv = setInterval(checkReminders, 60000 * 5);
-    return () => clearInterval(iv);
-  }, [currentUser, notifPermission, myPts, streakData.streak, streakFreeze, weeklyWinner]);
-
-  // ─── CELEBRATION NOTIFICATIONS ───
-  // Won the week — fires when lastWeekData loads and you're #1
-  const weekWinNotifiedRef = useRef(false);
-  useEffect(() => {
-    if (!currentUser || !lastWeekData || weekWinNotifiedRef.current || notifPermission !== 'granted') return;
-    if (lastWeekData.scores.length > 0 && lastWeekData.scores[0].member.id === currentUser.id) {
-      weekWinNotifiedRef.current = true;
-      throttledNotify('🏆 You won the week!', lastWeekData.scores[0].pts + ' pts — you dominated. Share your recap!', 'week-win');
-    }
-  }, [lastWeekData]);
-
-  // Duo streak milestone — fires when a mutual streak hits 3, 7, 14, 30
-  const duoMilestoneRef = useRef({});
-  useEffect(() => {
-    if (!currentUser || notifPermission !== 'granted') return;
-    Object.entries(mutualStreaks).forEach(([uid, days]) => {
-      const milestones = [3, 7, 14, 30];
-      const lastNotified = duoMilestoneRef.current[uid] || 0;
-      const crossed = milestones.find(m => days >= m && lastNotified < m);
-      if (crossed) {
-        const rival = activeMembers.find(m => m.id === uid);
-        if (rival) {
-          duoMilestoneRef.current[uid] = crossed;
-          throttledNotify('🔗 ' + crossed + '-day duo streak!', 'You and ' + rival.username + ' — ' + crossed + ' days grinding together.', 'duo-' + uid + '-' + crossed);
-        }
-      }
-    });
-  }, [mutualStreaks]);
   const freezeEarnedRef = useRef(false);
   useEffect(() => {
     if (!currentUser || !currentRoom) return;
@@ -1360,6 +1198,175 @@ export default function VersaApp() {
   const getDailyProgress = () => { if(!currentUser||!currentRoom)return 0; const pts=getTodayPts(currentUser.id); return Math.min(pts/DAILY_TARGET,1); };
   const getLeaderboard = () => activeMembers.map(m=>({member:m,todayPts:getTodayPts(m.id),weeklyPts:getWeeklyPts(m.id),crystals:getTodayCrystals(m.id),weeklyCrystals:getWeeklyCrystals(m.id)})).sort((a,b)=>leaderboardTab==='today'?b.todayPts-a.todayPts:b.weeklyPts-a.weeklyPts);
 
+  const myCr = currentUser&&currentRoom ? getTodayCrystals(currentUser.id) : {};
+  const myPts = currentUser&&currentRoom ? getTodayPts(currentUser.id) : 0;
+  const isPerfect = allCatNames.length > 0 && allCatNames.every(c => myCr[c]);
+  const dailyProg = currentUser&&currentRoom ? getDailyProgress() : 0;
+  const displayHabits = (myBoardIds && !editMode) ? habits.filter(h => myBoardIds.includes(h.id)) : habits;
+
+  // ─── PUSH NOTIFICATIONS SETUP ───
+  useEffect(() => {
+    if (!currentUser) return;
+    const setup = async () => {
+      const reg = await registerServiceWorker();
+      if (!reg) return;
+      if ('Notification' in window) {
+        setNotifPermission(Notification.permission);
+      }
+    };
+    setup();
+  }, [currentUser]);
+
+  // Helper: throttle notifications (max 1 per tag per 5 min)
+  const notifThrottleRef = useRef({});
+  const throttledNotify = (title, body, tag) => {
+    const now = Date.now();
+    const lastSent = notifThrottleRef.current[tag] || 0;
+    if (now - lastSent < 300000) return; // 5 min cooldown per tag
+    notifThrottleRef.current[tag] = now;
+    sendLocalNotification(title, body, tag);
+  };
+
+  // ─── COMPETITION NOTIFICATIONS ───
+  useEffect(() => {
+    if (!currentUser || !currentRoom || notifPermission !== 'granted') return;
+    const prev = prevCompletionsRef.current;
+    if (prev.length === 0) { prevCompletionsRef.current = completions; return; }
+    
+    const prevIds = new Set(prev.map(c => c.id + '_' + c.count));
+    const newOnes = completions.filter(c => c.userId !== currentUser.id && !prevIds.has(c.id + '_' + c.count));
+    
+    if (newOnes.length > 0) {
+      const latest = newOnes[newOnes.length - 1];
+      const member = activeMembers.find(m => m.id === latest.userId);
+      const habit = habits.find(h => h.id === latest.habitId);
+      if (member) {
+        const rivalPts = completions.filter(c => c.userId === latest.userId).reduce((s, c) => s + ((c.habitPoints || 0) * (c.count || 1)) + (c.bonusPoints || 0), 0);
+        const rivalCompletionCount = completions.filter(c => c.userId === latest.userId).reduce((s, c) => s + (c.count || 1), 0);
+
+        // 1. Rival passed you
+        const prevRivalPts = prev.filter(c => c.userId === latest.userId).reduce((s, c) => s + ((c.habitPoints || 0) * (c.count || 1)) + (c.bonusPoints || 0), 0);
+        if (rivalPts > myPts && prevRivalPts <= myPts && myPts > 0) {
+          throttledNotify('🔥 ' + member.username + ' passed you!', rivalPts + ' pts vs your ' + myPts + '. Time to grind.', 'rival-pass-' + latest.userId);
+        }
+        // 2. Rival on a tear (5+ completions)
+        else if (rivalCompletionCount >= 5 && rivalCompletionCount % 5 === 0) {
+          throttledNotify(member.username + ' is on a tear 💪', rivalCompletionCount + ' habits logged today. Don\'t fall behind.', 'rival-tear-' + latest.userId);
+        }
+        // 3. General rival activity (only when app is in background, less frequent)
+        else if (document.hidden && habit) {
+          throttledNotify(member.username + ' is grinding', habit.name + ' (+' + (habit.points || 10) + ')', 'rival-log');
+        }
+      }
+    }
+    prevCompletionsRef.current = completions;
+  }, [completions]);
+
+  // ─── REACTION NOTIFICATIONS ───
+  const prevActivityRef = useRef([]);
+  useEffect(() => {
+    if (!currentUser || notifPermission !== 'granted' || activityFeed.length === 0) return;
+    const prev = prevActivityRef.current;
+    if (prev.length === 0) { prevActivityRef.current = activityFeed; return; }
+
+    // Check for new reactions on MY activities
+    activityFeed.forEach(a => {
+      if (a.userId !== currentUser.id) return;
+      const prevA = prev.find(p => p.id === a.id);
+      const prevReactions = prevA?.reactions || {};
+      const newReactions = a.reactions || {};
+      Object.entries(newReactions).forEach(([uid, emoji]) => {
+        if (!prevReactions[uid] && uid !== currentUser.id) {
+          const reactor = activeMembers.find(m => m.id === uid);
+          if (reactor) {
+            throttledNotify(reactor.username + ' reacted ' + emoji, 'to your ' + (a.text || 'activity'), 'reaction-' + a.id);
+          }
+        }
+      });
+    });
+    prevActivityRef.current = activityFeed;
+  }, [activityFeed]);
+
+  // ─── PROTECTION NOTIFICATIONS (streak, logging reminders) ───
+  useEffect(() => {
+    if (!currentUser || notifPermission !== 'granted') return;
+    const checkReminders = () => {
+      const hour = new Date().getHours();
+      const today = getToday();
+
+      // Streak at risk — 8pm warning
+      if (hour === 20 && myPts < 80 && streakData.streak > 0) {
+        const key = 'vers-streak8-' + today;
+        if (!sessionStorage.getItem(key)) {
+          sendLocalNotification('⚠️ Your ' + streakData.streak + '-day streak is at risk', 'You need 80pts to keep it alive. Log some habits before midnight.', 'streak-8pm');
+          sessionStorage.setItem(key, '1');
+        }
+      }
+
+      // Last chance — 10pm warning
+      if (hour === 22 && myPts < 80 && streakData.streak > 0) {
+        const key = 'vers-streak10-' + today;
+        if (!sessionStorage.getItem(key)) {
+          sendLocalNotification('🚨 2 hours left!', 'Your ' + streakData.streak + '-day streak breaks at midnight. ' + (streakFreeze > 0 ? 'Freeze will save you, but you won\'t earn a new one.' : 'No freeze banked — this is it.'), 'streak-10pm');
+          sessionStorage.setItem(key, '1');
+        }
+      }
+
+      // Don't forget to log — 6pm gentle nudge if nothing logged
+      if (hour === 18 && myPts === 0) {
+        const key = 'vers-nudge-' + today;
+        if (!sessionStorage.getItem(key)) {
+          sendLocalNotification('📋 Don\'t forget to log today', 'Your rivals might already be ahead. Open Vers and start tracking.', 'daily-nudge');
+          sessionStorage.setItem(key, '1');
+        }
+      }
+
+      // Last place weekly warning — Sunday 6pm
+      if (new Date().getDay() === 0 && hour === 18) {
+        const key = 'vers-lastplace-' + today;
+        if (!sessionStorage.getItem(key) && weeklyWinner && activeMembers.length > 1) {
+          const lb = activeMembers.map(m => ({ id: m.id, pts: allCompletions.filter(c => c.userId === m.id).reduce((s, c) => s + ((c.habitPoints || 0) * (c.count || 1)) + (c.bonusPoints || 0), 0) })).sort((a, b) => b.pts - a.pts);
+          if (lb.length > 0 && lb[lb.length - 1].id === currentUser.id) {
+            sendLocalNotification('😬 You\'re in last place', 'The week resets tonight. Still time to make a push.', 'last-place');
+            sessionStorage.setItem(key, '1');
+          }
+        }
+      }
+    };
+    checkReminders();
+    const iv = setInterval(checkReminders, 60000 * 5);
+    return () => clearInterval(iv);
+  }, [currentUser, notifPermission, myPts, streakData.streak, streakFreeze, weeklyWinner]);
+
+  // ─── CELEBRATION NOTIFICATIONS ───
+  // Won the week — fires when lastWeekData loads and you're #1
+  const weekWinNotifiedRef = useRef(false);
+  useEffect(() => {
+    if (!currentUser || !lastWeekData || weekWinNotifiedRef.current || notifPermission !== 'granted') return;
+    if (lastWeekData.scores.length > 0 && lastWeekData.scores[0].member.id === currentUser.id) {
+      weekWinNotifiedRef.current = true;
+      throttledNotify('🏆 You won the week!', lastWeekData.scores[0].pts + ' pts — you dominated. Share your recap!', 'week-win');
+    }
+  }, [lastWeekData]);
+
+  // Duo streak milestone — fires when a mutual streak hits 3, 7, 14, 30
+  const duoMilestoneRef = useRef({});
+  useEffect(() => {
+    if (!currentUser || notifPermission !== 'granted') return;
+    Object.entries(mutualStreaks).forEach(([uid, days]) => {
+      const milestones = [3, 7, 14, 30];
+      const lastNotified = duoMilestoneRef.current[uid] || 0;
+      const crossed = milestones.find(m => days >= m && lastNotified < m);
+      if (crossed) {
+        const rival = activeMembers.find(m => m.id === uid);
+        if (rival) {
+          duoMilestoneRef.current[uid] = crossed;
+          throttledNotify('🔗 ' + crossed + '-day duo streak!', 'You and ' + rival.username + ' — ' + crossed + ' days grinding together.', 'duo-' + uid + '-' + crossed);
+        }
+      }
+    });
+  }, [mutualStreaks]);
+
   // ─── CATEGORY SYSTEM ───
   const COLOR_PALETTE = [
     { name:'Dusty Blue', neon:'#5b7cf5', bg:'bg-[#5b7cf5] hover:bg-[#4a6be4]', bgS:'bg-[#5b7cf5]/10', bgM:'bg-[#5b7cf5]/20', bdr:'border-[#5b7cf5]/30', txt:'text-[#5b7cf5]', txtB:'text-[#7b9cf7]', pill:'bg-[#5b7cf5]/20 text-[#5b7cf5]', glow:'shadow-[#5b7cf5]/15' },
@@ -1425,12 +1432,6 @@ export default function VersaApp() {
   };
   const inputCls = `w-full px-4 py-3 ${T.bgInput} border ${T.borderInput} rounded-xl focus:outline-none focus:border-[#4a90e8]/50 ${T.text} placeholder-[#4a6080] text-sm transition-all`;
   const btnPrimary = "w-full py-3.5 rounded-xl text-sm font-bold tracking-wide transition-all disabled:opacity-50 active:scale-[0.98]";
-
-  const myCr = currentUser&&currentRoom ? getTodayCrystals(currentUser.id) : {};
-  const myPts = currentUser&&currentRoom ? getTodayPts(currentUser.id) : 0;
-  const isPerfect = allCatNames.length > 0 && allCatNames.every(c => myCr[c]);
-  const dailyProg = currentUser&&currentRoom ? getDailyProgress() : 0;
-  const displayHabits = (myBoardIds && !editMode) ? habits.filter(h => myBoardIds.includes(h.id)) : habits;
 
   // ─── LOADING ───
   if (authLoading) return (
