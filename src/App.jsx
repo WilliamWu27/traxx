@@ -228,31 +228,33 @@ export default function VersaApp() {
   const loadDefaultHabits = async () => {
     const defaultHabits = [
       // STUDY — time-based
-      { name: 'Deep work', category: 'Study', points: 10, isRepeatable: true, maxCompletions: 99, unit: 'per 30 min' },
-      { name: 'Read', category: 'Study', points: 10, isRepeatable: true, maxCompletions: 99, unit: 'per 30 min' },
+      { name: 'Deep work', category: 'Study', points: 10, is_repeatable: true, max_completions: 99, unit: 'per 30 min' },
+      { name: 'Read', category: 'Study', points: 10, is_repeatable: true, max_completions: 99, unit: 'per 30 min' },
       // STUDY — completion-based
-      { name: 'Small task', category: 'Study', points: 10, isRepeatable: true, maxCompletions: 99 },
-      { name: 'Big task', category: 'Study', points: 30, isRepeatable: true, maxCompletions: 99 },
+      { name: 'Small task', category: 'Study', points: 10, is_repeatable: true, max_completions: 99 },
+      { name: 'Big task', category: 'Study', points: 30, is_repeatable: true, max_completions: 99 },
       // HEALTH — gym, sleep, nutrition
-      { name: 'Hit the gym', category: 'Health', points: 20, isRepeatable: true, maxCompletions: 99, unit: 'per 30 min' },
-      { name: 'Slept 7+ hours', category: 'Health', points: 30, isRepeatable: false, maxCompletions: 1 },
-      { name: 'Woke up before 7', category: 'Health', points: 30, isRepeatable: false, maxCompletions: 1 },
-      { name: 'Clean eating', category: 'Health', points: 10, isRepeatable: true, maxCompletions: 99, unit: 'per meal' },
+      { name: 'Hit the gym', category: 'Health', points: 20, is_repeatable: true, max_completions: 99, unit: 'per 30 min' },
+      { name: 'Slept 7+ hours', category: 'Health', points: 30, is_repeatable: false, max_completions: 1 },
+      { name: 'Woke up before 7', category: 'Health', points: 30, is_repeatable: false, max_completions: 1 },
+      { name: 'Clean eating', category: 'Health', points: 10, is_repeatable: true, max_completions: 99, unit: 'per meal' },
       // FOCUS — screen time, substances, mindset
-      { name: 'Screen time under 2.5hrs', category: 'Focus', points: 30, isRepeatable: false, maxCompletions: 1 },
-      { name: 'No vaping / substances', category: 'Focus', points: 30, isRepeatable: false, maxCompletions: 1 },
-      { name: 'Work done before 9pm', category: 'Focus', points: 30, isRepeatable: false, maxCompletions: 1 },
-      { name: 'Journaled', category: 'Focus', points: 10, isRepeatable: true, maxCompletions: 99, unit: 'per 5 min' },
+      { name: 'Screen time under 2.5hrs', category: 'Focus', points: 30, is_repeatable: false, max_completions: 1 },
+      { name: 'No vaping / substances', category: 'Focus', points: 30, is_repeatable: false, max_completions: 1 },
+      { name: 'Work done before 9pm', category: 'Focus', points: 30, is_repeatable: false, max_completions: 1 },
+      { name: 'Journaled', category: 'Focus', points: 10, is_repeatable: true, max_completions: 99, unit: 'per 5 min' },
     ];
     try {
       setLoading(true);
-      for (const habit of defaultHabits) {
+      const rows = defaultHabits.map(habit => {
         const id = currentRoom.id + '_' + Date.now() + '_' + Math.random().toString(36).slice(2,8);
-        await supabase.from('habits').upsert({ id, ...habit, room_id: currentRoom.id, created_by: currentUser.id });
-      }
+        return { id, ...habit, room_id: currentRoom.id, created_by: currentUser.id };
+      });
+      const { error } = await supabase.from('habits').insert(rows);
+      if (error) throw error;
       setShowAddHabit(false);
       setConfettiTrigger(v=>v+1);
-    } catch (err) { console.error(err); setError('Failed to load defaults'); } finally { setLoading(false); }
+    } catch (err) { console.error(err); setError('Failed to load defaults: ' + err.message); } finally { setLoading(false); }
   };
 
   // ─── AUTH LISTENER ───
@@ -1734,7 +1736,7 @@ export default function VersaApp() {
       {/* Add Habit */}
       <Modal show={showAddHabit} onClose={()=>setShowAddHabit(false)} dark={darkMode}>
         <ModalHeader title="Add Habit" onClose={()=>setShowAddHabit(false)} dark={darkMode}/>
-        <button onClick={loadDefaultHabits} disabled={loading} className="w-full mb-5 px-4 py-3 bg-[#7c82a8] text-white rounded-xl shadow-lg shadow-violet-500/20 text-sm font-bold active:scale-[0.98] disabled:opacity-50">{loading?'Loading...':'⚡ Load Student Preset (12 habits)'}</button>
+        <button onClick={loadDefaultHabits} disabled={loading} className="w-full mb-5 px-4 py-3 bg-[#7c82a8] text-white rounded-xl shadow-lg shadow-violet-500/20 text-sm font-bold active:scale-[0.98] disabled:opacity-50">{loading?'Loading...':'⚡ Load Preset (12 habits)'}</button>
         <div className="space-y-3">
           <input type="text" placeholder="Habit name" value={newHabit.name} onChange={e=>setNewHabit({...newHabit,name:e.target.value})} className={inputCls} maxLength={30}/>
           <div className="grid grid-cols-2 gap-3">
