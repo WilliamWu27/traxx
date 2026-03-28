@@ -581,10 +581,10 @@ export default function VersaApp() {
   const getRoomRole = (uid) => {
     if (!currentRoom) return null;
     if ((roomCreatedBy || currentRoom.createdBy) === uid) {
-      if (weeklyWinner?.member?.id === uid) return { role: 'Champion', icon: '👑', color: 'text-amber-400' };
+      if (weeklyWinner?.member?.id === uid) return { role: 'Champion', icon: '👑', color: 'text-[#e8864a]' };
       return { role: 'Creator', icon: '⚡', color: 'text-blue-400' };
     }
-    if (weeklyWinner?.member?.id === uid) return { role: 'Defender', icon: '🛡️', color: 'text-amber-400' };
+    if (weeklyWinner?.member?.id === uid) return { role: 'Defender', icon: '🛡️', color: 'text-[#e8864a]' };
     if (lastWeekData?.scores) {
       const lastIdx = lastWeekData.scores.findIndex(s=>s.member.id===uid);
       if (lastIdx === lastWeekData.scores.length - 1 && lastWeekData.scores.length > 1) return { role: 'Underdog', icon: '🔥', color: 'text-red-400' };
@@ -935,7 +935,7 @@ export default function VersaApp() {
   // ─── STREAK MULTIPLIER (balanced tiers) ───
   const getStreakMultiplier = (streak) => {
     if (streak >= 60) return { multi: 2.0, label: '2×', tier: 'Legend', color: 'text-red-400', bg: 'bg-red-500/20' };
-    if (streak >= 30) return { multi: 1.75, label: '1.75×', tier: 'Warrior', color: 'text-amber-400', bg: 'bg-amber-500/20' };
+    if (streak >= 30) return { multi: 1.75, label: '1.75×', tier: 'Warrior', color: 'text-[#e8864a]', bg: 'bg-[#e8864a]/20' };
     if (streak >= 14) return { multi: 1.5, label: '1.5×', tier: 'Dedicated', color: 'text-purple-400', bg: 'bg-purple-500/20' };
     if (streak >= 7) return { multi: 1.25, label: '1.25×', tier: 'Consistent', color: 'text-blue-400', bg: 'bg-blue-500/20' };
     if (streak >= 3) return { multi: 1.1, label: '1.1×', tier: 'Building', color: 'text-emerald-400', bg: 'bg-emerald-500/20' };
@@ -1097,7 +1097,7 @@ export default function VersaApp() {
     { name:'Slate', neon:'#7c82a8', bg:'bg-[#7c82a8] hover:bg-[#6b7198]', bgS:'bg-[#7c82a8]/10', bgM:'bg-[#7c82a8]/20', bdr:'border-[#7c82a8]/30', txt:'text-[#7c82a8]', txtB:'text-[#9498be]', pill:'bg-[#7c82a8]/20 text-[#7c82a8]', glow:'shadow-[#7c82a8]/20' },
     { name:'Clay', neon:'#d06b4a', bg:'bg-[#d06b4a] hover:bg-[#c05a3a]', bgS:'bg-[#d06b4a]/10', bgM:'bg-[#d06b4a]/20', bdr:'border-[#d06b4a]/30', txt:'text-[#d06b4a]', txtB:'text-[#e08b6a]', pill:'bg-[#d06b4a]/20 text-[#d06b4a]', glow:'shadow-[#d06b4a]/20' },
     { name:'Mauve', neon:'#9b6bc8', bg:'bg-[#9b6bc8] hover:bg-[#8a5ab8]', bgS:'bg-[#9b6bc8]/10', bgM:'bg-[#9b6bc8]/20', bdr:'border-[#9b6bc8]/30', txt:'text-[#9b6bc8]', txtB:'text-[#b58be0]', pill:'bg-[#9b6bc8]/20 text-[#9b6bc8]', glow:'shadow-[#9b6bc8]/20' },
-    { name:'Ochre', neon:'#c8a84a', bg:'bg-[#c8a84a]', bgS:'bg-[#c8a84a]/10', bgM:'bg-[#c8a84a]/20', bdr:'border-[#c8a84a]/30', txt:'text-[#c8a84a]', txtB:'text-[#dabe6a]', pill:'bg-[#c8a84a]/20 text-[#c8a84a]', glow:'shadow-[#c8a84a]/20' },
+    { name:'Ochre', neon:'#d4a04a', bg:'bg-[#d4a04a]', bgS:'bg-[#d4a04a]/10', bgM:'bg-[#d4a04a]/20', bdr:'border-[#d4a04a]/30', txt:'text-[#d4a04a]', txtB:'text-[#e0b86a]', pill:'bg-[#d4a04a]/20 text-[#d4a04a]', glow:'shadow-[#d4a04a]/20' },
   ];
   const ICON_OPTIONS = ['🧠','💪','✨','⭐','📚','🎨','💼','🏃','🧘','💰','🎯','❤️','🌱','🔬','🎮','🍎'];
   const DEFAULT_CATEGORIES = [
@@ -1200,7 +1200,7 @@ export default function VersaApp() {
             {[
               { icon: '📚', title: 'Track What Matters', desc: 'Studying, gym, screen time, sleep. Earn points for everything.', color: 'from-[#5b7cf5]/10 to-[#5b7cf5]/5' },
               { icon: '🔥', title: 'Streak Multipliers', desc: 'Don\'t break the chain → earn up to 2× points.', color: 'from-[#e8864a]/10 to-[#e8864a]/5' },
-              { icon: '🏆', title: 'Compete with Friends', desc: 'Real-time leaderboards. Set stakes. Loser pays.', color: 'from-[#c8a84a]/10 to-[#c8a84a]/5' },
+              { icon: '🏆', title: 'Compete with Friends', desc: 'Real-time leaderboards. Set stakes. Loser pays.', color: 'from-[#d4a04a]/10 to-[#d4a04a]/5' },
               { icon: '💎', title: 'Win Crystals', desc: 'Top scorer in Study, Health, or Focus earns the crystal.', color: 'from-[#9b6bc8]/10 to-[#9b6bc8]/5' },
             ].map((item,i) => (
               <div key={i} className={`bg-gradient-to-r ${item.color} backdrop-blur-sm border border-[#223858] rounded-2xl p-4 flex items-center gap-4`}>
@@ -1451,7 +1451,7 @@ export default function VersaApp() {
       {/* Mystery Bonus popup */}
       {bonusMsg && (
         <div className="fixed top-20 left-1/2 -translate-x-1/2 z-[101] animate-bounce">
-          <div className={`px-6 py-3 rounded-2xl shadow-2xl text-center ${bonusMsg.type==='jackpot'?'bg-gradient-to-r from-amber-500 to-yellow-500 text-black':bonusMsg.type==='epic'?'bg-gradient-to-r from-red-500 to-orange-500 text-white':bonusMsg.type==='rare'?'bg-gradient-to-r from-purple-600 to-blue-600 text-white':bonusMsg.type==='bonus'?'bg-gradient-to-r from-blue-500 to-cyan-500 text-white':'bg-gradient-to-r from-emerald-500 to-green-500 text-white'}`}>
+          <div className={`px-6 py-3 rounded-2xl shadow-2xl text-center ${bonusMsg.type==='jackpot'?'bg-gradient-to-r from-[#e8864a] to-[#d4a04a] text-white':bonusMsg.type==='epic'?'bg-gradient-to-r from-red-500 to-orange-500 text-white':bonusMsg.type==='rare'?'bg-gradient-to-r from-purple-600 to-blue-600 text-white':bonusMsg.type==='bonus'?'bg-gradient-to-r from-blue-500 to-cyan-500 text-white':'bg-gradient-to-r from-emerald-500 to-green-500 text-white'}`}>
             <div className="text-lg font-black">{bonusMsg.label}</div>
           </div>
         </div>
@@ -1542,13 +1542,13 @@ export default function VersaApp() {
                 <div key={r.member.id} className={`flex items-center gap-2 px-3 py-2 rounded-xl border shrink-0 ${ahead?(darkMode?'border-red-500/20 bg-red-500/5':'border-red-200 bg-red-50'):(darkMode?'border-emerald-500/20 bg-emerald-500/5':'border-emerald-200 bg-emerald-50')}`}>
                   <div className="relative">
                     <Avatar user={r.member} size={22} className={ahead?'bg-red-500/20 text-red-400':'bg-emerald-500/20 text-emerald-400'}/>
-                    {ms > 0 && <div className={`absolute -bottom-1 -right-1 w-4 h-4 rounded-full flex items-center justify-center text-[7px] font-black text-white ${ms>=7?'bg-gradient-to-r from-orange-500 to-red-500':ms>=3?'bg-orange-500':'bg-amber-500'}`}>{ms}</div>}
+                    {ms > 0 && <div className={`absolute -bottom-1 -right-1 w-4 h-4 rounded-full flex items-center justify-center text-[7px] font-black text-white ${ms>=7?'bg-gradient-to-r from-orange-500 to-red-500':ms>=3?'bg-orange-500':'bg-[#e8864a]'}`}>{ms}</div>}
                   </div>
                   <div className="flex flex-col">
                     <span className={`text-[11px] font-medium ${darkMode?'text-gray-300':'text-gray-700'}`}>{r.member.username}</span>
                     <div className="flex items-center gap-1.5">
                       <span className={`text-[10px] font-bold ${ahead?'text-red-400':'text-emerald-400'}`}>{r.pts} pts</span>
-                      {ms > 0 && <span className={`text-[9px] font-bold ${ms>=7?'text-[#e8864a]':ms>=3?'text-amber-400':'text-amber-500/70'}`}>🔗{ms}d</span>}
+                      {ms > 0 && <span className={`text-[9px] font-bold ${ms>=7?'text-[#e8864a]':ms>=3?'text-[#e8864a]':'text-[#e8864a]/70'}`}>🔗{ms}d</span>}
                     </div>
                   </div>
                 </div>
@@ -1632,9 +1632,9 @@ export default function VersaApp() {
           <div className={`rounded-2xl p-3 text-center ${darkMode?'bg-white/[0.03] border border-white/[0.06]':'bg-white border border-gray-200 shadow-sm'}`}><div className="flex justify-center gap-2 mb-1">{allCatNames.map(c=><div key={c} className={`w-5 h-5 rounded-full transition-all ${myCr[c]?getCT(c).bg+' shadow-md '+getCT(c).glow:(darkMode?'bg-white/[0.06]':'bg-gray-200')}`}/>)}</div><div className={`text-[9px] ${T.textDim} uppercase tracking-wider font-bold`}>Crystals</div></div>
         </div>
 
-        {weeklyWinner && <div className={`mb-3 p-3 rounded-2xl flex items-center justify-between ${darkMode?'bg-amber-500/5 border border-amber-500/10':'bg-amber-50 border border-amber-200'}`}><div className="flex items-center gap-2"><Crown size={14} className="text-amber-400"/><span className={`text-xs font-medium ${darkMode?'text-amber-300':'text-amber-700'}`}>{weeklyWinner.member.username} leads · {weeklyWinner.pts} pts</span></div><span className={`text-[10px] ${T.textDim}`}>{weeklyWinner.daysLeft > 0 ? weeklyWinner.daysLeft+'d left' : timeDisplay}</span></div>}
+        {weeklyWinner && <div className={`mb-3 p-3 rounded-2xl flex items-center justify-between ${darkMode?'bg-[#5b7cf5]/5 border border-[#5b7cf5]/10':'bg-[#5b7cf5]/5 border border-[#5b7cf5]/15'}`}><div className="flex items-center gap-2"><Crown size={14} className="text-[#e8864a]"/><span className={`text-xs font-medium ${darkMode?'text-[#5b7cf5]':'text-[#5b7cf5]'}`}>{weeklyWinner.member.username} leads · {weeklyWinner.pts} pts</span></div><span className={`text-[10px] ${T.textDim}`}>{weeklyWinner.daysLeft > 0 ? weeklyWinner.daysLeft+'d left' : timeDisplay}</span></div>}
 
-        {weeklyWinner && weeklyWinner.daysLeft <= 1 && activeMembers.length > 1 && <div className={`mb-3 p-3 rounded-2xl text-center ${darkMode?'bg-gradient-to-r from-amber-500/5 via-red-500/5 to-purple-500/5 border border-amber-500/10':'bg-gradient-to-r from-amber-50 via-red-50 to-purple-50 border border-amber-200'}`}><div className={`text-sm font-bold ${darkMode?'text-amber-300':'text-amber-700'}`}>{weeklyWinner.daysLeft === 0 ? '⏰ Final Hours — '+timeDisplay : '⚡ Final Day'}</div></div>}
+        {weeklyWinner && weeklyWinner.daysLeft <= 1 && activeMembers.length > 1 && <div className={`mb-3 p-3 rounded-2xl text-center ${darkMode?'bg-gradient-to-r from-[#5b7cf5]/5 via-[#9b6bc8]/5 to-[#e8864a]/5 border border-[#5b7cf5]/10':'bg-gradient-to-r from-[#5b7cf5]/5 via-[#9b6bc8]/5 to-[#e8864a]/5 border border-[#5b7cf5]/15'}`}><div className={`text-sm font-bold ${darkMode?'text-[#5b7cf5]':'text-[#5b7cf5]'}`}>{weeklyWinner.daysLeft === 0 ? '⏰ Final Hours — '+timeDisplay : '⚡ Final Day'}</div></div>}
 
         {/* ═══ ACTIVITY FEED (collapsible) ═══ */}
         {activityFeed.length > 0 && (
@@ -1655,7 +1655,7 @@ export default function VersaApp() {
                 <div key={a.id} className={`px-4 py-2.5 border-b last:border-b-0 ${T.border}`}>
                   <div className="flex items-center gap-2">
                     <Avatar user={activeMembers.find(m=>m.id===a.userId)||{username:a.username}} size={20} className={isMe?'bg-blue-500/20 text-blue-400':(darkMode?'bg-white/[0.06] text-gray-500':'bg-gray-100 text-gray-500')}/>
-                    <div className="flex-1 min-w-0 truncate"><span className={`text-[11px] ${isMe?'text-blue-400':(darkMode?'text-gray-400':'text-gray-600')} font-medium`}>{isMe?'You':a.username}</span><span className={`text-[11px] ${T.textDim} ml-1`}>{a.text}</span>{a.bonus==='jackpot'&&<span className="ml-1 text-[9px] text-amber-300 font-bold">5×</span>}{a.bonus==='epic'&&<span className="ml-1 text-[9px] text-red-400 font-bold">3×</span>}{a.bonus==='rare'&&<span className="ml-1 text-[9px] text-purple-400 font-bold">2×</span>}{a.bonus==='bonus'&&<span className="ml-1 text-[9px] text-cyan-400 font-bold">1.5×</span>}{a.bonus==='common'&&<span className="ml-1 text-[9px] text-emerald-400 font-bold">1.25×</span>}</div>
+                    <div className="flex-1 min-w-0 truncate"><span className={`text-[11px] ${isMe?'text-blue-400':(darkMode?'text-gray-400':'text-gray-600')} font-medium`}>{isMe?'You':a.username}</span><span className={`text-[11px] ${T.textDim} ml-1`}>{a.text}</span>{a.bonus==='jackpot'&&<span className="ml-1 text-[9px] text-[#e8864a] font-bold">5×</span>}{a.bonus==='epic'&&<span className="ml-1 text-[9px] text-red-400 font-bold">3×</span>}{a.bonus==='rare'&&<span className="ml-1 text-[9px] text-purple-400 font-bold">2×</span>}{a.bonus==='bonus'&&<span className="ml-1 text-[9px] text-cyan-400 font-bold">1.5×</span>}{a.bonus==='common'&&<span className="ml-1 text-[9px] text-emerald-400 font-bold">1.25×</span>}</div>
                     <span className={`text-[9px] ${T.textFaint} shrink-0`}>{timeAgo}</span>
                   </div>
                   <div className="flex items-center gap-1 mt-1 ml-7">
@@ -1674,18 +1674,18 @@ export default function VersaApp() {
 
         {/* Quick actions */}
         <div className="flex items-center justify-center gap-2 mb-4 flex-wrap">
-          <button onClick={()=>setShowLeaderboard(true)} className={`flex items-center gap-1.5 px-4 py-2 rounded-full text-[11px] font-bold transition-all active:scale-[0.97] ${darkMode?'bg-amber-500/10 text-amber-400 border border-amber-500/20':'bg-amber-50 text-amber-600 border border-amber-200'}`}><Trophy size={13}/>Leaderboard</button>
+          <button onClick={()=>setShowLeaderboard(true)} className={`flex items-center gap-1.5 px-4 py-2 rounded-full text-[11px] font-bold transition-all active:scale-[0.97] ${darkMode?'bg-[#e8864a]/10 text-[#e8864a] border border-[#e8864a]/20':'bg-[#e8864a]/8 text-[#e8864a] border border-[#e8864a]/20'}`}><Trophy size={13}/>Leaderboard</button>
           <button onClick={()=>setShowInviteModal(true)} className={`flex items-center gap-1.5 px-4 py-2 rounded-full text-[11px] font-bold transition-all active:scale-[0.97] ${darkMode?'bg-blue-500/10 text-blue-400 border border-blue-500/20':'bg-blue-50 text-blue-600 border border-blue-200'}`}><UserPlus size={13}/>Rooms</button>
-          {isRoomCreator&&<button onClick={()=>setShowRoomSettings(true)} className={`flex items-center gap-1.5 px-3 py-2 rounded-full text-[11px] font-bold transition-all active:scale-[0.97] ${darkMode?'bg-amber-500/10 text-amber-400 border border-amber-500/20':'bg-amber-50 text-amber-600 border border-amber-200'}`}><Crown size={12}/></button>}
+          {isRoomCreator&&<button onClick={()=>setShowRoomSettings(true)} className={`flex items-center gap-1.5 px-3 py-2 rounded-full text-[11px] font-bold transition-all active:scale-[0.97] ${darkMode?'bg-[#e8864a]/10 text-[#e8864a] border border-[#e8864a]/20':'bg-[#e8864a]/8 text-[#e8864a] border border-[#e8864a]/20'}`}><Crown size={12}/></button>}
         </div>
 
         {/* Settings */}
         <div className="mb-4">
           <div className="flex justify-center">
-            <button onClick={toggleDevMode} className={`text-[10px] font-bold tracking-wider uppercase px-4 py-2 rounded-full transition-all ${devMode?(darkMode?'bg-amber-500/15 text-amber-400 border border-amber-500/20':'bg-amber-50 text-amber-600 border border-amber-200'):(darkMode?'text-gray-600 hover:text-gray-400':'text-gray-400 hover:text-gray-600')}`}>⚙️ Settings</button>
+            <button onClick={toggleDevMode} className={`text-[10px] font-bold tracking-wider uppercase px-4 py-2 rounded-full transition-all ${devMode?(darkMode?'bg-[#5b7cf5]/10 text-[#5b7cf5] border border-[#5b7cf5]/20':'bg-[#5b7cf5]/8 text-[#5b7cf5] border border-[#5b7cf5]/20'):(darkMode?'text-gray-600 hover:text-gray-400':'text-gray-400 hover:text-gray-600')}`}>⚙️ Settings</button>
           </div>
           {devMode && (
-            <div className={`mt-3 p-4 rounded-2xl border ${darkMode?'border-amber-500/10 bg-amber-500/5':'border-amber-200 bg-amber-50'}`}>
+            <div className={`mt-3 p-4 rounded-2xl border ${darkMode?'border-[#223858] bg-[#5b7cf5]/5':'border-[#dce4ee] bg-[#5b7cf5]/5'}`}>
               <div className="flex items-center justify-center gap-2 flex-wrap">
                 <button onClick={()=>setShowAddHabit(true)} className={`text-[10px] font-bold uppercase px-3 py-1.5 rounded-lg transition-all ${T.textDim} hover:text-blue-400`}>➕ Habit</button>
                 <button onClick={()=>setShowAddCategory(true)} className={`text-[10px] font-bold uppercase px-3 py-1.5 rounded-lg transition-all ${T.textDim} hover:text-purple-400`}>➕ Category</button>
@@ -1801,7 +1801,7 @@ export default function VersaApp() {
         {roomStakes ? (
           <div>
             <div className="p-4 bg-gradient-to-r from-red-500/10 via-pink-500/10 to-purple-500/10 border border-red-500/15 rounded-xl mb-4">
-              <div className="flex items-center gap-2 mb-2"><span className={'text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider '+(roomStakes.type==='buyout'?'bg-amber-500/20 text-amber-400':roomStakes.type==='dare'?'bg-pink-500/20 text-pink-400':roomStakes.type==='service'?'bg-cyan-500/20 text-cyan-400':'bg-purple-500/20 text-purple-400')}>{roomStakes.type}</span><span className="text-[10px] text-gray-600 uppercase tracking-wider">{roomStakes.duration}</span></div>
+              <div className="flex items-center gap-2 mb-2"><span className={'text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider '+(roomStakes.type==='buyout'?'bg-[#e8864a]/20 text-[#e8864a]':roomStakes.type==='dare'?'bg-pink-500/20 text-pink-400':roomStakes.type==='service'?'bg-cyan-500/20 text-cyan-400':'bg-purple-500/20 text-purple-400')}>{roomStakes.type}</span><span className="text-[10px] text-gray-600 uppercase tracking-wider">{roomStakes.duration}</span></div>
               <p className="text-white font-medium">{roomStakes.description}</p>
               <p className="text-[11px] text-gray-600 mt-2">Set by {activeMembers.find(m=>m.id===roomStakes.createdBy)?.username||'unknown'}</p>
             </div>
@@ -1831,8 +1831,8 @@ export default function VersaApp() {
           const medals=['\u{1F947}','\u{1F948}','\u{1F949}'];
           const ms = !isMe ? (mutualStreaks[item.member.id] || 0) : 0;
           return (
-            <div key={item.member.id} className={'rounded-xl p-4 border transition-all '+(isMe?'bg-gradient-to-r from-blue-600/20 to-indigo-600/20 border-blue-500/30 shadow-lg shadow-[#5b7cf5]/10':i===0?'bg-amber-500/5 border-amber-500/20':(darkMode?'bg-white/[0.02] border-white/[0.04] hover:bg-white/[0.04]':'bg-gray-50 border-gray-200 hover:bg-gray-100'))}>
-              <div className="flex items-center justify-between"><div className="flex items-center gap-3"><div className="text-lg w-8 text-center">{i<3?medals[i]:<span className="text-sm text-gray-600">{i+1}</span>}</div><Avatar user={item.member} size={28} className={isMe?'bg-blue-500/20 text-blue-400':(darkMode?'bg-white/[0.06] text-gray-400':'bg-gray-100 text-gray-500')}/><div><div className={'text-sm font-semibold flex items-center gap-1.5 '+(isMe?'text-blue-300':(darkMode?'text-gray-300':'text-gray-700'))}>{item.member.username}{isMe&&<span className="text-[10px] text-gray-600">(you)</span>}{getRoomRole(item.member.id)&&<span className={`text-[9px] font-bold ${getRoomRole(item.member.id).color}`}>{getRoomRole(item.member.id).icon}</span>}{ms>0&&<span className={`text-[9px] font-bold ${ms>=7?'text-[#e8864a]':'text-amber-400'}`}>🔗{ms}</span>}</div><div className="text-xs text-gray-600">{pts} pts{leaderboardTab==='week'?' \u00b7 '+item.weeklyCrystals+' crystals':''}</div></div></div>
+            <div key={item.member.id} className={'rounded-xl p-4 border transition-all '+(isMe?'bg-gradient-to-r from-blue-600/20 to-indigo-600/20 border-blue-500/30 shadow-lg shadow-[#5b7cf5]/10':i===0?'bg-[#e8864a]/5 border-[#e8864a]/20':(darkMode?'bg-white/[0.02] border-white/[0.04] hover:bg-white/[0.04]':'bg-gray-50 border-gray-200 hover:bg-gray-100'))}>
+              <div className="flex items-center justify-between"><div className="flex items-center gap-3"><div className="text-lg w-8 text-center">{i<3?medals[i]:<span className="text-sm text-gray-600">{i+1}</span>}</div><Avatar user={item.member} size={28} className={isMe?'bg-blue-500/20 text-blue-400':(darkMode?'bg-white/[0.06] text-gray-400':'bg-gray-100 text-gray-500')}/><div><div className={'text-sm font-semibold flex items-center gap-1.5 '+(isMe?'text-blue-300':(darkMode?'text-gray-300':'text-gray-700'))}>{item.member.username}{isMe&&<span className="text-[10px] text-gray-600">(you)</span>}{getRoomRole(item.member.id)&&<span className={`text-[9px] font-bold ${getRoomRole(item.member.id).color}`}>{getRoomRole(item.member.id).icon}</span>}{ms>0&&<span className={`text-[9px] font-bold ${ms>=7?'text-[#e8864a]':'text-[#e8864a]'}`}>🔗{ms}</span>}</div><div className="text-xs text-gray-600">{pts} pts{leaderboardTab==='week'?' \u00b7 '+item.weeklyCrystals+' crystals':''}</div></div></div>
                 <div className="flex items-center gap-3">{leaderboardTab==='today'&&<div className="flex items-center gap-1.5">{allCatNames.map(c=><div key={c} className={'w-2.5 h-2.5 rounded-full '+(item.crystals[c]?getCT(c).bg+' shadow-sm':(isMe?'bg-white/10':(darkMode?'bg-white/[0.06]':'bg-gray-200')))}/>)}</div>}{!isMe&&<button onClick={()=>{setShowLeaderboard(false);setShowCompetitor(item.member);}} className={`text-[10px] uppercase tracking-wider font-medium ${darkMode?'text-gray-600 hover:text-white':'text-gray-400 hover:text-gray-700'}`}>View</button>}</div>
               </div>
             </div>
@@ -1929,9 +1929,9 @@ export default function VersaApp() {
           <div>
             <p className={`text-xs ${T.textDim} mb-4`}>{lastWeekData.dateRange}</p>
             {lastWeekData.scores.length > 0 && (
-              <div className="text-center p-5 bg-gradient-to-r from-amber-500/10 to-yellow-500/10 border border-amber-500/15 rounded-xl mb-4">
+              <div className="text-center p-5 bg-gradient-to-r from-[#e8864a]/10 to-[#d4a04a]/10 border border-[#e8864a]/15 rounded-xl mb-4">
                 <span className="text-3xl">🏆</span>
-                <h3 className="text-xl font-black text-amber-300 mt-2">{lastWeekData.scores[0].member.username}</h3>
+                <h3 className="text-xl font-black text-[#e8864a] mt-2">{lastWeekData.scores[0].member.username}</h3>
                 <p className={`text-sm ${T.textMuted} mt-1`}>{lastWeekData.scores[0].pts} points &middot; {lastWeekData.scores[0].activeDays} active days</p>
               </div>
             )}
@@ -2156,10 +2156,10 @@ export default function VersaApp() {
           const today = new Date();
           // 5 tiers: 0%, 10% (40pts), 30% (120pts), 50% (200pts), 80% (320pts)
           const getColor = (pts) => {
-            if (pts >= 320) return 'rgba(74,144,232,1)';
-            if (pts >= 200) return 'rgba(74,144,232,0.7)';
-            if (pts >= 120) return 'rgba(74,144,232,0.45)';
-            if (pts >= 40) return 'rgba(74,144,232,0.25)';
+            if (pts >= 320) return 'rgba(74,186,122,1)';
+            if (pts >= 200) return 'rgba(74,186,122,0.7)';
+            if (pts >= 120) return 'rgba(74,186,122,0.45)';
+            if (pts >= 40) return 'rgba(74,186,122,0.25)';
             return null;
           };
           for (let i = 89; i >= 0; i--) {
@@ -2179,10 +2179,10 @@ export default function VersaApp() {
           <div className="flex items-center gap-1">
             <span className={`text-[10px] ${T.textDim} mr-1`}>0</span>
             <div className="w-[10px] h-[10px] rounded-[2px]" style={{backgroundColor:darkMode?'rgba(255,255,255,0.04)':'#f3f4f6'}}/>
-            <div className="w-[10px] h-[10px] rounded-[2px]" style={{backgroundColor:'rgba(74,144,232,0.25)'}}/>
-            <div className="w-[10px] h-[10px] rounded-[2px]" style={{backgroundColor:'rgba(74,144,232,0.45)'}}/>
-            <div className="w-[10px] h-[10px] rounded-[2px]" style={{backgroundColor:'rgba(74,144,232,0.7)'}}/>
-            <div className="w-[10px] h-[10px] rounded-[2px]" style={{backgroundColor:'rgba(74,144,232,1)'}}/>
+            <div className="w-[10px] h-[10px] rounded-[2px]" style={{backgroundColor:'rgba(74,186,122,0.25)'}}/>
+            <div className="w-[10px] h-[10px] rounded-[2px]" style={{backgroundColor:'rgba(74,186,122,0.45)'}}/>
+            <div className="w-[10px] h-[10px] rounded-[2px]" style={{backgroundColor:'rgba(74,186,122,0.7)'}}/>
+            <div className="w-[10px] h-[10px] rounded-[2px]" style={{backgroundColor:'rgba(74,186,122,1)'}}/>
             <span className={`text-[10px] ${T.textDim} ml-1`}>400</span>
           </div>
           <span className={`text-[10px] ${T.textDim}`}>Today</span>
@@ -2216,7 +2216,7 @@ export default function VersaApp() {
                 { v: insightsData.avgPerDay, l: 'Avg habits/day', c: 'text-blue-400', icon: '📊' },
                 { v: insightsData.bestDay, l: 'Best day', c: 'text-emerald-400', icon: '🔥' },
                 { v: insightsData.avgPtsPerDay, l: 'Avg pts/day', c: 'text-purple-400', icon: '⚡' },
-                { v: insightsData.bestStreak+'d', l: 'Best streak', c: 'text-amber-400', icon: '🏆' },
+                { v: insightsData.bestStreak+'d', l: 'Best streak', c: 'text-[#e8864a]', icon: '🏆' },
               ].map((s,i) => (
                 <div key={i} className={`p-3 rounded-xl ${darkMode?'bg-white/[0.03] border border-white/[0.04]':'bg-gray-50 border border-gray-200'}`}>
                   <div className="text-sm mb-0.5">{s.icon}</div>
@@ -2280,8 +2280,8 @@ export default function VersaApp() {
           </div>
         )}
         {pendingBoards.find(b=>b.userId===currentUser?.id&&b.status==='pending') && (
-          <div className="mb-3 p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl">
-            <span className="text-xs text-amber-400 font-medium">⏳ Your board is pending approval</span>
+          <div className="mb-3 p-3 bg-[#e8864a]/10 border border-[#e8864a]/20 rounded-xl">
+            <span className="text-xs text-[#e8864a] font-medium">⏳ Your board is pending approval</span>
           </div>
         )}
         <div className="space-y-2 mb-3 max-h-52 overflow-y-auto">
@@ -2349,7 +2349,7 @@ export default function VersaApp() {
 
       {/* Room Settings (Creator only) */}
       <Modal show={showRoomSettings} onClose={()=>setShowRoomSettings(false)} wide dark={darkMode}>
-        <ModalHeader title="Room Settings" onClose={()=>setShowRoomSettings(false)} icon={<Crown size={16} className="text-amber-400"/>} dark={darkMode}/>
+        <ModalHeader title="Room Settings" onClose={()=>setShowRoomSettings(false)} icon={<Crown size={16} className="text-[#e8864a]"/>} dark={darkMode}/>
         <div className={`text-[10px] ${T.textDim} mb-4 flex items-center gap-2`}>
           <span className="font-mono tracking-wider bg-white/[0.06] px-2 py-1 rounded">{currentRoom?.code}</span>
           <span>·</span>
@@ -2366,11 +2366,11 @@ export default function VersaApp() {
               return (
                 <div key={m.id} className={`flex items-center justify-between p-3 rounded-xl border ${darkMode?'border-white/[0.06] bg-white/[0.02]':'border-gray-200 bg-gray-50'}`}>
                   <div className="flex items-center gap-3">
-                    <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-black ${isCreator?'bg-amber-500/20 text-amber-400':'bg-blue-500/20 text-blue-400'}`}>{m.photoURL?<img src={m.photoURL} className="w-8 h-8 rounded-full object-cover" referrerPolicy="no-referrer"/>:m.username?.charAt(0)?.toUpperCase()}</div>
+                    <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-black ${isCreator?'bg-[#e8864a]/20 text-[#e8864a]':'bg-blue-500/20 text-blue-400'}`}>{m.photoURL?<img src={m.photoURL} className="w-8 h-8 rounded-full object-cover" referrerPolicy="no-referrer"/>:m.username?.charAt(0)?.toUpperCase()}</div>
                     <div>
                       <div className="flex items-center gap-1.5">
                         <span className={`text-sm font-medium ${darkMode?'text-gray-200':'text-gray-800'}`}>{m.username}</span>
-                        {isCreator&&<span className="text-[9px] bg-amber-500/20 text-amber-400 px-1.5 py-0.5 rounded-full font-bold">Creator</span>}
+                        {isCreator&&<span className="text-[9px] bg-[#e8864a]/20 text-[#e8864a] px-1.5 py-0.5 rounded-full font-bold">Creator</span>}
                         {isMe&&<span className={`text-[9px] ${T.textDim}`}>(you)</span>}
                       </div>
                       <div className={`text-[10px] ${T.textDim}`}>{m.email}</div>
@@ -2378,7 +2378,7 @@ export default function VersaApp() {
                   </div>
                   {!isMe && (
                     <div className="flex items-center gap-1.5">
-                      <button onClick={()=>transferOwnership(m.id)} className={`text-[9px] px-2 py-1 rounded-lg font-medium transition-all ${darkMode?'text-gray-600 hover:text-amber-400 hover:bg-amber-500/10':'text-gray-400 hover:text-amber-600 hover:bg-amber-50'}`}>Transfer</button>
+                      <button onClick={()=>transferOwnership(m.id)} className={`text-[9px] px-2 py-1 rounded-lg font-medium transition-all ${darkMode?'text-gray-600 hover:text-[#e8864a] hover:bg-[#e8864a]/10':'text-gray-400 hover:text-[#e8864a] hover:bg-[#e8864a]/8'}`}>Transfer</button>
                       <button onClick={()=>kickMember(m.id)} className={`text-[9px] px-2 py-1 rounded-lg font-medium transition-all ${darkMode?'text-gray-600 hover:text-red-400 hover:bg-red-500/10':'text-gray-400 hover:text-red-600 hover:bg-red-50'}`}>Remove</button>
                     </div>
                   )}
