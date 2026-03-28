@@ -561,12 +561,20 @@ export default function VersaApp() {
     if (!currentUser) return;
     try {
       const ago = new Date(); ago.setDate(ago.getDate()-90);
-      const snap = await getDocs(query(collection(db,'completions'),where('userId','==',currentUser.id),where('date','>=',formatDateStr(ago))));
+      const agoStr = formatDateStr(ago);
+      // Use single where to avoid needing a composite index
+      const snap = await getDocs(query(collection(db,'completions'),where('userId','==',currentUser.id)));
       const map = {};
-      snap.docs.forEach(d => { const dt = d.data(); const pts = ((dt.habitPoints||dt.points||0)*(dt.count||1))+(dt.bonusPoints||0); if(pts>0) map[dt.date] = (map[dt.date]||0) + pts; });
+      snap.docs.forEach(d => {
+        const dt = d.data();
+        if (dt.date < agoStr) return; // filter client-side
+        const basePts = dt.habitPoints || habits.find(h => h.id === dt.habitId)?.points || 0;
+        const pts = (basePts * (dt.count || 1)) + (dt.bonusPoints || 0);
+        if (pts > 0) map[dt.date] = (map[dt.date] || 0) + pts;
+      });
       setHeatMapData(map);
       setShowHeatMap(true);
-    } catch { setShowHeatMap(true); }
+    } catch (err) { console.error('Heat map error:', err); setShowHeatMap(true); }
   };
 
   // ─── ROOM ROLES (computed from performance) ───
@@ -896,7 +904,17 @@ export default function VersaApp() {
       setShowEditHabit(null);
     } catch { setError('Failed to save'); }
   };
-  const deleteHabit = async (hid) => { if (!confirm('Delete this habit?')) return; try { await deleteDoc(doc(db, 'habits', hid)); } catch {} };
+  const deleteHabit = async (hid) => {
+    if (!confirm('Delete this habit?')) return;
+    try {
+      await deleteDoc(doc(db, 'habits', hid));
+      // Delete all completions for this habit in this room
+      const snap = await getDocs(query(collection(db, 'completions'), where('habitId', '==', hid), where('roomId', '==', currentRoom.id)));
+      const batch = [];
+      snap.docs.forEach(d => batch.push(deleteDoc(doc(db, 'completions', d.id))));
+      await Promise.all(batch);
+    } catch (err) { console.error('Delete habit error:', err); }
+  };
   const openEditHabit = (habit) => { setEditHabitData({ name: habit.name, category: habit.category, points: habit.points, isRepeatable: habit.isRepeatable, maxCompletions: habit.maxCompletions, unit: habit.unit||'', description: habit.description||'' }); setShowEditHabit(habit.id); };
 
   // ─── COMPLETIONS (with embedded habit data for orphan-proofing) ───
