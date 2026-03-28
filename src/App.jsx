@@ -1204,6 +1204,47 @@ export default function VersaApp() {
   const dailyProg = currentUser&&currentRoom ? getDailyProgress() : 0;
   const displayHabits = (myBoardIds && !editMode) ? habits.filter(h => myBoardIds.includes(h.id)) : habits;
 
+  const allCatNames = activeCategories.map(c=>c.name);
+
+  const addCategory = async () => {
+    if (!newCatName.trim() || activeCategories.find(c=>c.name.toLowerCase()===newCatName.trim().toLowerCase())) return;
+    const updated = [...activeCategories, { name: newCatName.trim(), colorIdx: newCatColor, icon: newCatIcon }];
+    try {
+      await supabase.from('room_categories').upsert({ room_id: currentRoom.id, categories: updated });
+      setNewCatName(''); setNewCatColor(0); setNewCatIcon('⭐'); setShowAddCategory(false);
+    } catch { setError('Failed to add category'); }
+  };
+  const deleteCategory = async (catName) => {
+    const catHabits = habits.filter(h=>h.category===catName);
+    if (catHabits.length > 0) { setError('Delete habits in this category first'); setTimeout(()=>setError(''),2000); return; }
+    if (['Study','Health','Focus'].includes(catName)) { setError("Can't delete default categories"); setTimeout(()=>setError(''),2000); return; }
+    const updated = activeCategories.filter(c=>c.name!==catName);
+    try { await supabase.from('room_categories').upsert({ room_id: currentRoom.id, categories: updated }); } catch {}
+  };
+  const stakePresets = [
+    { type:'custom', label:'Custom', desc:'Set your own', ph:'e.g. Loser does 50 pushups' },
+    { type:'buyout', label:'Buyout', desc:'Loser buys something', ph:'e.g. Loser buys lunch' },
+    { type:'dare', label:'Dare', desc:'Loser performs a dare', ph:'e.g. Embarrassing post' },
+    { type:'service', label:'Service', desc:'Loser does a favor', ph:"e.g. Loser's chores" },
+  ];
+
+  // ─── THEME CLASSES ───
+  const T = darkMode ? {
+    bg: 'bg-[#0f1b2d]', bgCard: 'bg-[#182544]', bgCardHover: 'hover:bg-[#1e2e50]', bgInput: 'bg-[#182544]',
+    border: 'border-[#223858]', borderInput: 'border-[#264060]', text: 'text-white', textMuted: 'text-[#7a8ba8]',
+    textDim: 'text-[#4a6080]', textFaint: 'text-[#2a4060]', headerBg: 'bg-[#0f1b2d]/95', modalBg: 'bg-[#122040]',
+    selectBg: 'bg-[#122040]', glowOrb: '/8', blurBg: 'backdrop-blur-xl'
+  } : {
+    bg: 'bg-[#f0f4f8]', bgCard: 'bg-white', bgCardHover: 'hover:bg-gray-50', bgInput: 'bg-[#eef2f7]',
+    border: 'border-[#dce4ee]', borderInput: 'border-[#ccd6e4]', text: 'text-[#1a2744]', textMuted: 'text-[#6b7e96]',
+    textDim: 'text-[#9aaec0]', textFaint: 'text-[#c4d2e0]', headerBg: 'bg-[#f0f4f8]/95', modalBg: 'bg-white',
+    selectBg: 'bg-white', glowOrb: '/5', blurBg: 'backdrop-blur-xl'
+  };
+  const inputCls = `w-full px-4 py-3 ${T.bgInput} border ${T.borderInput} rounded-xl focus:outline-none focus:border-[#4a90e8]/50 ${T.text} placeholder-[#4a6080] text-sm transition-all`;
+  const btnPrimary = "w-full py-3.5 rounded-xl text-sm font-bold tracking-wide transition-all disabled:opacity-50 active:scale-[0.98]";
+
+
+
   // ─── PUSH NOTIFICATIONS SETUP ───
   useEffect(() => {
     if (!currentUser) return;
@@ -1394,44 +1435,6 @@ export default function VersaApp() {
   // Backward compat: CT object for the 3 defaults
   const CT = {};
   activeCategories.forEach(c => { CT[c.name] = getCT(c.name); });
-  const allCatNames = activeCategories.map(c=>c.name);
-
-  const addCategory = async () => {
-    if (!newCatName.trim() || activeCategories.find(c=>c.name.toLowerCase()===newCatName.trim().toLowerCase())) return;
-    const updated = [...activeCategories, { name: newCatName.trim(), colorIdx: newCatColor, icon: newCatIcon }];
-    try {
-      await supabase.from('room_categories').upsert({ room_id: currentRoom.id, categories: updated });
-      setNewCatName(''); setNewCatColor(0); setNewCatIcon('⭐'); setShowAddCategory(false);
-    } catch { setError('Failed to add category'); }
-  };
-  const deleteCategory = async (catName) => {
-    const catHabits = habits.filter(h=>h.category===catName);
-    if (catHabits.length > 0) { setError('Delete habits in this category first'); setTimeout(()=>setError(''),2000); return; }
-    if (['Study','Health','Focus'].includes(catName)) { setError("Can't delete default categories"); setTimeout(()=>setError(''),2000); return; }
-    const updated = activeCategories.filter(c=>c.name!==catName);
-    try { await supabase.from('room_categories').upsert({ room_id: currentRoom.id, categories: updated }); } catch {}
-  };
-  const stakePresets = [
-    { type:'custom', label:'Custom', desc:'Set your own', ph:'e.g. Loser does 50 pushups' },
-    { type:'buyout', label:'Buyout', desc:'Loser buys something', ph:'e.g. Loser buys lunch' },
-    { type:'dare', label:'Dare', desc:'Loser performs a dare', ph:'e.g. Embarrassing post' },
-    { type:'service', label:'Service', desc:'Loser does a favor', ph:"e.g. Loser's chores" },
-  ];
-
-  // ─── THEME CLASSES ───
-  const T = darkMode ? {
-    bg: 'bg-[#0f1b2d]', bgCard: 'bg-[#182544]', bgCardHover: 'hover:bg-[#1e2e50]', bgInput: 'bg-[#182544]',
-    border: 'border-[#223858]', borderInput: 'border-[#264060]', text: 'text-white', textMuted: 'text-[#7a8ba8]',
-    textDim: 'text-[#4a6080]', textFaint: 'text-[#2a4060]', headerBg: 'bg-[#0f1b2d]/95', modalBg: 'bg-[#122040]',
-    selectBg: 'bg-[#122040]', glowOrb: '/8', blurBg: 'backdrop-blur-xl'
-  } : {
-    bg: 'bg-[#f0f4f8]', bgCard: 'bg-white', bgCardHover: 'hover:bg-gray-50', bgInput: 'bg-[#eef2f7]',
-    border: 'border-[#dce4ee]', borderInput: 'border-[#ccd6e4]', text: 'text-[#1a2744]', textMuted: 'text-[#6b7e96]',
-    textDim: 'text-[#9aaec0]', textFaint: 'text-[#c4d2e0]', headerBg: 'bg-[#f0f4f8]/95', modalBg: 'bg-white',
-    selectBg: 'bg-white', glowOrb: '/5', blurBg: 'backdrop-blur-xl'
-  };
-  const inputCls = `w-full px-4 py-3 ${T.bgInput} border ${T.borderInput} rounded-xl focus:outline-none focus:border-[#4a90e8]/50 ${T.text} placeholder-[#4a6080] text-sm transition-all`;
-  const btnPrimary = "w-full py-3.5 rounded-xl text-sm font-bold tracking-wide transition-all disabled:opacity-50 active:scale-[0.98]";
 
   // ─── LOADING ───
   if (authLoading) return (
