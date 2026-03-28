@@ -1426,22 +1426,23 @@ export default function VersaApp() {
   const inputCls = `w-full px-4 py-3 ${T.bgInput} border ${T.borderInput} rounded-xl focus:outline-none focus:border-[#4a90e8]/50 ${T.text} placeholder-[#4a6080] text-sm transition-all`;
   const btnPrimary = "w-full py-3.5 rounded-xl text-sm font-bold tracking-wide transition-all disabled:opacity-50 active:scale-[0.98]";
 
+  const myCr = currentUser&&currentRoom ? getTodayCrystals(currentUser.id) : {};
+  const myPts = currentUser&&currentRoom ? getTodayPts(currentUser.id) : 0;
+  const isPerfect = allCatNames.length > 0 && allCatNames.every(c => myCr[c]);
+  const dailyProg = currentUser&&currentRoom ? getDailyProgress() : 0;
+  const displayHabits = (myBoardIds && !editMode) ? habits.filter(h => myBoardIds.includes(h.id)) : habits;
+
   // ─── LOADING ───
   if (authLoading) return (
     <div className="min-h-screen bg-[#0f1b2d] flex items-center justify-center relative overflow-hidden">
       <div className="text-center">
-        <h1 className="text-4xl font-black tracking-[0.4em] text-white mb-2">VERSA</h1>
+        <h1 className="text-4xl font-black tracking-[0.4em] text-white mb-2">VERS</h1>
         <p className="text-[#4a6080] text-[10px] tracking-[0.25em] uppercase mb-6">Keep yourself accountable.</p>
         <div className="flex justify-center gap-2">{['bg-[#5b7cf5]','bg-[#e8864a]','bg-[#4aba7a]'].map((c,i)=><div key={i} className={`w-1.5 h-1.5 rounded-full ${c} animate-pulse`} style={{animationDelay:i*200+'ms'}} />)}</div>
       </div>
     </div>
   );
 
-  const myCr = currentUser&&currentRoom ? getTodayCrystals(currentUser.id) : {};
-  const myPts = currentUser&&currentRoom ? getTodayPts(currentUser.id) : 0;
-  const isPerfect = allCatNames.length > 0 && allCatNames.every(c => myCr[c]);
-  const dailyProg = currentUser&&currentRoom ? getDailyProgress() : 0;
-  const displayHabits = (myBoardIds && !editMode) ? habits.filter(h => myBoardIds.includes(h.id)) : habits;
   if (dailyProg >= 1 && prevProgRef.current < 1 && prevProgRef.current > 0) {
     // Schedule celebration (can't call hooks here but can set ref + trigger state in next tick)
     setTimeout(() => setCelebrateComplete(true), 0);
