@@ -76,7 +76,7 @@ const PUNISHMENTS = [
 function Modal({ show, onClose, children, wide, dark }) {
   if (!show) return null;
   const isDark = dark !== undefined ? dark : true;
-  const mbg = isDark ? 'bg-[#16161e] border-[#2a2a36]' : 'bg-white border-[#e8e5e0]';
+  const mbg = isDark ? 'bg-[#122040] border-[#1e3050]' : 'bg-white border-[#dce4ee]';
   return (
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50" onClick={onClose}>
       <div className={`rounded-2xl w-full p-6 border shadow-2xl max-h-[85vh] overflow-y-auto ${mbg} ` + (wide ? 'max-w-md' : 'max-w-sm')} onClick={e => e.stopPropagation()}>
@@ -90,8 +90,8 @@ function ModalHeader({ title, onClose, icon, dark }) {
   const isDark = dark !== undefined ? dark : true;
   return (
     <div className="flex items-center justify-between mb-5">
-      <div className="flex items-center gap-2">{icon}{typeof title === 'string' ? <h2 className={`text-lg font-bold ${isDark?'text-[#eee]':'text-[#1a1a1a]'}`}>{title}</h2> : title}</div>
-      <button onClick={onClose} className={`${isDark?'text-[#5a5244] hover:text-[#eee]':'text-[#c4b9a8] hover:text-[#1a1a1a]'} transition-colors`}><X size={20} /></button>
+      <div className="flex items-center gap-2">{icon}{typeof title === 'string' ? <h2 className={`text-lg font-bold ${isDark?'text-white':'text-[#1a1a1a]'}`}>{title}</h2> : title}</div>
+      <button onClick={onClose} className={`${isDark?'text-[#5a5244] hover:text-white':'text-[#c4b9a8] hover:text-[#1a1a1a]'} transition-colors`}><X size={20} /></button>
     </div>
   );
 }
@@ -1141,22 +1141,22 @@ export default function VersaApp() {
 
   // ─── THEME CLASSES ───
   const T = darkMode ? {
-    bg: 'bg-[#111118]', bgCard: 'bg-[#1a1a24]', bgCardHover: 'hover:bg-[#22222e]', bgInput: 'bg-[#1e1e28]',
-    border: 'border-[#2a2a36]', borderInput: 'border-[#363642]', text: 'text-[#eee]', textMuted: 'text-[#777]',
-    textDim: 'text-[#555]', textFaint: 'text-[#333]', headerBg: 'bg-[#111118]/95', modalBg: 'bg-[#16161e]',
-    selectBg: 'bg-[#16161e]', glowOrb: '/8', blurBg: 'backdrop-blur-xl'
+    bg: 'bg-[#0f1b2d]', bgCard: 'bg-[#162038]', bgCardHover: 'hover:bg-[#1c2844]', bgInput: 'bg-[#162038]',
+    border: 'border-[#1e3050]', borderInput: 'border-[#264060]', text: 'text-white', textMuted: 'text-[#7a8ba8]',
+    textDim: 'text-[#4a6080]', textFaint: 'text-[#2a4060]', headerBg: 'bg-[#0f1b2d]/95', modalBg: 'bg-[#122040]',
+    selectBg: 'bg-[#122040]', glowOrb: '/8', blurBg: 'backdrop-blur-xl'
   } : {
-    bg: 'bg-[#f5f3f0]', bgCard: 'bg-white', bgCardHover: 'hover:bg-gray-50', bgInput: 'bg-[#f0eeeb]',
-    border: 'border-[#e8e5e0]', borderInput: 'border-[#ddd9d4]', text: 'text-[#1a1a1a]', textMuted: 'text-[#888]',
-    textDim: 'text-[#aaa]', textFaint: 'text-[#ccc]', headerBg: 'bg-[#f5f3f0]/95', modalBg: 'bg-white',
+    bg: 'bg-[#f0f4f8]', bgCard: 'bg-white', bgCardHover: 'hover:bg-gray-50', bgInput: 'bg-[#eef2f7]',
+    border: 'border-[#dce4ee]', borderInput: 'border-[#ccd6e4]', text: 'text-[#1a2744]', textMuted: 'text-[#6b7e96]',
+    textDim: 'text-[#9aaec0]', textFaint: 'text-[#c4d2e0]', headerBg: 'bg-[#f0f4f8]/95', modalBg: 'bg-white',
     selectBg: 'bg-white', glowOrb: '/5', blurBg: 'backdrop-blur-xl'
   };
-  const inputCls = `w-full px-4 py-3 ${T.bgInput} border ${T.borderInput} rounded-xl focus:outline-none focus:border-[#6366f1]/40 ${T.text} placeholder-[#aaa] text-sm transition-all`;
+  const inputCls = `w-full px-4 py-3 ${T.bgInput} border ${T.borderInput} rounded-xl focus:outline-none focus:border-[#4a90e8]/50 ${T.text} placeholder-[#4a6080] text-sm transition-all`;
   const btnPrimary = "w-full py-3.5 rounded-xl text-sm font-bold tracking-wide transition-all disabled:opacity-50 active:scale-[0.98]";
 
   // ─── LOADING ───
   if (authLoading) return (
-    <div className="min-h-screen bg-[#f5f3f0] flex items-center justify-center relative overflow-hidden">
+    <div className="min-h-screen bg-[#0f1b2d] flex items-center justify-center relative overflow-hidden">
       <div className="text-center">
         <h1 className="text-4xl font-black tracking-[0.4em] text-[#1a1a1a] mb-5">VERSA</h1>
         <div className="flex justify-center gap-2">{['bg-[#5b7cf5] hover:bg-[#4a6be4]','bg-[#e8864a]','bg-[#4aba7a]'].map((c,i)=><div key={i} className={`w-1.5 h-1.5 rounded-full ${c} animate-pulse`} style={{animationDelay:i*200+'ms'}} />)}</div>
@@ -1479,7 +1479,7 @@ export default function VersaApp() {
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <h1 className="text-lg font-black tracking-[0.15em]">VERSA</h1>
-              {streakData.streak>0&&<div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full ${darkMode?'bg-orange-500/10':'bg-orange-50'}`}><Flame size={13} className="text-[#e8864a]"/><span className="text-[#e8864a] text-sm font-bold">{streakData.streak}</span>{streakMulti.multi>1&&<span className={`text-[9px] font-bold ${streakMulti.color}`}>{streakMulti.label}</span>}{streakFreeze>0&&<span className="text-xs">🛡️</span>}</div>}
+              {streakData.streak>0&&<div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full ${darkMode?'bg-[#e8864a]/15':'bg-[#e8864a]/10'}`}><Flame size={13} className="text-[#e8864a]"/><span className="text-[#e8864a] text-sm font-bold">{streakData.streak}</span>{streakMulti.multi>1&&<span className={`text-[9px] font-bold ${streakMulti.color}`}>{streakMulti.label}</span>}{streakFreeze>0&&<span className="text-xs">🛡️</span>}</div>}
             </div>
             <div className="flex items-center gap-2">
               <button onClick={toggleTheme} className={`p-2 rounded-xl ${darkMode?'hover:bg-white/[0.06]':'hover:bg-gray-100'} transition-colors`}>{darkMode?<Sun size={16} className="text-gray-500"/>:<Moon size={16} className="text-gray-400"/>}</button>
@@ -2156,10 +2156,10 @@ export default function VersaApp() {
           const today = new Date();
           // 5 tiers: 0%, 10% (40pts), 30% (120pts), 50% (200pts), 80% (320pts)
           const getColor = (pts) => {
-            if (pts >= 320) return 'rgba(91,124,245,1)';
-            if (pts >= 200) return 'rgba(91,124,245,0.7)';
-            if (pts >= 120) return 'rgba(91,124,245,0.45)';
-            if (pts >= 40) return 'rgba(91,124,245,0.25)';
+            if (pts >= 320) return 'rgba(74,144,232,1)';
+            if (pts >= 200) return 'rgba(74,144,232,0.7)';
+            if (pts >= 120) return 'rgba(74,144,232,0.45)';
+            if (pts >= 40) return 'rgba(74,144,232,0.25)';
             return null;
           };
           for (let i = 89; i >= 0; i--) {
@@ -2179,10 +2179,10 @@ export default function VersaApp() {
           <div className="flex items-center gap-1">
             <span className={`text-[10px] ${T.textDim} mr-1`}>0</span>
             <div className="w-[10px] h-[10px] rounded-[2px]" style={{backgroundColor:darkMode?'rgba(255,255,255,0.04)':'#f3f4f6'}}/>
-            <div className="w-[10px] h-[10px] rounded-[2px]" style={{backgroundColor:'rgba(91,124,245,0.25)'}}/>
-            <div className="w-[10px] h-[10px] rounded-[2px]" style={{backgroundColor:'rgba(91,124,245,0.45)'}}/>
-            <div className="w-[10px] h-[10px] rounded-[2px]" style={{backgroundColor:'rgba(91,124,245,0.7)'}}/>
-            <div className="w-[10px] h-[10px] rounded-[2px]" style={{backgroundColor:'rgba(91,124,245,1)'}}/>
+            <div className="w-[10px] h-[10px] rounded-[2px]" style={{backgroundColor:'rgba(74,144,232,0.25)'}}/>
+            <div className="w-[10px] h-[10px] rounded-[2px]" style={{backgroundColor:'rgba(74,144,232,0.45)'}}/>
+            <div className="w-[10px] h-[10px] rounded-[2px]" style={{backgroundColor:'rgba(74,144,232,0.7)'}}/>
+            <div className="w-[10px] h-[10px] rounded-[2px]" style={{backgroundColor:'rgba(74,144,232,1)'}}/>
             <span className={`text-[10px] ${T.textDim} ml-1`}>400</span>
           </div>
           <span className={`text-[10px] ${T.textDim}`}>Today</span>
