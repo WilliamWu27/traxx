@@ -1,6 +1,49 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Clock, Plus, X, LogOut, Copy, Check, UserPlus, HelpCircle, Trophy, User, Flame, Zap, Star, TrendingUp, ArrowLeftRight, Edit3, Calendar, ChevronLeft, ChevronRight, Crown, Target, ArrowUp, ArrowDown, Minus as MinusIcon, GripVertical, BarChart3, Sun, Moon, ChevronDown, Trash2 } from 'lucide-react';
+import { Clock, Plus, X, LogOut, Copy, Check, UserPlus, HelpCircle, Trophy, User, Flame, Zap, Star, TrendingUp, ArrowLeftRight, Edit3, Calendar, ChevronLeft, ChevronRight, Crown, Target, ArrowUp, ArrowDown, Minus as MinusIcon, GripVertical, BarChart3, Sun, Moon, ChevronDown, Trash2, Bell } from 'lucide-react';
 import { supabase } from './supabase';
+
+// ─── PUSH NOTIFICATIONS ───
+const VAPID_PUBLIC_KEY = 'BEcFKhe3DpVfW8crc-iYvCm8KGAfrZvqKS0ysp9QxEpUuhIpUw8u8qJlV7Pb73nKgyUkqxEmZ4mSjJ4BoyTXdvo';
+
+function urlBase64ToUint8Array(base64String) {
+  const padding = '='.repeat((4 - base64String.length % 4) % 4);
+  const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+  const rawData = window.atob(base64);
+  return Uint8Array.from([...rawData].map(char => char.charCodeAt(0)));
+}
+
+async function registerServiceWorker() {
+  if (!('serviceWorker' in navigator)) return null;
+  try {
+    const reg = await navigator.serviceWorker.register('/sw.js');
+    return reg;
+  } catch (err) { console.error('SW registration failed:', err); return null; }
+}
+
+async function subscribeToPush(reg) {
+  if (!('PushManager' in window)) return null;
+  try {
+    let sub = await reg.pushManager.getSubscription();
+    if (!sub) {
+      sub = await reg.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY)
+      });
+    }
+    return sub;
+  } catch (err) { console.error('Push subscription failed:', err); return null; }
+}
+
+async function sendLocalNotification(title, body, tag) {
+  if (!('Notification' in window) || Notification.permission !== 'granted') return;
+  const reg = await navigator.serviceWorker?.ready;
+  if (reg) {
+    reg.showNotification(title, {
+      body, icon: '/icon-192.png', badge: '/icon-192.png',
+      tag: tag || 'vers-' + Date.now(), renotify: true
+    });
+  }
+}
 
 // ─── CONFETTI ───
 function ConfettiCanvas({ trigger }) {
@@ -170,6 +213,8 @@ export default function VersaApp() {
   const [rivalStatus, setRivalStatus] = useState([]);
   const [showInsights, setShowInsights] = useState(false);
   const [showActivityExpanded, setShowActivityExpanded] = useState(false);
+  const [notifPermission, setNotifPermission] = useState('default');
+  const prevCompletionsRef = useRef([]);
   const [insightsData, setInsightsData] = useState(null);
   const [streakMilestone, setStreakMilestone] = useState(null);
   const [streakFreeze, setStreakFreeze] = useState(0);
@@ -759,7 +804,168 @@ export default function VersaApp() {
     update(); const iv = setInterval(update, 30000); return () => clearInterval(iv);
   }, []);
 
-  // ─── STREAK FREEZE EARN/REVOKE CHECK ───
+  // ─── PUSH NOTIFICATIONS SETUP ───
+  useEffect(() => {
+    if (!currentUser) return;
+    const setup = async () => {
+      const reg = await registerServiceWorker();
+      if (!reg) return;
+      if ('Notification' in window) {
+        setNotifPermission(Notification.permission);
+      }
+    };
+    setup();
+  }, [currentUser]);
+
+  // Helper: throttle notifications (max 1 per tag per 5 min)
+  const notifThrottleRef = useRef({});
+  const throttledNotify = (title, body, tag) => {
+    const now = Date.now();
+    const lastSent = notifThrottleRef.current[tag] || 0;
+    if (now - lastSent < 300000) return; // 5 min cooldown per tag
+    notifThrottleRef.current[tag] = now;
+    sendLocalNotification(title, body, tag);
+  };
+
+  // ─── COMPETITION NOTIFICATIONS ───
+  useEffect(() => {
+    if (!currentUser || !currentRoom || notifPermission !== 'granted') return;
+    const prev = prevCompletionsRef.current;
+    if (prev.length === 0) { prevCompletionsRef.current = completions; return; }
+    
+    const prevIds = new Set(prev.map(c => c.id + '_' + c.count));
+    const newOnes = completions.filter(c => c.userId !== currentUser.id && !prevIds.has(c.id + '_' + c.count));
+    
+    if (newOnes.length > 0) {
+      const latest = newOnes[newOnes.length - 1];
+      const member = activeMembers.find(m => m.id === latest.userId);
+      const habit = habits.find(h => h.id === latest.habitId);
+      if (member) {
+        const rivalPts = completions.filter(c => c.userId === latest.userId).reduce((s, c) => s + ((c.habitPoints || 0) * (c.count || 1)) + (c.bonusPoints || 0), 0);
+        const rivalCompletionCount = completions.filter(c => c.userId === latest.userId).reduce((s, c) => s + (c.count || 1), 0);
+
+        // 1. Rival passed you
+        const prevRivalPts = prev.filter(c => c.userId === latest.userId).reduce((s, c) => s + ((c.habitPoints || 0) * (c.count || 1)) + (c.bonusPoints || 0), 0);
+        if (rivalPts > myPts && prevRivalPts <= myPts && myPts > 0) {
+          throttledNotify('🔥 ' + member.username + ' passed you!', rivalPts + ' pts vs your ' + myPts + '. Time to grind.', 'rival-pass-' + latest.userId);
+        }
+        // 2. Rival on a tear (5+ completions)
+        else if (rivalCompletionCount >= 5 && rivalCompletionCount % 5 === 0) {
+          throttledNotify(member.username + ' is on a tear 💪', rivalCompletionCount + ' habits logged today. Don\'t fall behind.', 'rival-tear-' + latest.userId);
+        }
+        // 3. General rival activity (only when app is in background, less frequent)
+        else if (document.hidden && habit) {
+          throttledNotify(member.username + ' is grinding', habit.name + ' (+' + (habit.points || 10) + ')', 'rival-log');
+        }
+      }
+    }
+    prevCompletionsRef.current = completions;
+  }, [completions]);
+
+  // ─── REACTION NOTIFICATIONS ───
+  const prevActivityRef = useRef([]);
+  useEffect(() => {
+    if (!currentUser || notifPermission !== 'granted' || activityFeed.length === 0) return;
+    const prev = prevActivityRef.current;
+    if (prev.length === 0) { prevActivityRef.current = activityFeed; return; }
+
+    // Check for new reactions on MY activities
+    activityFeed.forEach(a => {
+      if (a.userId !== currentUser.id) return;
+      const prevA = prev.find(p => p.id === a.id);
+      const prevReactions = prevA?.reactions || {};
+      const newReactions = a.reactions || {};
+      Object.entries(newReactions).forEach(([uid, emoji]) => {
+        if (!prevReactions[uid] && uid !== currentUser.id) {
+          const reactor = activeMembers.find(m => m.id === uid);
+          if (reactor) {
+            throttledNotify(reactor.username + ' reacted ' + emoji, 'to your ' + (a.text || 'activity'), 'reaction-' + a.id);
+          }
+        }
+      });
+    });
+    prevActivityRef.current = activityFeed;
+  }, [activityFeed]);
+
+  // ─── PROTECTION NOTIFICATIONS (streak, logging reminders) ───
+  useEffect(() => {
+    if (!currentUser || notifPermission !== 'granted') return;
+    const checkReminders = () => {
+      const hour = new Date().getHours();
+      const today = getToday();
+
+      // Streak at risk — 8pm warning
+      if (hour === 20 && myPts < 80 && streakData.streak > 0) {
+        const key = 'vers-streak8-' + today;
+        if (!sessionStorage.getItem(key)) {
+          sendLocalNotification('⚠️ Your ' + streakData.streak + '-day streak is at risk', 'You need 80pts to keep it alive. Log some habits before midnight.', 'streak-8pm');
+          sessionStorage.setItem(key, '1');
+        }
+      }
+
+      // Last chance — 10pm warning
+      if (hour === 22 && myPts < 80 && streakData.streak > 0) {
+        const key = 'vers-streak10-' + today;
+        if (!sessionStorage.getItem(key)) {
+          sendLocalNotification('🚨 2 hours left!', 'Your ' + streakData.streak + '-day streak breaks at midnight. ' + (streakFreeze > 0 ? 'Freeze will save you, but you won\'t earn a new one.' : 'No freeze banked — this is it.'), 'streak-10pm');
+          sessionStorage.setItem(key, '1');
+        }
+      }
+
+      // Don't forget to log — 6pm gentle nudge if nothing logged
+      if (hour === 18 && myPts === 0) {
+        const key = 'vers-nudge-' + today;
+        if (!sessionStorage.getItem(key)) {
+          sendLocalNotification('📋 Don\'t forget to log today', 'Your rivals might already be ahead. Open Vers and start tracking.', 'daily-nudge');
+          sessionStorage.setItem(key, '1');
+        }
+      }
+
+      // Last place weekly warning — Sunday 6pm
+      if (new Date().getDay() === 0 && hour === 18) {
+        const key = 'vers-lastplace-' + today;
+        if (!sessionStorage.getItem(key) && weeklyWinner && activeMembers.length > 1) {
+          const lb = activeMembers.map(m => ({ id: m.id, pts: allCompletions.filter(c => c.userId === m.id).reduce((s, c) => s + ((c.habitPoints || 0) * (c.count || 1)) + (c.bonusPoints || 0), 0) })).sort((a, b) => b.pts - a.pts);
+          if (lb.length > 0 && lb[lb.length - 1].id === currentUser.id) {
+            sendLocalNotification('😬 You\'re in last place', 'The week resets tonight. Still time to make a push.', 'last-place');
+            sessionStorage.setItem(key, '1');
+          }
+        }
+      }
+    };
+    checkReminders();
+    const iv = setInterval(checkReminders, 60000 * 5);
+    return () => clearInterval(iv);
+  }, [currentUser, notifPermission, myPts, streakData.streak, streakFreeze, weeklyWinner]);
+
+  // ─── CELEBRATION NOTIFICATIONS ───
+  // Won the week — fires when lastWeekData loads and you're #1
+  const weekWinNotifiedRef = useRef(false);
+  useEffect(() => {
+    if (!currentUser || !lastWeekData || weekWinNotifiedRef.current || notifPermission !== 'granted') return;
+    if (lastWeekData.scores.length > 0 && lastWeekData.scores[0].member.id === currentUser.id) {
+      weekWinNotifiedRef.current = true;
+      throttledNotify('🏆 You won the week!', lastWeekData.scores[0].pts + ' pts — you dominated. Share your recap!', 'week-win');
+    }
+  }, [lastWeekData]);
+
+  // Duo streak milestone — fires when a mutual streak hits 3, 7, 14, 30
+  const duoMilestoneRef = useRef({});
+  useEffect(() => {
+    if (!currentUser || notifPermission !== 'granted') return;
+    Object.entries(mutualStreaks).forEach(([uid, days]) => {
+      const milestones = [3, 7, 14, 30];
+      const lastNotified = duoMilestoneRef.current[uid] || 0;
+      const crossed = milestones.find(m => days >= m && lastNotified < m);
+      if (crossed) {
+        const rival = activeMembers.find(m => m.id === uid);
+        if (rival) {
+          duoMilestoneRef.current[uid] = crossed;
+          throttledNotify('🔗 ' + crossed + '-day duo streak!', 'You and ' + rival.username + ' — ' + crossed + ' days grinding together.', 'duo-' + uid + '-' + crossed);
+        }
+      }
+    });
+  }, [mutualStreaks]);
   const freezeEarnedRef = useRef(false);
   useEffect(() => {
     if (!currentUser || !currentRoom) return;
@@ -1910,6 +2116,7 @@ export default function VersaApp() {
         <div className="grid grid-cols-2 gap-3 mb-4"><div className={`text-center p-3 ${T.bgCard} rounded-xl border ${T.border}`}><div className="text-lg font-black text-purple-400">{streakData.activeDays||0}</div><div className="text-[9px] text-gray-600 tracking-wider uppercase mt-0.5">Active Days</div></div><div className={`text-center p-3 ${T.bgCard} rounded-xl border ${T.border}`}><div className="text-lg font-black text-cyan-400">{streakData.totalCompletions||0}</div><div className="text-[9px] text-gray-600 tracking-wider uppercase mt-0.5">Completions</div></div></div>
         <div className={`p-3 ${T.bgCard} rounded-xl border ${T.border}`}><div className="text-[9px] text-gray-600 tracking-wider uppercase mb-2">Crystals</div><div className="flex justify-center gap-4">{allCatNames.map(c=><div key={c} className="text-center"><div className={'w-6 h-6 rounded-full mx-auto mb-1 transition-all '+(myCr[c]?getCT(c).bg+' shadow-md '+getCT(c).glow:'bg-white/[0.06]')}/><span className="text-[9px] text-gray-600">{c}</span></div>)}</div></div>
         <div className={`mt-4 p-3 ${T.bgCard} rounded-xl border ${T.border} flex items-center justify-between`}><div><div className={`text-sm font-medium ${T.text}`}>Email Reminders</div><div className="text-[10px] text-gray-500">Daily nudges at 12pm & 6pm</div></div><button onClick={async()=>{const newVal=currentUser.emailReminders===false?true:false;try{await supabase.from('users').update({email_reminders:!newVal}).eq('id',currentUser.id);setCurrentUser(p=>({...p,emailReminders:!newVal}));}catch{}}} className={'relative w-11 h-6 rounded-full transition-all '+(currentUser.emailReminders!==false?'bg-blue-500':(darkMode?'bg-white/[0.08]':'bg-gray-200'))}><div className={'absolute top-1 w-4 h-4 rounded-full bg-white transition-all shadow-sm '+(currentUser.emailReminders!==false?'left-6':'left-1')}/></button></div>
+        <div className={`mt-2 p-3 ${T.bgCard} rounded-xl border ${T.border} flex items-center justify-between`}><div><div className={`text-sm font-medium ${T.text}`}>Push Notifications</div><div className="text-[10px] text-gray-500">{notifPermission==='granted'?'Enabled — rivals, streaks, reminders':notifPermission==='denied'?'Blocked in browser settings':'Get notified when rivals log habits'}</div></div>{notifPermission==='granted'?<div className="text-[#4aba7a] text-sm font-bold">✓ On</div>:notifPermission==='denied'?<div className="text-red-400 text-sm font-bold">Blocked</div>:<button onClick={async()=>{try{const perm=await Notification.requestPermission();setNotifPermission(perm);if(perm==='granted'){const reg=await registerServiceWorker();if(reg)await subscribeToPush(reg);}}catch{}}} className="px-3 py-1.5 bg-[#5b7cf5] text-white text-xs font-bold rounded-lg active:scale-[0.97]">Enable</button>}</div>
         {/* Quick actions */}
         <div className="mt-5 space-y-2">
           <button onClick={()=>{setShowProfile(false);setShowInviteModal(true);}} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border transition-all ${darkMode?'border-white/[0.06] bg-white/[0.02] hover:bg-white/[0.04] text-gray-300':'border-gray-200 bg-gray-50 hover:bg-gray-100 text-gray-700'}`}><UserPlus size={16} className="text-blue-400"/><span className="text-sm">Invite to Room</span></button>
@@ -2018,7 +2225,7 @@ export default function VersaApp() {
             <div className="flex gap-2">
               <button onClick={async()=>{
                 const text = `🏆 Versa Weekly Recap\n${lastWeekData.dateRange}\n\n${lastWeekData.scores.map((s,i)=>((['🥇','🥈','🥉'][i]||`${i+1}.`)+' '+s.member.username+' — '+s.pts+'pts')).join('\n')}\n\nJoin us: ${window.location.origin}?join=${currentRoom?.code}`;
-                if(navigator.share){try{await navigator.share({title:'Versa Weekly Recap',text});}catch{}}else{navigator.clipboard.writeText(text);setCopied(true);setTimeout(()=>setCopied(false),2000);}
+                if(navigator.share){try{await navigator.share({title:'Vers Weekly Recap',text});}catch{}}else{navigator.clipboard.writeText(text);setCopied(true);setTimeout(()=>setCopied(false),2000);}
               }} className="flex-1 px-4 py-3 bg-[#5b7cf5] text-white rounded-xl text-sm font-bold flex items-center justify-center gap-2 active:scale-[0.98]"><Copy size={14}/>{copied?'Copied!':'Share Recap'}</button>
               <button onClick={()=>{setShowWeeklyRecap(false);setStoryCardIdx(0);setShowStoryCards(true);}} className="flex-1 px-4 py-3 bg-[#9b6bc8] text-white rounded-xl text-sm font-bold flex items-center justify-center gap-2 active:scale-[0.98]">📸 Story</button>
               {lastWeekData.scores.length>1&&<button onClick={()=>{setShowWeeklyRecap(false);setShowPunishmentWheel(true);setWheelResult(null);}} className="flex-1 px-4 py-3 bg-[#d06b4a] text-white rounded-xl text-sm font-bold flex items-center justify-center gap-2 active:scale-[0.98]">🎰 Wheel</button>}
@@ -2089,7 +2296,7 @@ export default function VersaApp() {
                 <button onClick={()=>{setWheelResult(null);}} className="flex-1 px-4 py-3 border border-white/[0.08] text-gray-400 rounded-xl text-sm font-medium hover:bg-white/[0.04]">Spin Again</button>
                 <button onClick={async()=>{
                   const text = `🎰 Versa Punishment Wheel\n\n${lastWeekData.scores[lastWeekData.scores.length-1].member.username} lost and has to:\n${wheelResult}\n\nJoin us: ${window.location.origin}?join=${currentRoom?.code}`;
-                  if(navigator.share){try{await navigator.share({title:'Versa Punishment',text});}catch{}}else{navigator.clipboard.writeText(text);setCopied(true);setTimeout(()=>setCopied(false),2000);}
+                  if(navigator.share){try{await navigator.share({title:'Vers Punishment',text});}catch{}}else{navigator.clipboard.writeText(text);setCopied(true);setTimeout(()=>setCopied(false),2000);}
                 }} className="flex-1 px-4 py-3 bg-[#5b7cf5] text-white rounded-xl text-sm font-bold active:scale-[0.98]">{copied?'Copied!':'Share'}</button>
               </div>
             )}
@@ -2201,7 +2408,7 @@ export default function VersaApp() {
               }catch{
                 // Fallback: share as text
                 const text=`🏆 Versa Weekly Recap\n${lastWeekData.dateRange}\n\nWinner: ${lastWeekData.scores[0].member.username} — ${lastWeekData.scores[0].pts}pts`;
-                if(navigator.share){try{await navigator.share({title:'Versa Recap',text});}catch{}}else{navigator.clipboard.writeText(text);}
+                if(navigator.share){try{await navigator.share({title:'Vers Recap',text});}catch{}}else{navigator.clipboard.writeText(text);}
               }
             }} className="w-full mt-2 py-3 bg-[#9b6bc8] text-white rounded-xl text-sm font-bold active:scale-[0.98]">📸 Save as Image</button>
           </div>
