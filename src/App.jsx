@@ -228,21 +228,21 @@ export default function VersaApp() {
   const loadDefaultHabits = async () => {
     const defaultHabits = [
       // STUDY — time-based
-      { name: 'Deep work', category: 'Study', points: 10, is_repeatable: true, max_completions: 99, unit: 'per 30 min' },
-      { name: 'Read', category: 'Study', points: 10, is_repeatable: true, max_completions: 99, unit: 'per 30 min' },
+      { name: 'Deep work', category: 'Study', points: 10, is_repeatable: true, unit: 'per 30 min' },
+      { name: 'Read', category: 'Study', points: 10, is_repeatable: true, unit: 'per 30 min' },
       // STUDY — completion-based
-      { name: 'Small task', category: 'Study', points: 10, is_repeatable: true, max_completions: 99 },
-      { name: 'Big task', category: 'Study', points: 30, is_repeatable: true, max_completions: 99 },
+      { name: 'Small task', category: 'Study', points: 10, is_repeatable: true },
+      { name: 'Big task', category: 'Study', points: 30, is_repeatable: true },
       // HEALTH — gym, sleep, nutrition
-      { name: 'Hit the gym', category: 'Health', points: 20, is_repeatable: true, max_completions: 99, unit: 'per 30 min' },
-      { name: 'Slept 7+ hours', category: 'Health', points: 30, is_repeatable: false, max_completions: 1 },
-      { name: 'Woke up before 7', category: 'Health', points: 30, is_repeatable: false, max_completions: 1 },
-      { name: 'Clean eating', category: 'Health', points: 10, is_repeatable: true, max_completions: 99, unit: 'per meal' },
+      { name: 'Hit the gym', category: 'Health', points: 20, is_repeatable: true, unit: 'per 30 min' },
+      { name: 'Slept 7+ hours', category: 'Health', points: 30, is_repeatable: false },
+      { name: 'Woke up before 7', category: 'Health', points: 30, is_repeatable: false },
+      { name: 'Clean eating', category: 'Health', points: 10, is_repeatable: true, unit: 'per meal' },
       // FOCUS — screen time, substances, mindset
-      { name: 'Screen time under 2.5hrs', category: 'Focus', points: 30, is_repeatable: false, max_completions: 1 },
-      { name: 'No vaping / substances', category: 'Focus', points: 30, is_repeatable: false, max_completions: 1 },
-      { name: 'Work done before 9pm', category: 'Focus', points: 30, is_repeatable: false, max_completions: 1 },
-      { name: 'Journaled', category: 'Focus', points: 10, is_repeatable: true, max_completions: 99, unit: 'per 5 min' },
+      { name: 'Screen time under 2.5hrs', category: 'Focus', points: 30, is_repeatable: false },
+      { name: 'No vaping / substances', category: 'Focus', points: 30, is_repeatable: false },
+      { name: 'Work done before 9pm', category: 'Focus', points: 30, is_repeatable: false },
+      { name: 'Journaled', category: 'Focus', points: 10, is_repeatable: true, unit: 'per 5 min' },
     ];
     try {
       setLoading(true);
@@ -928,7 +928,7 @@ export default function VersaApp() {
       const hid = currentRoom.id+'_'+Date.now()+'_'+Math.random().toString(36).slice(2,8);
       await supabase.from('habits').insert({
         id: hid, name: newHabit.name.trim(), category: newHabit.category, points: parseInt(newHabit.points)||10,
-        is_repeatable: newHabit.isRepeatable, max_completions: parseInt(newHabit.maxCompletions)||1,
+        is_repeatable: newHabit.isRepeatable,
         unit: newHabit.unit?.trim() || null, description: newHabit.description?.trim() || null,
         room_id: currentRoom.id, created_by: currentUser.id
       });
@@ -946,7 +946,7 @@ export default function VersaApp() {
       await supabase.from('habits').update({
         name: editHabitData.name.trim(), category: editHabitData.category,
         points: parseInt(editHabitData.points)||10, is_repeatable: editHabitData.isRepeatable,
-        max_completions: parseInt(editHabitData.maxCompletions)||1,
+        
         unit: editHabitData.unit?.trim() || null, description: editHabitData.description?.trim() || null
       }).eq('id', showEditHabit);
       setShowEditHabit(null);
@@ -1015,7 +1015,7 @@ export default function VersaApp() {
 
   const handleIncrement = async (hid) => {
     const t = getToday(), h = habits.find(x=>x.id===hid); if(!h) return;
-    const max = h.isRepeatable ? (h.maxCompletions||1) : 1;
+    const max = h.isRepeatable ? 999999 : 1;
     const ex = getExisting(hid);
     const triggerMaxed = () => { setConfettiTrigger(v=>v+1); setMaxedHabit(hid); setTimeout(()=>setMaxedHabit(null),1500); };
 
@@ -1026,9 +1026,9 @@ export default function VersaApp() {
 
     // Optimistic update — immediately update local state
     if (ex) {
-      if (ex.count >= max) return;
+      if (!h.isRepeatable && ex.count >= 1) return;
       setCompletions(prev => prev.map(c => c.id === ex.id ? { ...c, count: c.count + 1, habitPoints: baseWithStreak, bonusPoints: bonus ? (c.bonusPoints||0) + (finalPts - baseWithStreak) : c.bonusPoints||0 } : c));
-      if (ex.count + 1 >= max) triggerMaxed();
+      if (!h.isRepeatable && ex.count + 1 >= 1) triggerMaxed();
     } else {
       const cid = currentUser.id+'_'+hid+'_'+t;
       setCompletions(prev => [...prev, { id: cid, userId: currentUser.id, habitId: hid, roomId: currentRoom.id, date: t, count: 1, habitName: h.name, habitPoints: baseWithStreak, habitCategory: h.category, streakMultiplier: streakMulti.multi, bonusPoints: bonus ? finalPts - baseWithStreak : 0 }]);
@@ -1037,7 +1037,7 @@ export default function VersaApp() {
 
     try {
       if (ex) {
-        if (ex.count < max) {
+        if (h.isRepeatable || ex.count < 1) {
           await supabase.from('completions').update({
             count: ex.count+1,
             habit_points: baseWithStreak,
@@ -1646,10 +1646,11 @@ export default function VersaApp() {
               <div key={catName}>
                 <div className="flex items-center gap-2 mb-2 mt-4 first:mt-0"><span className="text-base">{catIcon}</span><span className={`text-xs font-bold tracking-wider uppercase ${t.txt}`}>{catName}</span></div>
                 {catHabits.map(h => {
-                  const cnt = getCount(h.id), mx = h.isRepeatable ? (h.maxCompletions||1) : 1;
-                  const done = cnt > 0, maxed = cnt >= mx;
+                  const cnt = getCount(h.id);
+                  const done = cnt > 0;
+                  const maxed = !h.isRepeatable && cnt >= 1;
                   return (
-                    <div key={h.id} className={`flex items-center gap-3 mb-1.5 rounded-2xl p-3 pl-0 overflow-hidden transition-all ${maxed?(darkMode?'bg-gradient-to-r from-'+t.bg.replace('bg-','')+'10 to-transparent':'bg-'+t.bg.replace('bg-','').replace('500','50')):(darkMode?'bg-white/[0.02]':'bg-white')} ${darkMode?'border border-white/[0.04]':'border border-gray-100 shadow-sm'}`}>
+                    <div key={h.id} className={`flex items-center gap-3 mb-1.5 rounded-2xl p-3 pl-0 overflow-hidden transition-all ${maxed?(darkMode?'bg-gradient-to-r from-'+t.bg.replace('bg-','')+'10 to-transparent':'bg-'+t.bg.replace('bg-','').replace('500','50')):(darkMode?'bg-[#182544]':'bg-white')} ${darkMode?'border border-[#223858]':'border border-gray-100 shadow-sm'}`}>
                       <div className={`w-1 self-stretch rounded-r-full ${done?t.bg:'bg-transparent'} transition-all`}/>
                       <div className="min-w-0 flex-1">
                         <div className={`text-[13px] font-semibold ${done?(darkMode?'text-white':'text-gray-900'):(darkMode?'text-gray-400':'text-gray-600')}`}>{h.name}</div>
@@ -1657,15 +1658,11 @@ export default function VersaApp() {
                         <div className={`text-[10px] ${T.textDim} flex items-center gap-1.5 mt-0.5`}>
                           <span>{h.points}pts</span>
                           {h.unit&&<><span>·</span><span>{h.unit}</span></>}
-                          {h.isRepeatable&&<><span>·</span><span className={maxed?'font-bold '+t.txt:''}>{cnt}/{mx}</span></>}
-                          {maxed&&<span className={`${t.pill} text-[8px] font-bold px-1.5 py-0.5 rounded-full ${maxedHabit===h.id?'animate-bounce':''}`}>MAXED ✓</span>}
+                          {h.isRepeatable && cnt > 0 && <><span>·</span><span className={'font-bold '+t.txt}>×{cnt}</span></>}
                         </div>
-                        {h.isRepeatable && mx > 1 && cnt > 0 && !maxed && (
-                          <div className={`mt-1.5 h-1 rounded-full overflow-hidden ${darkMode?'bg-white/[0.06]':'bg-gray-100'}`}><div className={`h-full rounded-full ${t.bg} transition-all duration-500`} style={{width:(cnt/mx*100)+'%'}}/></div>
-                        )}
                       </div>
                       <div className="flex items-center gap-1.5 shrink-0">
-                        {cnt > 0 && !editMode && <button onClick={()=>handleDecrement(h.id)} className={`w-8 h-8 rounded-full flex items-center justify-center transition-all active:scale-90 ${darkMode?'bg-white/[0.04] text-gray-500 hover:bg-white/[0.08]':'bg-gray-100 text-gray-400 hover:bg-gray-200'}`}><MinusIcon size={14}/></button>}
+                        {cnt > 0 && !editMode && <button onClick={()=>handleDecrement(h.id)} className={`w-8 h-8 rounded-full flex items-center justify-center transition-all active:scale-90 ${darkMode?'bg-[#1e3050] text-[#7a8ba8] hover:bg-[#264060]':'bg-gray-100 text-gray-400 hover:bg-gray-200'}`}><MinusIcon size={14}/></button>}
                         {!maxed && !editMode && <button onClick={()=>handleIncrement(h.id)} className={`w-10 h-10 rounded-full flex items-center justify-center transition-all active:scale-90 shadow-lg text-white font-bold ${t.bg} hover:opacity-90`} style={{boxShadow:`0 4px 14px ${t.neon}40`}}><Plus size={18}/></button>}
                         {maxed && !editMode && <div className={`w-10 h-10 rounded-full flex items-center justify-center ${t.bg} text-white`}><Check size={18}/></div>}
                         {editMode && <><button onClick={()=>openEditHabit(h)} className="text-blue-400 p-1.5"><Edit3 size={14}/></button><button onClick={()=>deleteHabit(h.id)} className="text-red-400 p-1.5"><Trash2 size={14}/></button></>}
@@ -1776,8 +1773,7 @@ export default function VersaApp() {
           </div>
           <input type="text" placeholder="Time description (e.g. 30 min, per hour)" value={newHabit.unit} onChange={e=>setNewHabit({...newHabit,unit:e.target.value})} className={inputCls} maxLength={20}/>
           <input type="text" placeholder="Description (e.g. what counts?)" value={newHabit.description} onChange={e=>setNewHabit({...newHabit,description:e.target.value})} className={inputCls} maxLength={60}/>
-          <label className="flex items-center gap-3 py-1 cursor-pointer"><input type="checkbox" checked={newHabit.isRepeatable} onChange={e=>setNewHabit({...newHabit,isRepeatable:e.target.checked,maxCompletions:e.target.checked?5:1})} className="w-4 h-4 rounded accent-blue-500"/><span className="text-sm text-gray-400">Repeatable</span></label>
-          {newHabit.isRepeatable&&<input type="number" placeholder="Max per day" value={newHabit.maxCompletions} onChange={e=>setNewHabit({...newHabit,maxCompletions:e.target.value})} className={inputCls}/>}
+          <label className="flex items-center gap-3 py-1 cursor-pointer"><input type="checkbox" checked={newHabit.isRepeatable} onChange={e=>setNewHabit({...newHabit,isRepeatable:e.target.checked})} className="w-4 h-4 rounded accent-blue-500"/><span className="text-sm text-gray-400">Repeatable</span></label>
           {error&&<p className="text-red-400 text-xs text-center">{error}</p>}
           <div className="flex gap-3 pt-2"><button onClick={()=>setShowAddHabit(false)} className={`flex-1 px-4 py-3 border ${T.border} rounded-xl text-sm ${T.textMuted} hover:${T.bgCardHover}`}>Cancel</button><button onClick={addHabit} className="flex-1 px-4 py-3 bg-[#5b7cf5] text-white rounded-xl text-sm font-bold shadow-lg shadow-[#5b7cf5]/15 active:scale-[0.98]">Add</button></div>
         </div>
@@ -1794,8 +1790,7 @@ export default function VersaApp() {
           </div>
           <input type="text" placeholder="Time description (e.g. 30 min, per hour)" value={editHabitData.unit||''} onChange={e=>setEditHabitData({...editHabitData,unit:e.target.value})} className={inputCls} maxLength={20}/>
           <input type="text" placeholder="Description (e.g. what counts?)" value={editHabitData.description||''} onChange={e=>setEditHabitData({...editHabitData,description:e.target.value})} className={inputCls} maxLength={60}/>
-          <label className="flex items-center gap-3 py-1 cursor-pointer"><input type="checkbox" checked={editHabitData.isRepeatable||false} onChange={e=>setEditHabitData({...editHabitData,isRepeatable:e.target.checked,maxCompletions:e.target.checked?5:1})} className="w-4 h-4 rounded accent-blue-500"/><span className="text-sm text-gray-400">Repeatable</span></label>
-          {editHabitData.isRepeatable&&<input type="number" placeholder="Max per day" value={editHabitData.maxCompletions||''} onChange={e=>setEditHabitData({...editHabitData,maxCompletions:e.target.value})} className={inputCls}/>}
+          <label className="flex items-center gap-3 py-1 cursor-pointer"><input type="checkbox" checked={editHabitData.isRepeatable||false} onChange={e=>setEditHabitData({...editHabitData,isRepeatable:e.target.checked})} className="w-4 h-4 rounded accent-blue-500"/><span className="text-sm text-gray-400">Repeatable</span></label>
           <div className="flex gap-3 pt-2"><button onClick={()=>setShowEditHabit(null)} className={`flex-1 px-4 py-3 border ${T.border} rounded-xl text-sm ${T.textMuted} hover:${T.bgCardHover}`}>Cancel</button><button onClick={saveEditHabit} className="flex-1 px-4 py-3 bg-[#5b7cf5] text-white rounded-xl text-sm font-bold shadow-lg shadow-[#5b7cf5]/15 active:scale-[0.98]">Save</button></div>
         </div>
       </Modal>
@@ -2382,21 +2377,18 @@ export default function VersaApp() {
                 <input type="checkbox" checked={newHabit.isRepeatable} onChange={e=>setNewHabit(p=>({...p,isRepeatable:e.target.checked}))} className="rounded"/>
                 Repeatable
               </label>
-              {newHabit.isRepeatable && (
-                <input type="number" value={newHabit.maxCompletions} onChange={e=>setNewHabit(p=>({...p,maxCompletions:parseInt(e.target.value)||1}))} className={inputCls+' !w-20 !py-2'} min="1" max="50" placeholder="Max"/>
-              )}
             </div>
             <button onClick={async()=>{
               if(!newHabit.name.trim())return;
               try{
                 const hid=currentRoom.id+'_'+Date.now()+'_'+Math.random().toString(36).slice(2,8);
-                await supabase.from('habits').upsert({id:hid,
+                await supabase.from('habits').insert({id:hid,
                   name:newHabit.name.trim(),category:newHabit.category,points:parseInt(newHabit.points)||10,
-                  isRepeatable:newHabit.isRepeatable,maxCompletions:parseInt(newHabit.maxCompletions)||1,
-                  roomId:currentRoom.id,createdBy:currentUser.id,createdAt:new Date().toISOString()
+                  is_repeatable:newHabit.isRepeatable,
+                  room_id:currentRoom.id,created_by:currentUser.id
                 });
                 setCustomBoardHabits(prev=>[...prev,hid]);
-                setNewHabit({name:'',category:newHabit.category,points:10,isRepeatable:false,maxCompletions:1});
+                setNewHabit({name:'',category:newHabit.category,points:10,isRepeatable:false});
               }catch{setError('Failed to add');}
             }} disabled={!newHabit.name.trim()} className="w-full py-2.5 bg-[#5b7cf5] text-white rounded-xl text-xs font-bold active:scale-[0.98] disabled:opacity-40">Add & Select</button>
           </div>
