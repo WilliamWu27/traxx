@@ -264,11 +264,15 @@ export default function VersaApp() {
     const joinCode = params.get('join');
     if (joinCode) { setRoomCode(joinCode.toUpperCase()); window.history.replaceState({}, '', window.location.pathname); }
 
+    // Safety timeout — if auth never fires, stop loading
+    const timeout = setTimeout(() => setAuthLoading(false), 5000);
+
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (session?.user) {
-        const user = session.user;
-        try {
-          const { data: ud } = await supabase.from('users').select('*').eq('id', user.id).single();
+      clearTimeout(timeout);
+      try {
+        if (session?.user) {
+          const user = session.user;
+          const { data: ud, error: udErr } = await supabase.from('users').select('*').eq('id', user.id).maybeSingle();
           if (ud) {
             const data = { id: user.id, ...ud, photoURL: ud.photo_url || user.user_metadata?.avatar_url };
             setCurrentUser(data);
@@ -276,7 +280,7 @@ export default function VersaApp() {
             setUserRooms(rooms);
             const active = data.active_room || (rooms.length > 0 ? rooms[0] : null);
             if (active) {
-              const { data: rd } = await supabase.from('rooms').select('*').eq('id', active).single();
+              const { data: rd } = await supabase.from('rooms').select('*').eq('id', active).maybeSingle();
               if (rd) { setCurrentRoom({ id: rd.id, ...rd, code: rd.code || rd.id }); setView('dashboard'); }
               else setShowRoomModal(true);
             } else setShowRoomModal(true);
@@ -287,11 +291,11 @@ export default function VersaApp() {
             setCurrentUser({ id: user.id, username, email: user.email, photoURL: user.user_metadata?.avatar_url, rooms: [] });
             setShowRoomModal(true);
           }
-        } catch (err) { console.error(err); setError(err.message); }
-      } else setCurrentUser(null);
+        } else { setCurrentUser(null); }
+      } catch (err) { console.error('Auth error:', err); }
       setAuthLoading(false);
     });
-    return () => subscription?.unsubscribe();
+    return () => { clearTimeout(timeout); subscription?.unsubscribe(); };
   }, []);
 
   // ─── REALTIME DATA ───
@@ -1189,7 +1193,7 @@ export default function VersaApp() {
     <div className="min-h-screen bg-[#0f1b2d] flex items-center justify-center relative overflow-hidden">
       <div className="text-center">
         <h1 className="text-4xl font-black tracking-[0.4em] text-white mb-2">VERSA</h1>
-        <p className="text-[#4a6080] text-[10px] tracking-[0.25em] uppercase mb-6">Outwork · Outgrind · Outlast</p>
+        <p className="text-[#4a6080] text-[10px] tracking-[0.25em] uppercase mb-6">Keep yourself accountable.</p>
         <div className="flex justify-center gap-2">{['bg-[#5b7cf5]','bg-[#e8864a]','bg-[#4aba7a]'].map((c,i)=><div key={i} className={`w-1.5 h-1.5 rounded-full ${c} animate-pulse`} style={{animationDelay:i*200+'ms'}} />)}</div>
       </div>
     </div>
@@ -1222,7 +1226,7 @@ export default function VersaApp() {
               <div className="flex gap-1"><div className="w-2 h-2 rounded-full bg-[#5b7cf5] animate-pulse"/><div className="w-2 h-2 rounded-full bg-[#e8864a] animate-pulse" style={{animationDelay:'150ms'}}/><div className="w-2 h-2 rounded-full bg-[#4aba7a] animate-pulse" style={{animationDelay:'300ms'}}/></div>
             </div>
             <h1 className="text-5xl font-black tracking-[0.35em] text-white mb-2">VERSA</h1>
-            <p className="text-[#4a6080] text-[11px] tracking-[0.25em] uppercase font-medium">Outwork · Outgrind · Outlast</p>
+            <p className="text-[#4a6080] text-[11px] tracking-[0.25em] uppercase font-medium">Keep yourself accountable.</p>
           </div>
 
           {/* Feature cards */}
