@@ -374,7 +374,7 @@ export default function VersaApp() {
     // Fetch personal board
     const fetchBoard = async () => {
       const boardId = currentUser.id+'_'+currentRoom.id;
-      const { data } = await supabase.from('my_board').select('*').eq('id', boardId).single();
+      const { data } = await supabase.from('my_board').select('*').eq('id', boardId).maybeSingle();
       if (data?.habit_ids) setMyBoardIds(data.habit_ids);
       else setMyBoardIds(null);
     };
@@ -383,7 +383,7 @@ export default function VersaApp() {
     // Fetch habit order
     const fetchOrder = async () => {
       const orderId = currentUser.id+'_'+currentRoom.id;
-      const { data } = await supabase.from('habit_order').select('*').eq('id', orderId).single();
+      const { data } = await supabase.from('habit_order').select('*').eq('id', orderId).maybeSingle();
       if (data?.order_ids) setHabitOrder(data.order_ids);
       else setHabitOrder([]);
     };
@@ -408,7 +408,7 @@ export default function VersaApp() {
     if (!currentRoom) { setRoomKicked([]); setRoomCreatedBy(null); return; }
     const load = async () => {
       try {
-        const { data: rd } = await supabase.from('rooms').select('*').eq('id', currentRoom.id).single();
+        const { data: rd } = await supabase.from('rooms').select('*').eq('id', currentRoom.id).maybeSingle();
         if (rd) {
           setRoomKicked(rd.kicked || []);
           setRoomCreatedBy(rd.created_by || null);
@@ -466,7 +466,7 @@ export default function VersaApp() {
         const today = getToday(), yStr = getYesterday();
 
         // Load freeze from user doc
-        const { data: userSnap } = await supabase.from('users').select('streak_freeze').eq('id', currentUser.id).single();
+        const { data: userSnap } = await supabase.from('users').select('streak_freeze').eq('id', currentUser.id).maybeSingle();
         const savedFreeze = userSnap?.streak_freeze || 0;
         setStreakFreeze(savedFreeze);
 
@@ -494,12 +494,11 @@ export default function VersaApp() {
         }
 
         // Yesterday's points for solo mode
-        const yComps = snap.docs.filter(d => d.data().date === yStr && d.data().roomId === currentRoom.id);
+        const yComps = allDocs.filter(d => d.date === yStr && d.roomId === currentRoom.id);
         let yPts = 0;
         yComps.forEach(d => {
-          const data = d.data();
-          const pts = data.habitPoints || habits.find(h=>h.id===data.habitId)?.points || 0;
-          yPts += pts * (data.count || 1);
+          const pts = d.habitPoints || habits.find(h=>h.id===d.habitId)?.points || 0;
+          yPts += pts * (d.count || 1);
         });
         setYesterdayPoints(yPts);
         // Check for streak milestone
@@ -514,7 +513,7 @@ export default function VersaApp() {
             setTimeout(() => setStreakMilestone(null), 4000);
           }
         }
-        setStreakData({ streak, activeDays: dates.length, totalCompletions: snap.docs.reduce((s,d)=>s+(d.data().count||1),0) });
+        setStreakData({ streak, activeDays: dates.length, totalCompletions: allDocs.reduce((s,d)=>s+(d.count||1),0) });
       } catch (err) { console.error(err); setStreakData({streak:0,activeDays:0,totalCompletions:0}); }
     };
     calc();
@@ -742,7 +741,7 @@ export default function VersaApp() {
       await supabase.from('board_proposals').update({ [field]: updList, [other]: otherList, status }).eq('id', boardRef);
       // If approved, apply to the user's personal board
       if (status === 'approved') {
-        await supabase.from('my_board').upsert({ id: boardDoc.userId+'_'+currentRoom.id, habit_ids: boardDoc.habitIds, user_id: boardDoc.userId, room_id: currentRoom.id });
+        await supabase.from('my_board').upsert({ id: boardDoc.user_id+'_'+currentRoom.id, habit_ids: boardDoc.habit_ids || boardDoc.habitIds, user_id: boardDoc.user_id || boardDoc.userId, room_id: currentRoom.id });
       }
     } catch {}
   };
@@ -850,16 +849,16 @@ export default function VersaApp() {
     const code = roomCode.trim().toUpperCase();
     if (!code) { setError('Enter room code'); setLoading(false); return; }
     try {
-      const { data: rd2 } = await supabase.from('rooms').select('*').eq('id', code).single();
+      const { data: rd2 } = await supabase.from('rooms').select('*').eq('id', code).maybeSingle();
       if (!rd2) { setError('Room not found'); setLoading(false); return; }
       const nr2 = [...new Set([...(userRooms||[]),code])]; await supabase.from('users').update({ rooms: nr2, active_room: code }).eq('id', currentUser.id);
-      setUserRooms(p=>p.includes(code)?p:[...p,code]); setCurrentRoom({id:code,...rd.data()}); setShowRoomModal(false); setShowSwitchRoom(false); setView('dashboard'); setRoomCode('');
+      setUserRooms(p=>p.includes(code)?p:[...p,code]); setCurrentRoom({id:code,...rd2,code:rd2.code||code}); setShowRoomModal(false); setShowSwitchRoom(false); setView('dashboard'); setRoomCode('');
     } catch (err) { setError('Failed: '+err.message); } finally { setLoading(false); }
   };
   const switchRoom = async (rid) => {
     setLoading(true);
     try {
-      const { data: rd3 } = await supabase.from('rooms').select('*').eq('id', rid).single();
+      const { data: rd3 } = await supabase.from('rooms').select('*').eq('id', rid).maybeSingle();
       if (rd3) { await supabase.from('users').update({ active_room: rid }).eq('id', currentUser.id); setCurrentRoom({id:rd3.id,...rd3,code:rd3.code||rd3.id}); setRoomKicked(rd3.kicked||[]); setRoomCreatedBy(rd3.created_by||null); setShowSwitchRoom(false); }
     } catch { setError('Failed to switch'); } finally { setLoading(false); }
   };
@@ -946,7 +945,6 @@ export default function VersaApp() {
       await supabase.from('habits').update({
         name: editHabitData.name.trim(), category: editHabitData.category,
         points: parseInt(editHabitData.points)||10, is_repeatable: editHabitData.isRepeatable,
-        
         unit: editHabitData.unit?.trim() || null, description: editHabitData.description?.trim() || null
       }).eq('id', showEditHabit);
       setShowEditHabit(null);
@@ -1001,7 +999,7 @@ export default function VersaApp() {
   const reactToActivity = async (activityId, emoji) => {
     if (!currentUser) return;
     try {
-      const { data } = await supabase.from('activity').select('reactions').eq('id', activityId).single();
+      const { data } = await supabase.from('activity').select('reactions').eq('id', activityId).maybeSingle();
       if (!data) return;
       const reactions = data.reactions || {};
       if (reactions[currentUser.id] === emoji) {
