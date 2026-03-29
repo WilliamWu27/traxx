@@ -204,7 +204,7 @@ function VersaAppMain() {
   const [userRooms, setUserRooms] = useState([]);
   const [roomStakes, setRoomStakes] = useState(null);
   const [newStake, setNewStake] = useState({ type: 'custom', description: '', duration: 'weekly' });
-  const [newHabit, setNewHabit] = useState({ name: '', category: 'Study', points: 10, isRepeatable: false, maxCompletions: 1, unit: '', description: '' });
+  const [newHabit, setNewHabit] = useState({ name: '', category: 'Study', points: 10, isRepeatable: false, unit: '', description: '' });
   const [historyDate, setHistoryDate] = useState(null);
   const [editHabitData, setEditHabitData] = useState({});
   const [weeklyWinner, setWeeklyWinner] = useState(null);
@@ -374,7 +374,7 @@ function VersaAppMain() {
     // Fetch habits
     const fetchHabits = async () => {
       const { data } = await supabase.from('habits').select('*').eq('room_id', currentRoom.id);
-      if (data) setHabits(data.map(h => ({ ...h, id: h.id, roomId: h.room_id, isRepeatable: h.is_repeatable, maxCompletions: h.max_completions, createdBy: h.created_by })));
+      if (data) setHabits(data.map(h => ({ ...h, id: h.id, roomId: h.room_id, isRepeatable: h.is_repeatable, createdBy: h.created_by })));
     };
     fetchHabits();
     subs.push(supabase.channel('habits-'+currentRoom.id).on('postgres_changes', { event: '*', schema: 'public', table: 'habits', filter: 'room_id=eq.'+currentRoom.id }, ()=>setTimeout(fetchHabits,300)).subscribe());
@@ -985,7 +985,7 @@ function VersaAppMain() {
     const hid = currentRoom.id+'_'+Date.now()+'_'+Math.random().toString(36).slice(2,8);
     // Optimistic update
     setHabits(prev => [...prev, { id: hid, name: newHabit.name.trim(), category: newHabit.category, points: parseInt(newHabit.points)||10, isRepeatable: newHabit.isRepeatable, unit: newHabit.unit?.trim()||null, description: newHabit.description?.trim()||null, roomId: currentRoom.id, createdBy: currentUser.id }]);
-    setNewHabit({ name:'', category:'Study', points:10, isRepeatable:false, maxCompletions:1, unit:'', description:'' }); setShowAddHabit(false);
+    setNewHabit({ name:'', category:'Study', points:10, isRepeatable:false, unit:'', description:'' }); setShowAddHabit(false);
     try {
       await supabase.from('habits').insert({
         id: hid, name: newHabit.name.trim(), category: newHabit.category, points: parseInt(newHabit.points)||10,
@@ -1023,7 +1023,7 @@ function VersaAppMain() {
       await supabase.from('completions').delete().eq('habit_id', hid).eq('room_id', currentRoom.id);
     } catch (err) { console.error('Delete habit error:', err); }
   };
-  const openEditHabit = (habit) => { setEditHabitData({ name: habit.name, category: habit.category, points: habit.points, isRepeatable: habit.isRepeatable, maxCompletions: habit.maxCompletions, unit: habit.unit||'', description: habit.description||'' }); setShowEditHabit(habit.id); };
+  const openEditHabit = (habit) => { setEditHabitData({ name: habit.name, category: habit.category, points: habit.points, isRepeatable: habit.isRepeatable, unit: habit.unit||'', description: habit.description||'' }); setShowEditHabit(habit.id); };
 
   // ─── COMPLETIONS (with embedded habit data for orphan-proofing) ───
   const getExisting = (hid) => { const t = getToday(); return completions.find(c=>c.userId===currentUser.id&&c.habitId===hid&&c.date===t); };
@@ -1469,7 +1469,7 @@ function VersaAppMain() {
 
           {/* CTA */}
           <div className="space-y-3">
-            <button onClick={handleGoogleSignIn} disabled={loading} className="w-full py-3.5 rounded-2xl text-sm font-bold tracking-wide transition-all active:scale-[0.98] bg-white text-[#0f1b2d] shadow-lg shadow-white/10 flex items-center justify-center gap-3 hover:bg-gray-100 disabled:opacity-50">
+            <button onClick={handleGoogleSignIn} disabled={loading} className="w-full py-3.5 rounded-2xl text-sm font-bold tracking-wide transition-all active:scale-[0.98] bg-white text-[#0f1b2d] shadow-lg shadow-[#1e3050] flex items-center justify-center gap-3 hover:bg-gray-100 disabled:opacity-50">
               <svg className="w-5 h-5" viewBox="0 0 24 24"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 01-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" fill="#4285F4"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/></svg>
               Continue with Google
             </button>
@@ -1494,7 +1494,7 @@ function VersaAppMain() {
             <h1 className="text-4xl font-black tracking-[0.3em] text-white mb-1">VERSA</h1>
             <div className="flex justify-center gap-2 mt-3"><div className="w-6 h-0.5 rounded-full bg-blue-500"/><div className="w-6 h-0.5 rounded-full bg-orange-500"/><div className="w-6 h-0.5 rounded-full bg-emerald-500"/></div>
           </div>
-          <div className="bg-white/[0.03] backdrop-blur-xl rounded-3xl border border-white/[0.06] p-7">
+          <div className="bg-[#151d30] backdrop-blur-xl rounded-3xl border border-[#223858] p-7">
             {view === 'forgot' ? (
               <form onSubmit={handleForgotPassword} className="space-y-4">
                 <h2 className="text-lg font-bold text-white text-center mb-1">Reset Password</h2>
@@ -1513,7 +1513,7 @@ function VersaAppMain() {
                   <svg className="w-4 h-4" viewBox="0 0 24 24"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 01-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" fill="#4285F4"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/></svg>
                   Continue with Google
                 </button>
-                <div className="flex items-center gap-3"><div className="flex-1 h-px bg-white/[0.06]"/><span className="text-gray-600 text-[10px] tracking-wider uppercase">or</span><div className="flex-1 h-px bg-white/[0.06]"/></div>
+                <div className="flex items-center gap-3"><div className="flex-1 h-px bg-[#1e3050]"/><span className="text-gray-600 text-[10px] tracking-wider uppercase">or</span><div className="flex-1 h-px bg-[#1e3050]"/></div>
                 <form onSubmit={handleLogin} className="space-y-3">
                   <input type="email" placeholder="Email" value={email} onChange={e=>setEmail(e.target.value)} className={inputCls+' !rounded-xl'} required disabled={loading} />
                   <input type="password" placeholder="Password" value={password} onChange={e=>setPassword(e.target.value)} className={inputCls+' !rounded-xl'} required disabled={loading} />
@@ -1533,7 +1533,7 @@ function VersaAppMain() {
                   <svg className="w-4 h-4" viewBox="0 0 24 24"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 01-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" fill="#4285F4"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/></svg>
                   Sign up with Google
                 </button>
-                <div className="flex items-center gap-3"><div className="flex-1 h-px bg-white/[0.06]"/><span className="text-gray-600 text-[10px] tracking-wider uppercase">or</span><div className="flex-1 h-px bg-white/[0.06]"/></div>
+                <div className="flex items-center gap-3"><div className="flex-1 h-px bg-[#1e3050]"/><span className="text-gray-600 text-[10px] tracking-wider uppercase">or</span><div className="flex-1 h-px bg-[#1e3050]"/></div>
                 <form onSubmit={handleSignup} className="space-y-3">
                   <input type="text" placeholder="Username" value={username} onChange={e=>setUsername(e.target.value)} className={inputCls+' !rounded-xl'} required disabled={loading} />
                   <input type="email" placeholder="Email" value={email} onChange={e=>setEmail(e.target.value)} className={inputCls+' !rounded-xl'} required disabled={loading} />
@@ -1590,7 +1590,7 @@ function VersaAppMain() {
                 { icon: '🏠', title: 'Create a room', desc: 'Start fresh and invite friends', action: () => setOnboardingStep(1) },
                 { icon: '🔗', title: 'Join a room', desc: 'Got a code from a friend?', action: () => setOnboardingStep(2) },
               ].map((opt, i) => (
-                <button key={i} onClick={opt.action} className="w-full flex items-center gap-4 p-4 bg-white/[0.03] border border-white/[0.06] rounded-2xl text-left hover:bg-white/[0.06] transition-all active:scale-[0.98]">
+                <button key={i} onClick={opt.action} className="w-full flex items-center gap-4 p-4 bg-[#151d30] border border-[#223858] rounded-2xl text-left hover:bg-[#1e3050] transition-all active:scale-[0.98]">
                   <span className="text-2xl">{opt.icon}</span>
                   <div><p className="text-white font-semibold text-sm">{opt.title}</p><p className="text-gray-500 text-[11px]">{opt.desc}</p></div>
                   <ChevronRight size={16} className="text-gray-600 ml-auto"/>
@@ -1609,7 +1609,7 @@ function VersaAppMain() {
               <h2 className="text-xl font-bold text-white mb-1">Create your room</h2>
               <p className="text-gray-500 text-sm">A room is where you and your friends track habits and compete. You'll get a code to share.</p>
             </div>
-            <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl p-5 space-y-4">
+            <div className="bg-[#151d30] border border-[#223858] rounded-2xl p-5 space-y-4">
               <div className="flex items-center gap-3 text-gray-400 text-xs">
                 <div className="w-6 h-6 rounded-full bg-blue-500/20 flex items-center justify-center text-blue-400 text-[10px] font-bold">1</div>
                 <span>We'll create a room with a unique invite code</span>
@@ -1637,8 +1637,8 @@ function VersaAppMain() {
               <h2 className="text-xl font-bold text-white mb-1">Join a room</h2>
               <p className="text-gray-500 text-sm">Enter the 6-letter code your friend shared with you.</p>
             </div>
-            <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl p-5">
-              <input type="text" placeholder="ABCDEF" value={roomCode} onChange={e=>setRoomCode(e.target.value.toUpperCase())} className="w-full px-4 py-4 bg-white/[0.04] border border-white/[0.08] rounded-xl focus:outline-none focus:border-blue-500/50 text-white placeholder-gray-600 text-lg font-mono tracking-[0.4em] text-center" maxLength={6} autoFocus/>
+            <div className="bg-[#151d30] border border-[#223858] rounded-2xl p-5">
+              <input type="text" placeholder="ABCDEF" value={roomCode} onChange={e=>setRoomCode(e.target.value.toUpperCase())} className="w-full px-4 py-4 bg-[#1e2e50] border border-[#2a4060] rounded-xl focus:outline-none focus:border-blue-500/50 text-white placeholder-gray-600 text-lg font-mono tracking-[0.4em] text-center" maxLength={6} autoFocus/>
             </div>
             <button onClick={async()=>{await joinRoom(); setOnboardingStep(0); setShowOnboardingTour(true);}} disabled={loading||roomCode.length<4} className={btnPrimary+' bg-gradient-to-r from-orange-500 to-red-500 text-white shadow-lg shadow-orange-500/20 rounded-2xl disabled:opacity-40'}>{loading?'Joining...':'Join Room'}</button>
             <button onClick={()=>setOnboardingStep(0)} className="w-full text-gray-600 text-xs hover:text-gray-400 transition-colors text-center">← Back</button>
@@ -1673,7 +1673,7 @@ function VersaAppMain() {
               {/* Progress dots */}
               <div className="flex justify-center gap-1.5 mb-5">
                 {tourSteps.map((_, i) => (
-                  <div key={i} className={`h-1 rounded-full transition-all ${i === onboardingStep ? 'w-6 bg-blue-500' : i < onboardingStep ? 'w-2 bg-blue-500/40' : 'w-2 bg-white/10'}`}/>
+                  <div key={i} className={`h-1 rounded-full transition-all ${i === onboardingStep ? 'w-6 bg-blue-500' : i < onboardingStep ? 'w-2 bg-blue-500/40' : 'w-2 bg-[#1e3050]'}`}/>
                 ))}
               </div>
 
@@ -1739,8 +1739,8 @@ function VersaAppMain() {
               {streakData.streak>0&&<div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full ${darkMode?'bg-[#e8864a]/15':'bg-[#e8864a]/10'}`}><Flame size={13} className="text-[#e8864a]"/><span className="text-[#e8864a] text-sm font-bold">{streakData.streak}</span>{streakMulti.multi>1&&<span className={`text-[9px] font-bold ${streakMulti.color}`}>{streakMulti.label}</span>}{streakFreeze>0&&<span className="text-xs">🛡️</span>}</div>}
             </div>
             <div className="flex items-center gap-2">
-              <button onClick={toggleTheme} className={`p-2 rounded-xl ${darkMode?'hover:bg-white/[0.06]':'hover:bg-gray-100'} transition-colors`}>{darkMode?<Sun size={16} className="text-gray-500"/>:<Moon size={16} className="text-gray-400"/>}</button>
-              <button onClick={()=>setShowProfile(true)} className={`p-2 rounded-xl ${darkMode?'hover:bg-white/[0.06]':'hover:bg-gray-100'} transition-colors`}>{currentUser.photoURL?<img src={currentUser.photoURL} className="w-7 h-7 rounded-full object-cover" referrerPolicy="no-referrer"/>:<User size={16} className={T.textMuted}/>}</button>
+              <button onClick={toggleTheme} className={`p-2 rounded-xl ${darkMode?'hover:bg-[#1e3050]':'hover:bg-gray-100'} transition-colors`}>{darkMode?<Sun size={16} className="text-gray-500"/>:<Moon size={16} className="text-gray-400"/>}</button>
+              <button onClick={()=>setShowProfile(true)} className={`p-2 rounded-xl ${darkMode?'hover:bg-[#1e3050]':'hover:bg-gray-100'} transition-colors`}>{currentUser.photoURL?<img src={currentUser.photoURL} className="w-7 h-7 rounded-full object-cover" referrerPolicy="no-referrer"/>:<User size={16} className={T.textMuted}/>}</button>
             </div>
           </div>
         </div>
@@ -1779,7 +1779,7 @@ function VersaAppMain() {
             const pts = getCatPts(currentUser.id, c);
             const hasCrystal = myCr[c];
             return (
-              <div key={c} className={`relative rounded-2xl p-3 text-center transition-all ${hasCrystal?ct.bgM+' border '+ct.bdr+' shadow-lg '+ct.glow:(darkMode?'bg-white/[0.03] border border-white/[0.06]':'bg-white border border-gray-200 shadow-sm')}`}>
+              <div key={c} className={`relative rounded-2xl p-3 text-center transition-all ${hasCrystal?ct.bgM+' border '+ct.bdr+' shadow-lg '+ct.glow:(darkMode?'bg-[#151d30] border border-[#223858]':'bg-white border border-gray-200 shadow-sm')}`}>
                 <div className="text-xl mb-0.5">{activeCategories.find(cat=>cat.name===c)?.icon||'📋'}</div>
                 <div className={`text-lg font-black ${hasCrystal?ct.txt:T.text}`}>{pts}</div>
                 <div className={`text-[9px] font-bold tracking-wider uppercase ${hasCrystal?ct.txt:T.textDim}`}>{c}</div>
@@ -1802,7 +1802,7 @@ function VersaAppMain() {
                     {ms > 0 && <div className={`absolute -bottom-1 -right-1 w-4 h-4 rounded-full flex items-center justify-center text-[7px] font-black text-white ${ms>=7?'bg-gradient-to-r from-orange-500 to-red-500':ms>=3?'bg-orange-500':'bg-[#e8864a]'}`}>{ms}</div>}
                   </div>
                   <div className="flex flex-col">
-                    <span className={`text-[11px] font-medium ${darkMode?'text-gray-300':'text-gray-700'}`}>{r.member.username}</span>
+                    <span className={`text-[11px] font-medium ${darkMode?'text-[#9aaec0]':'text-[#4a6080]'}`}>{r.member.username}</span>
                     <div className="flex items-center gap-1.5">
                       <span className={`text-[10px] font-bold ${ahead?'text-red-400':'text-emerald-400'}`}>{r.pts} pts</span>
                       {ms > 0 && <span className={`text-[9px] font-bold ${ms>=7?'text-[#e8864a]':ms>=3?'text-[#e8864a]':'text-[#e8864a]/70'}`}>🔗{ms}d</span>}
@@ -1816,13 +1816,13 @@ function VersaAppMain() {
         )}
 
         {soloMode && !rivalStatus.length && yesterdayPoints > 0 && (
-          <div className={`flex items-center justify-between mb-4 px-4 py-2.5 rounded-xl ${darkMode?'bg-white/[0.03] border border-white/[0.06]':'bg-gray-50 border border-gray-200'}`}>
+          <div className={`flex items-center justify-between mb-4 px-4 py-2.5 rounded-xl ${darkMode?'bg-[#151d30] border border-[#223858]':'bg-gray-50 border border-gray-200'}`}>
             <span className={`text-xs ${T.textDim}`}>Yesterday: {yesterdayPoints} pts</span>
             {myPts > yesterdayPoints && myPts > 0 && <span className="text-[11px] text-emerald-400 font-bold">↑ Ahead</span>}
           </div>
         )}
 
-        {!roomStakes && <div className="flex justify-center mb-4"><button onClick={()=>setShowStakes(true)} className={`flex items-center gap-2 px-5 py-2 rounded-full text-xs font-bold transition-all active:scale-[0.97] ${darkMode?'bg-white/[0.04] text-gray-500 border border-white/[0.06] hover:text-gray-300':'bg-gray-100 text-gray-400 border border-gray-200 hover:text-gray-600'}`}><Zap size={13}/>Set Stakes</button></div>}
+        {!roomStakes && <div className="flex justify-center mb-4"><button onClick={()=>setShowStakes(true)} className={`flex items-center gap-2 px-5 py-2 rounded-full text-xs font-bold transition-all active:scale-[0.97] ${darkMode?'bg-[#1e2e50] text-gray-500 border border-[#223858] hover:text-gray-300':'bg-gray-100 text-gray-400 border border-gray-200 hover:text-gray-600'}`}><Zap size={13}/>Set Stakes</button></div>}
 
         {devMode && boardRequests.length > 0 && boardRequests.map(br => (
           <div key={br.id} className={`mb-2 p-2.5 rounded-xl border ${darkMode?'bg-purple-500/5 border-purple-500/15':'bg-purple-50 border-purple-200'}`}>
@@ -1849,7 +1849,7 @@ function VersaAppMain() {
                     <div key={h.id} className={`flex items-center gap-3 mb-1.5 rounded-2xl p-3 pl-0 overflow-hidden transition-all ${maxed?(darkMode?'bg-gradient-to-r from-'+t.bg.replace('bg-','')+'10 to-transparent':'bg-'+t.bg.replace('bg-','').replace('500','50')):(darkMode?'bg-[#182544]':'bg-white')} ${darkMode?'border border-[#223858]':'border border-gray-100 shadow-sm'}`}>
                       <div className={`w-1 self-stretch rounded-r-full ${done?t.bg:'bg-transparent'} transition-all`}/>
                       <div className="min-w-0 flex-1">
-                        <div className={`text-[13px] font-semibold ${done?(darkMode?'text-white':'text-gray-900'):(darkMode?'text-gray-400':'text-gray-600')}`}>{h.name}</div>
+                        <div className={`text-[13px] font-semibold ${done?(darkMode?'text-white':'text-gray-900'):(darkMode?'text-[#7a8ba8]':'text-[#6b7e96]')}`}>{h.name}</div>
                         {h.description&&<div className={`text-[10px] ${T.textDim} mt-0.5`}>{h.description}</div>}
                         <div className={`text-[10px] ${T.textDim} flex items-center gap-1.5 mt-0.5`}>
                           <span>{h.points}pts</span>
@@ -1873,17 +1873,17 @@ function VersaAppMain() {
             <div className="text-center py-16"><div className="text-5xl mb-4">🎯</div><p className={`${T.textMuted} text-sm mb-5`}>No habits yet</p><button onClick={()=>setShowAddHabit(true)} className="inline-flex items-center gap-2 px-6 py-3 bg-[#5b7cf5] text-white rounded-2xl shadow-lg shadow-[#5b7cf5]/15 text-sm font-bold active:scale-[0.98]"><Plus size={18}/>Add Habits</button></div>
           ) : devMode ? (
             <div className="flex gap-2 mt-2">
-              <button onClick={()=>setShowAddHabit(true)} className={`flex-1 border border-dashed rounded-2xl p-4 hover:text-blue-400 hover:border-blue-500/30 hover:bg-blue-500/5 flex items-center justify-center gap-2 transition-all ${darkMode?'border-white/[0.08] text-gray-600':'border-gray-300 text-gray-400'}`}><Plus size={15}/><span className="text-xs font-medium">Add Habit</span></button>
-              <button onClick={()=>setShowAddCategory(true)} className={`border border-dashed rounded-2xl p-4 hover:text-purple-400 hover:border-purple-500/30 hover:bg-purple-500/5 flex items-center justify-center gap-2 transition-all ${darkMode?'border-white/[0.08] text-gray-600':'border-gray-300 text-gray-400'}`}><span className="text-xs font-medium">+ Category</span></button>
+              <button onClick={()=>setShowAddHabit(true)} className={`flex-1 border border-dashed rounded-2xl p-4 hover:text-blue-400 hover:border-blue-500/30 hover:bg-blue-500/5 flex items-center justify-center gap-2 transition-all ${darkMode?'border-[#2a4060] text-gray-600':'border-gray-300 text-gray-400'}`}><Plus size={15}/><span className="text-xs font-medium">Add Habit</span></button>
+              <button onClick={()=>setShowAddCategory(true)} className={`border border-dashed rounded-2xl p-4 hover:text-purple-400 hover:border-purple-500/30 hover:bg-purple-500/5 flex items-center justify-center gap-2 transition-all ${darkMode?'border-[#2a4060] text-gray-600':'border-gray-300 text-gray-400'}`}><span className="text-xs font-medium">+ Category</span></button>
             </div>
           ) : null}
         </div>
 
         {/* ═══ SECONDARY ═══ */}
         <div className="grid grid-cols-3 gap-2 mb-4">
-          <div className={`rounded-2xl p-3 text-center ${darkMode?'bg-white/[0.03] border border-white/[0.06]':'bg-white border border-gray-200 shadow-sm'}`}><div className="text-xl font-black text-blue-400">{myPts}</div><div className={`text-[9px] ${T.textDim} uppercase tracking-wider font-bold`}>Today</div></div>
-          <div className={`rounded-2xl p-3 text-center ${darkMode?'bg-white/[0.03] border border-white/[0.06]':'bg-white border border-gray-200 shadow-sm'}`}><div className="text-xl font-black text-emerald-400">{getWeeklyPts(currentUser.id)}</div><div className={`text-[9px] ${T.textDim} uppercase tracking-wider font-bold`}>Week</div></div>
-          <div className={`rounded-2xl p-3 text-center ${darkMode?'bg-white/[0.03] border border-white/[0.06]':'bg-white border border-gray-200 shadow-sm'}`}><div className="flex justify-center gap-2 mb-1">{allCatNames.map(c=><div key={c} className={`w-5 h-5 rounded-full transition-all ${myCr[c]?getCT(c).bg+' shadow-md '+getCT(c).glow:(darkMode?'bg-white/[0.06]':'bg-gray-200')}`}/>)}</div><div className={`text-[9px] ${T.textDim} uppercase tracking-wider font-bold`}>Crystals</div></div>
+          <div className={`rounded-2xl p-3 text-center ${darkMode?'bg-[#151d30] border border-[#223858]':'bg-white border border-gray-200 shadow-sm'}`}><div className="text-xl font-black text-blue-400">{myPts}</div><div className={`text-[9px] ${T.textDim} uppercase tracking-wider font-bold`}>Today</div></div>
+          <div className={`rounded-2xl p-3 text-center ${darkMode?'bg-[#151d30] border border-[#223858]':'bg-white border border-gray-200 shadow-sm'}`}><div className="text-xl font-black text-emerald-400">{getWeeklyPts(currentUser.id)}</div><div className={`text-[9px] ${T.textDim} uppercase tracking-wider font-bold`}>Week</div></div>
+          <div className={`rounded-2xl p-3 text-center ${darkMode?'bg-[#151d30] border border-[#223858]':'bg-white border border-gray-200 shadow-sm'}`}><div className="flex justify-center gap-2 mb-1">{allCatNames.map(c=><div key={c} className={`w-5 h-5 rounded-full transition-all ${myCr[c]?getCT(c).bg+' shadow-md '+getCT(c).glow:(darkMode?'bg-[#1e3050]':'bg-gray-200')}`}/>)}</div><div className={`text-[9px] ${T.textDim} uppercase tracking-wider font-bold`}>Crystals</div></div>
         </div>
 
         {weeklyWinner && <div className={`mb-3 p-3 rounded-2xl flex items-center justify-between ${darkMode?'bg-[#5b7cf5]/5 border border-[#5b7cf5]/10':'bg-[#5b7cf5]/5 border border-[#5b7cf5]/15'}`}><div className="flex items-center gap-2"><Crown size={14} className="text-[#e8864a]"/><span className={`text-xs font-medium ${darkMode?'text-[#5b7cf5]':'text-[#5b7cf5]'}`}>{weeklyWinner.member.username} leads · {weeklyWinner.pts} pts</span></div><span className={`text-[10px] ${T.textDim}`}>{weeklyWinner.daysLeft > 0 ? weeklyWinner.daysLeft+'d left' : timeDisplay}</span></div>}
@@ -1892,8 +1892,8 @@ function VersaAppMain() {
 
         {/* ═══ ACTIVITY FEED (collapsible) ═══ */}
         {activityFeed.length > 0 && (
-          <div className={`mb-4 rounded-2xl border overflow-hidden ${darkMode?'border-white/[0.06] bg-white/[0.02]':'border-gray-200 bg-white shadow-sm'}`}>
-            <button onClick={()=>setShowActivityExpanded(!showActivityExpanded)} className={`w-full px-4 py-2.5 flex items-center justify-between ${darkMode?'hover:bg-white/[0.02]':'hover:bg-gray-50'} transition-colors`}>
+          <div className={`mb-4 rounded-2xl border overflow-hidden ${darkMode?'border-[#223858] bg-[#182544]':'border-gray-200 bg-white shadow-sm'}`}>
+            <button onClick={()=>setShowActivityExpanded(!showActivityExpanded)} className={`w-full px-4 py-2.5 flex items-center justify-between ${darkMode?'hover:bg-[#182544]':'hover:bg-gray-50'} transition-colors`}>
               <span className={`text-[10px] font-bold tracking-wider uppercase ${T.textMuted}`}>Activity</span>
               <ChevronDown size={14} className={`${T.textDim} transition-transform ${showActivityExpanded?'rotate-180':''}`}/>
             </button>
@@ -1908,16 +1908,16 @@ function VersaAppMain() {
               return (
                 <div key={a.id} className={`px-4 py-2.5 border-b last:border-b-0 ${T.border}`}>
                   <div className="flex items-center gap-2">
-                    <Avatar user={activeMembers.find(m=>m.id===a.userId)||{username:a.username}} size={20} className={isMe?'bg-blue-500/20 text-blue-400':(darkMode?'bg-white/[0.06] text-gray-500':'bg-gray-100 text-gray-500')}/>
-                    <div className="flex-1 min-w-0 truncate"><span className={`text-[11px] ${isMe?'text-blue-400':(darkMode?'text-gray-400':'text-gray-600')} font-medium`}>{isMe?'You':a.username}</span><span className={`text-[11px] ${T.textDim} ml-1`}>{a.text}</span>{a.bonus==='jackpot'&&<span className="ml-1 text-[9px] text-[#e8864a] font-bold">5×</span>}{a.bonus==='epic'&&<span className="ml-1 text-[9px] text-red-400 font-bold">3×</span>}{a.bonus==='rare'&&<span className="ml-1 text-[9px] text-purple-400 font-bold">2×</span>}{a.bonus==='bonus'&&<span className="ml-1 text-[9px] text-cyan-400 font-bold">1.5×</span>}{a.bonus==='common'&&<span className="ml-1 text-[9px] text-emerald-400 font-bold">1.25×</span>}</div>
+                    <Avatar user={activeMembers.find(m=>m.id===a.userId)||{username:a.username}} size={20} className={isMe?'bg-blue-500/20 text-blue-400':(darkMode?'bg-[#1e3050] text-gray-500':'bg-gray-100 text-gray-500')}/>
+                    <div className="flex-1 min-w-0 truncate"><span className={`text-[11px] ${isMe?'text-blue-400':(darkMode?'text-[#7a8ba8]':'text-[#6b7e96]')} font-medium`}>{isMe?'You':a.username}</span><span className={`text-[11px] ${T.textDim} ml-1`}>{a.text}</span>{a.bonus==='jackpot'&&<span className="ml-1 text-[9px] text-[#e8864a] font-bold">5×</span>}{a.bonus==='epic'&&<span className="ml-1 text-[9px] text-red-400 font-bold">3×</span>}{a.bonus==='rare'&&<span className="ml-1 text-[9px] text-purple-400 font-bold">2×</span>}{a.bonus==='bonus'&&<span className="ml-1 text-[9px] text-cyan-400 font-bold">1.5×</span>}{a.bonus==='common'&&<span className="ml-1 text-[9px] text-emerald-400 font-bold">1.25×</span>}</div>
                     <span className={`text-[9px] ${T.textFaint} shrink-0`}>{timeAgo}</span>
                   </div>
                   <div className="flex items-center gap-1 mt-1 ml-7">
                     {Object.keys(reactionCounts).length > 0 && Object.entries(reactionCounts).map(([emoji, count]) => (
-                      <span key={emoji} className={`text-[9px] px-1.5 py-0.5 rounded-full ${myReaction===emoji?'bg-blue-500/20 border border-blue-500/30':(darkMode?'bg-white/[0.04]':'bg-gray-100')}`}>{emoji} {count}</span>
+                      <span key={emoji} className={`text-[9px] px-1.5 py-0.5 rounded-full ${myReaction===emoji?'bg-blue-500/20 border border-blue-500/30':(darkMode?'bg-[#1e2e50]':'bg-gray-100')}`}>{emoji} {count}</span>
                     ))}
                     {!isMe && <div className="flex gap-0.5 ml-1">{REACTION_EMOJIS.map(e => (
-                      <button key={e} onClick={()=>reactToActivity(a.id,e)} className={`text-[11px] w-7 h-7 rounded-full flex items-center justify-center transition-all hover:scale-110 ${myReaction===e?'bg-blue-500/20':(darkMode?'hover:bg-white/[0.06]':'hover:bg-gray-100')}`}>{e}</button>
+                      <button key={e} onClick={()=>reactToActivity(a.id,e)} className={`text-[11px] w-7 h-7 rounded-full flex items-center justify-center transition-all hover:scale-110 ${myReaction===e?'bg-blue-500/20':(darkMode?'hover:bg-[#1e3050]':'hover:bg-gray-100')}`}>{e}</button>
                     ))}</div>}
                   </div>
                 </div>
@@ -2003,11 +2003,11 @@ function VersaAppMain() {
             </div>
           );
         })}</div>
-        <div className={`border-t ${darkMode?'border-white/[0.06]':'border-gray-200'} pt-4`}>
+        <div className={`border-t ${darkMode?'border-[#223858]':'border-gray-200'} pt-4`}>
           <p className={`text-xs ${T.textMuted} mb-3`}>Add a new category</p>
           <input type="text" placeholder="Category name" value={newCatName} onChange={e=>setNewCatName(e.target.value)} className={inputCls+' mb-3'} maxLength={20}/>
           <p className={`text-[10px] ${T.textDim} mb-2`}>Icon</p>
-          <div className="flex flex-wrap gap-1.5 mb-4">{ICON_OPTIONS.map(ic=><button key={ic} onClick={()=>setNewCatIcon(ic)} className={`w-8 h-8 rounded-lg text-sm flex items-center justify-center transition-all ${newCatIcon===ic?'bg-blue-500/20 border border-blue-500/30 scale-110':darkMode?'bg-white/[0.04] hover:bg-white/[0.08]':'bg-gray-100 hover:bg-gray-200'}`}>{ic}</button>)}</div>
+          <div className="flex flex-wrap gap-1.5 mb-4">{ICON_OPTIONS.map(ic=><button key={ic} onClick={()=>setNewCatIcon(ic)} className={`w-8 h-8 rounded-lg text-sm flex items-center justify-center transition-all ${newCatIcon===ic?'bg-blue-500/20 border border-blue-500/30 scale-110':darkMode?'bg-[#1e2e50] hover:bg-[#223858]':'bg-gray-100 hover:bg-gray-200'}`}>{ic}</button>)}</div>
           <p className={`text-[10px] ${T.textDim} mb-2`}>Color</p>
           <div className="flex flex-wrap gap-2 mb-4">{COLOR_PALETTE.map((cp,i)=><button key={i} onClick={()=>setNewCatColor(i)} className={`w-7 h-7 rounded-full transition-all ${cp.bg} ${newCatColor===i?'ring-2 ring-offset-2 ring-white/30 scale-110':''}`}/>)}</div>
           {error&&<p className="text-red-400 text-xs text-center mb-2">{error}</p>}
@@ -2033,13 +2033,13 @@ function VersaAppMain() {
               const pts = (h?.points || c.habitPoints || 0) * (c.count||1);
               const cat = h?.category || c.habitCategory || 'Study';
               return (
-                <div key={c.id} className={'p-3 rounded-xl border bg-white/[0.02] '+(CT[cat]||getCT(cat)).bdr+' flex items-center justify-between'}>
+                <div key={c.id} className={'p-3 rounded-xl border bg-[#182544] '+(CT[cat]||getCT(cat)).bdr+' flex items-center justify-between'}>
                   <div className="flex items-center gap-2"><span className="text-sm">{(CT[cat]||getCT(cat)).icon}</span><span className="text-sm text-gray-300">{name}</span></div>
                   <div className="flex items-center gap-2"><span className="text-xs text-gray-500">x{c.count||1}</span><span className={'text-sm font-bold '+(CT[cat]||getCT(cat)).txt}>{pts} pts</span></div>
                 </div>
               );
             })}
-            <div className="pt-2 border-t border-white/[0.06] flex justify-between items-center">
+            <div className="pt-2 border-t border-[#223858] flex justify-between items-center">
               <span className="text-sm text-gray-500">Total</span>
               <span className="text-lg font-black text-white">{historyCompletions.filter(c=>c.userId===currentUser.id).reduce((s,c)=>{const h=habits.find(x=>x.id===c.habitId);return s+((h?.points||c.habitPoints||0)*(c.count||1));},0)} pts</span>
             </div>
@@ -2063,10 +2063,10 @@ function VersaAppMain() {
           <div>
             <p className={`${T.textMuted} text-sm mb-4`}>Set what's on the line. The weekly loser pays up.</p>
             <div className="grid grid-cols-2 gap-2 mb-4">{stakePresets.map(sp=>(
-              <button key={sp.type} onClick={()=>setNewStake({...newStake,type:sp.type,description:sp.ph.replace('e.g. ','')})} className={'p-3 rounded-xl border text-left transition-all '+(newStake.type===sp.type?'border-red-500/40 bg-red-500/10':(darkMode?'border-white/[0.06] bg-white/[0.02] hover:bg-white/[0.04]':'border-gray-200 bg-gray-50 hover:bg-gray-100'))}><div className={'text-xs font-bold mb-0.5 '+(newStake.type===sp.type?'text-red-400':'text-gray-400')}>{sp.label}</div><div className="text-[10px] text-gray-600">{sp.desc}</div></button>
+              <button key={sp.type} onClick={()=>setNewStake({...newStake,type:sp.type,description:sp.ph.replace('e.g. ','')})} className={'p-3 rounded-xl border text-left transition-all '+(newStake.type===sp.type?'border-red-500/40 bg-red-500/10':(darkMode?'border-[#223858] bg-[#182544] hover:bg-[#1e2e50]':'border-gray-200 bg-gray-50 hover:bg-gray-100'))}><div className={'text-xs font-bold mb-0.5 '+(newStake.type===sp.type?'text-red-400':'text-gray-400')}>{sp.label}</div><div className="text-[10px] text-gray-600">{sp.desc}</div></button>
             ))}</div>
             <input type="text" placeholder={stakePresets.find(s=>s.type===newStake.type)?.ph||'Describe the stake...'} value={newStake.description} onChange={e=>setNewStake({...newStake,description:e.target.value})} className={inputCls+' mb-3'} maxLength={60}/>
-            <div className="flex gap-2 mb-4">{['weekly','monthly'].map(d=><button key={d} onClick={()=>setNewStake({...newStake,duration:d})} className={'flex-1 py-2.5 text-xs font-bold rounded-xl transition-all uppercase tracking-wider '+(newStake.duration===d?(darkMode?'bg-white/[0.1] text-white':'bg-gray-200 text-gray-900'):(darkMode?'bg-white/[0.02] text-gray-600':'bg-gray-100 text-gray-400'))}>{d}</button>)}</div>
+            <div className="flex gap-2 mb-4">{['weekly','monthly'].map(d=><button key={d} onClick={()=>setNewStake({...newStake,duration:d})} className={'flex-1 py-2.5 text-xs font-bold rounded-xl transition-all uppercase tracking-wider '+(newStake.duration===d?(darkMode?'bg-[#223858] text-white':'bg-gray-200 text-gray-900'):(darkMode?'bg-[#182544] text-gray-600':'bg-gray-100 text-gray-400'))}>{d}</button>)}</div>
             <button onClick={saveStake} disabled={!newStake.description.trim()||loading} className="w-full px-4 py-4 bg-[#d06b4a] text-white rounded-xl text-base font-bold shadow-lg shadow-red-500/20 active:scale-[0.98] disabled:opacity-30 transition-all">{loading?'Saving...':!newStake.description.trim()?'Type a stake above':'⚡ Set Stakes'}</button>
             {error&&<p className="text-red-400 text-xs text-center mt-2">{error}</p>}
           </div>
@@ -2077,15 +2077,15 @@ function VersaAppMain() {
       {/* Leaderboard */}
       <Modal show={showLeaderboard} onClose={()=>setShowLeaderboard(false)} wide dark={darkMode}>
         <ModalHeader title="Leaderboard" onClose={()=>setShowLeaderboard(false)} icon={<span className="text-xl">&#x1F3C6;</span>} dark={darkMode}/>
-        <div className="flex gap-1 mb-5 bg-white/[0.03] rounded-xl p-1">{['today','week'].map(tab=><button key={tab} onClick={()=>setLeaderboardTab(tab)} className={'flex-1 py-2 text-xs font-bold rounded-lg transition-all tracking-wider uppercase '+(leaderboardTab===tab?(darkMode?'bg-white/[0.08] text-white':'bg-gray-200 text-gray-900'):(darkMode?'text-gray-600 hover:text-gray-400':'text-gray-400 hover:text-gray-600'))}>{tab==='today'?'Today':'This Week'}</button>)}</div>
+        <div className="flex gap-1 mb-5 bg-[#151d30] rounded-xl p-1">{['today','week'].map(tab=><button key={tab} onClick={()=>setLeaderboardTab(tab)} className={'flex-1 py-2 text-xs font-bold rounded-lg transition-all tracking-wider uppercase '+(leaderboardTab===tab?(darkMode?'bg-[#223858] text-white':'bg-gray-200 text-gray-900'):(darkMode?'text-gray-600 hover:text-gray-400':'text-gray-400 hover:text-gray-600'))}>{tab==='today'?'Today':'This Week'}</button>)}</div>
         <div className="space-y-2">{getLeaderboard().map((item,i)=>{
           const pts=leaderboardTab==='today'?item.todayPts:item.weeklyPts, isMe=item.member.id===currentUser.id;
           const medals=['\u{1F947}','\u{1F948}','\u{1F949}'];
           const ms = !isMe ? (mutualStreaks[item.member.id] || 0) : 0;
           return (
-            <div key={item.member.id} className={'rounded-xl p-4 border transition-all '+(isMe?'bg-gradient-to-r from-blue-600/20 to-indigo-600/20 border-blue-500/30 shadow-lg shadow-[#5b7cf5]/10':i===0?'bg-[#e8864a]/5 border-[#e8864a]/20':(darkMode?'bg-white/[0.02] border-white/[0.04] hover:bg-white/[0.04]':'bg-gray-50 border-gray-200 hover:bg-gray-100'))}>
-              <div className="flex items-center justify-between"><div className="flex items-center gap-3"><div className="text-lg w-8 text-center">{i<3?medals[i]:<span className="text-sm text-gray-600">{i+1}</span>}</div><Avatar user={item.member} size={28} className={isMe?'bg-blue-500/20 text-blue-400':(darkMode?'bg-white/[0.06] text-gray-400':'bg-gray-100 text-gray-500')}/><div><div className={'text-sm font-semibold flex items-center gap-1.5 '+(isMe?'text-blue-300':(darkMode?'text-gray-300':'text-gray-700'))}>{item.member.username}{isMe&&<span className="text-[10px] text-gray-600">(you)</span>}{getRoomRole(item.member.id)&&<span className={`text-[9px] font-bold ${getRoomRole(item.member.id).color}`}>{getRoomRole(item.member.id).icon}</span>}{ms>0&&<span className={`text-[9px] font-bold ${ms>=7?'text-[#e8864a]':'text-[#e8864a]'}`}>🔗{ms}</span>}</div><div className="text-xs text-gray-600">{pts} pts{leaderboardTab==='week'?' \u00b7 '+item.weeklyCrystals+' crystals':''}</div></div></div>
-                <div className="flex items-center gap-3">{leaderboardTab==='today'&&<div className="flex items-center gap-1.5">{allCatNames.map(c=><div key={c} className={'w-2.5 h-2.5 rounded-full '+(item.crystals[c]?getCT(c).bg+' shadow-sm':(isMe?'bg-white/10':(darkMode?'bg-white/[0.06]':'bg-gray-200')))}/>)}</div>}{!isMe&&<button onClick={()=>{setShowLeaderboard(false);setShowCompetitor(item.member);}} className={`text-[10px] uppercase tracking-wider font-medium ${darkMode?'text-gray-600 hover:text-white':'text-gray-400 hover:text-gray-700'}`}>View</button>}</div>
+            <div key={item.member.id} className={'rounded-xl p-4 border transition-all '+(isMe?'bg-gradient-to-r from-blue-600/20 to-indigo-600/20 border-blue-500/30 shadow-lg shadow-[#5b7cf5]/10':i===0?'bg-[#e8864a]/5 border-[#e8864a]/20':(darkMode?'bg-[#182544] border-[#1e3050] hover:bg-[#1e2e50]':'bg-gray-50 border-gray-200 hover:bg-gray-100'))}>
+              <div className="flex items-center justify-between"><div className="flex items-center gap-3"><div className="text-lg w-8 text-center">{i<3?medals[i]:<span className="text-sm text-gray-600">{i+1}</span>}</div><Avatar user={item.member} size={28} className={isMe?'bg-blue-500/20 text-blue-400':(darkMode?'bg-[#1e3050] text-gray-400':'bg-gray-100 text-gray-500')}/><div><div className={'text-sm font-semibold flex items-center gap-1.5 '+(isMe?'text-blue-300':(darkMode?'text-[#9aaec0]':'text-[#4a6080]'))}>{item.member.username}{isMe&&<span className="text-[10px] text-gray-600">(you)</span>}{getRoomRole(item.member.id)&&<span className={`text-[9px] font-bold ${getRoomRole(item.member.id).color}`}>{getRoomRole(item.member.id).icon}</span>}{ms>0&&<span className={`text-[9px] font-bold ${ms>=7?'text-[#e8864a]':'text-[#e8864a]'}`}>🔗{ms}</span>}</div><div className="text-xs text-gray-600">{pts} pts{leaderboardTab==='week'?' \u00b7 '+item.weeklyCrystals+' crystals':''}</div></div></div>
+                <div className="flex items-center gap-3">{leaderboardTab==='today'&&<div className="flex items-center gap-1.5">{allCatNames.map(c=><div key={c} className={'w-2.5 h-2.5 rounded-full '+(item.crystals[c]?getCT(c).bg+' shadow-sm':(isMe?'bg-[#1e3050]':(darkMode?'bg-[#1e3050]':'bg-gray-200')))}/>)}</div>}{!isMe&&<button onClick={()=>{setShowLeaderboard(false);setShowCompetitor(item.member);}} className={`text-[10px] uppercase tracking-wider font-medium ${darkMode?'text-gray-600 hover:text-white':'text-gray-400 hover:text-gray-700'}`}>View</button>}</div>
               </div>
             </div>
           );
@@ -2099,17 +2099,17 @@ function VersaAppMain() {
         <div className="text-center mb-6"><div className="relative inline-block">{currentUser.photoURL?<img src={currentUser.photoURL} className="w-20 h-20 rounded-full object-cover border-2 border-blue-500/30" referrerPolicy="no-referrer"/>:<><ProgressRing progress={dailyProg} size={80} stroke={4} color={dailyProg>=1?'#10b981':'#3b82f6'}/><div className="absolute inset-0 flex items-center justify-center"><span className="text-xl font-black">{Math.round(dailyProg*100)}%</span></div></>}</div><h3 className="text-xl font-bold mt-3">{currentUser.username}</h3><p className="text-gray-600 text-xs">{currentUser.email}</p></div>
         <div className="grid grid-cols-4 gap-2 mb-4">{[{v:streakData.streak||0,l:'Streak',c:'text-[#e8864a]',i:<Flame size={16} className="text-[#e8864a] mx-auto mb-1"/>},{v:streakFreeze>0?'🛡️':'—',l:'Freeze',c:streakFreeze>0?'text-cyan-400':'text-gray-600',i:null},{v:myPts,l:'Today',c:'text-blue-400',i:<Star size={16} className="text-blue-400 mx-auto mb-1"/>},{v:getWeeklyPts(currentUser.id),l:'Week',c:'text-emerald-400',i:<TrendingUp size={16} className="text-emerald-400 mx-auto mb-1"/>}].map((s,i)=><div key={i} className={`text-center p-3 ${T.bgCard} rounded-xl border ${T.border}`}>{s.i}<div className={'text-xl font-black '+s.c}>{s.v}</div><div className="text-[9px] text-gray-600 tracking-wider uppercase mt-0.5">{s.l}</div></div>)}</div>
         <div className="grid grid-cols-2 gap-3 mb-4"><div className={`text-center p-3 ${T.bgCard} rounded-xl border ${T.border}`}><div className="text-lg font-black text-purple-400">{streakData.activeDays||0}</div><div className="text-[9px] text-gray-600 tracking-wider uppercase mt-0.5">Active Days</div></div><div className={`text-center p-3 ${T.bgCard} rounded-xl border ${T.border}`}><div className="text-lg font-black text-cyan-400">{streakData.totalCompletions||0}</div><div className="text-[9px] text-gray-600 tracking-wider uppercase mt-0.5">Completions</div></div></div>
-        <div className={`p-3 ${T.bgCard} rounded-xl border ${T.border}`}><div className="text-[9px] text-gray-600 tracking-wider uppercase mb-2">Crystals</div><div className="flex justify-center gap-4">{allCatNames.map(c=><div key={c} className="text-center"><div className={'w-6 h-6 rounded-full mx-auto mb-1 transition-all '+(myCr[c]?getCT(c).bg+' shadow-md '+getCT(c).glow:'bg-white/[0.06]')}/><span className="text-[9px] text-gray-600">{c}</span></div>)}</div></div>
-        <div className={`mt-4 p-3 ${T.bgCard} rounded-xl border ${T.border} flex items-center justify-between`}><div><div className={`text-sm font-medium ${T.text}`}>Email Reminders</div><div className="text-[10px] text-gray-500">Daily nudges at 12pm & 6pm</div></div><button onClick={async()=>{const current=currentUser.emailReminders!==false;const next=!current;try{await supabase.from('users').update({email_reminders:next}).eq('id',currentUser.id);setCurrentUser(p=>({...p,emailReminders:next}));}catch(e){console.error(e);}}} className={'relative w-11 h-6 rounded-full transition-all '+(currentUser.emailReminders!==false?'bg-[#5b7cf5]':(darkMode?'bg-white/[0.08]':'bg-gray-200'))}><div className={'absolute top-1 w-4 h-4 rounded-full bg-white transition-all shadow-sm '+(currentUser.emailReminders!==false?'left-6':'left-1')}/></button></div>
+        <div className={`p-3 ${T.bgCard} rounded-xl border ${T.border}`}><div className="text-[9px] text-gray-600 tracking-wider uppercase mb-2">Crystals</div><div className="flex justify-center gap-4">{allCatNames.map(c=><div key={c} className="text-center"><div className={'w-6 h-6 rounded-full mx-auto mb-1 transition-all '+(myCr[c]?getCT(c).bg+' shadow-md '+getCT(c).glow:'bg-[#1e3050]')}/><span className="text-[9px] text-gray-600">{c}</span></div>)}</div></div>
+        <div className={`mt-4 p-3 ${T.bgCard} rounded-xl border ${T.border} flex items-center justify-between`}><div><div className={`text-sm font-medium ${T.text}`}>Email Reminders</div><div className="text-[10px] text-gray-500">Daily nudges at 12pm & 6pm</div></div><button onClick={async()=>{const current=currentUser.emailReminders!==false;const next=!current;try{await supabase.from('users').update({email_reminders:next}).eq('id',currentUser.id);setCurrentUser(p=>({...p,emailReminders:next}));}catch(e){console.error(e);}}} className={'relative w-11 h-6 rounded-full transition-all '+(currentUser.emailReminders!==false?'bg-[#5b7cf5]':(darkMode?'bg-[#223858]':'bg-gray-200'))}><div className={'absolute top-1 w-4 h-4 rounded-full bg-white transition-all shadow-sm '+(currentUser.emailReminders!==false?'left-6':'left-1')}/></button></div>
         <div className={`mt-2 p-3 ${T.bgCard} rounded-xl border ${T.border} flex items-center justify-between`}><div><div className={`text-sm font-medium ${T.text}`}>Push Notifications</div><div className="text-[10px] text-gray-500">{notifPermission==='granted'?'Rivals, streaks, reminders':notifPermission==='denied'?'Blocked in browser settings':'Get notified when rivals log habits'}</div></div>{notifPermission==='granted'?<div className="text-[#4aba7a] text-sm font-bold">✓ On</div>:notifPermission==='denied'?<div className="text-red-400 text-xs">Check browser settings</div>:<button onClick={async()=>{try{const p=await Notification.requestPermission();setNotifPermission(p);if(p==='granted'){const r=await registerServiceWorker();if(r){const sub=await subscribeToPush(r);if(sub&&currentUser){await supabase.from('push_subscriptions').upsert({id:currentUser.id+'_'+Date.now(),user_id:currentUser.id,subscription:sub.toJSON()});}}}}catch(e){console.error('Push setup error:',e);}}} className="px-3 py-1.5 bg-[#5b7cf5] text-white text-xs font-bold rounded-lg active:scale-[0.97]">Enable</button>}</div>
 
         {/* Quick actions */}
         <div className="mt-5 space-y-2">
-          <button onClick={()=>{setShowProfile(false);setShowInviteModal(true);}} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border transition-all ${darkMode?'border-white/[0.06] bg-white/[0.02] hover:bg-white/[0.04] text-gray-300':'border-gray-200 bg-gray-50 hover:bg-gray-100 text-gray-700'}`}><UserPlus size={16} className="text-blue-400"/><span className="text-sm">Invite to Room</span></button>
-          <button onClick={()=>{setShowProfile(false);setShowStakes(true);}} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border transition-all ${darkMode?'border-white/[0.06] bg-white/[0.02] hover:bg-white/[0.04] text-gray-300':'border-gray-200 bg-gray-50 hover:bg-gray-100 text-gray-700'}`}><Zap size={16} className="text-red-400"/><span className="text-sm">Stakes</span></button>
-          {lastWeekData&&<button onClick={()=>{setShowProfile(false);setShowWeeklyRecap(true);}} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border transition-all ${darkMode?'border-white/[0.06] bg-white/[0.02] hover:bg-white/[0.04] text-gray-300':'border-gray-200 bg-gray-50 hover:bg-gray-100 text-gray-700'}`}><BarChart3 size={16} className="text-purple-400"/><span className="text-sm">Weekly Recap</span></button>}
-          <button onClick={()=>{setShowProfile(false);setShowHelp(true);}} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border transition-all ${darkMode?'border-white/[0.06] bg-white/[0.02] hover:bg-white/[0.04] text-gray-300':'border-gray-200 bg-gray-50 hover:bg-gray-100 text-gray-700'}`}><HelpCircle size={16} className="text-gray-400"/><span className="text-sm">How Versa Works</span></button>
-          <button onClick={()=>supabase.auth.signOut()} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border transition-all ${darkMode?'border-white/[0.06] bg-white/[0.02] hover:bg-red-500/5 text-red-400':'border-gray-200 bg-gray-50 hover:bg-red-50 text-red-500'}`}><LogOut size={16}/><span className="text-sm">Sign Out</span></button>
+          <button onClick={()=>{setShowProfile(false);setShowInviteModal(true);}} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border transition-all ${darkMode?'border-[#223858] bg-[#182544] hover:bg-[#1e2e50] text-gray-300':'border-gray-200 bg-gray-50 hover:bg-gray-100 text-gray-700'}`}><UserPlus size={16} className="text-blue-400"/><span className="text-sm">Invite to Room</span></button>
+          <button onClick={()=>{setShowProfile(false);setShowStakes(true);}} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border transition-all ${darkMode?'border-[#223858] bg-[#182544] hover:bg-[#1e2e50] text-gray-300':'border-gray-200 bg-gray-50 hover:bg-gray-100 text-gray-700'}`}><Zap size={16} className="text-red-400"/><span className="text-sm">Stakes</span></button>
+          {lastWeekData&&<button onClick={()=>{setShowProfile(false);setShowWeeklyRecap(true);}} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border transition-all ${darkMode?'border-[#223858] bg-[#182544] hover:bg-[#1e2e50] text-gray-300':'border-gray-200 bg-gray-50 hover:bg-gray-100 text-gray-700'}`}><BarChart3 size={16} className="text-purple-400"/><span className="text-sm">Weekly Recap</span></button>}
+          <button onClick={()=>{setShowProfile(false);setShowHelp(true);}} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border transition-all ${darkMode?'border-[#223858] bg-[#182544] hover:bg-[#1e2e50] text-gray-300':'border-gray-200 bg-gray-50 hover:bg-gray-100 text-gray-700'}`}><HelpCircle size={16} className="text-gray-400"/><span className="text-sm">How Versa Works</span></button>
+          <button onClick={()=>supabase.auth.signOut()} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border transition-all ${darkMode?'border-[#223858] bg-[#182544] hover:bg-red-500/5 text-red-400':'border-gray-200 bg-gray-50 hover:bg-red-50 text-red-500'}`}><LogOut size={16}/><span className="text-sm">Sign Out</span></button>
         </div>
       </Modal>
 
@@ -2141,10 +2141,10 @@ function VersaAppMain() {
         {/* Current room code */}
         <div className="text-center mb-4">
           <p className="text-xs text-gray-500 mb-3 tracking-wider uppercase">Share this room code</p>
-          <div className="mb-4 relative inline-block"><code className={`inline-block px-8 py-4 ${darkMode?'bg-gradient-to-b from-white/[0.08] to-white/[0.03] border-white/[0.1] text-white':'bg-gradient-to-b from-gray-100 to-gray-50 border-gray-200 text-gray-900'} border text-3xl font-mono rounded-xl tracking-[0.4em] shadow-2xl`}>{currentRoom?.code}</code><div className="absolute -inset-3 bg-gradient-to-r from-blue-500/10 via-purple-500/10 to-emerald-500/10 blur-xl rounded-xl -z-10"/></div>
+          <div className="mb-4 relative inline-block"><code className={`inline-block px-8 py-4 ${darkMode?'bg-gradient-to-b from-white/[0.08] to-white/[0.03] border-[#2a4060] text-white':'bg-gradient-to-b from-gray-100 to-gray-50 border-gray-200 text-gray-900'} border text-3xl font-mono rounded-xl tracking-[0.4em] shadow-2xl`}>{currentRoom?.code}</code><div className="absolute -inset-3 bg-gradient-to-r from-blue-500/10 via-purple-500/10 to-emerald-500/10 blur-xl rounded-xl -z-10"/></div>
           <div className="flex gap-2">
             <button onClick={copyCode} className="flex-1 px-4 py-2.5 bg-[#5b7cf5] text-white rounded-xl shadow-lg shadow-[#5b7cf5]/15 flex items-center justify-center gap-2 text-sm font-bold active:scale-[0.98]">{copied?<Check size={14}/>:<Copy size={14}/>}{copied?'Copied!':'Copy Code'}</button>
-            {navigator.share && <button onClick={async()=>{try{await navigator.share({title:'Join me on Versa',text:`Join my room on Versa! Code: ${currentRoom?.code}`,url:`${window.location.origin}?join=${currentRoom?.code}`});}catch{}}} className={`flex-1 px-4 py-2.5 border ${darkMode?'border-white/[0.08] text-white hover:bg-white/[0.04]':'border-gray-200 text-gray-700 hover:bg-gray-50'} rounded-xl flex items-center justify-center gap-2 text-sm font-medium active:scale-[0.98]`}><UserPlus size={14}/>Share</button>}
+            {navigator.share && <button onClick={async()=>{try{await navigator.share({title:'Join me on Versa',text:`Join my room on Versa! Code: ${currentRoom?.code}`,url:`${window.location.origin}?join=${currentRoom?.code}`});}catch{}}} className={`flex-1 px-4 py-2.5 border ${darkMode?'border-[#2a4060] text-white hover:bg-[#1e2e50]':'border-gray-200 text-gray-700 hover:bg-gray-50'} rounded-xl flex items-center justify-center gap-2 text-sm font-medium active:scale-[0.98]`}><UserPlus size={14}/>Share</button>}
           </div>
         </div>
 
@@ -2153,7 +2153,7 @@ function VersaAppMain() {
           <div className={`border-t ${T.border} pt-4 mt-4`}>
             <p className={`text-xs ${T.textMuted} mb-2 font-bold tracking-wider uppercase`}>Your Rooms</p>
             <div className="space-y-1.5">{userRooms.map(rid=>(
-              <div key={rid} className={`px-3 py-2.5 rounded-xl border flex items-center justify-between transition-all ${currentRoom?.id===rid?'border-blue-500/30 bg-blue-500/10':(darkMode?'border-white/[0.06] bg-white/[0.02] hover:bg-white/[0.04]':'border-gray-200 bg-gray-50 hover:bg-gray-100')}`}>
+              <div key={rid} className={`px-3 py-2.5 rounded-xl border flex items-center justify-between transition-all ${currentRoom?.id===rid?'border-blue-500/30 bg-blue-500/10':(darkMode?'border-[#223858] bg-[#182544] hover:bg-[#1e2e50]':'border-gray-200 bg-gray-50 hover:bg-gray-100')}`}>
                 <div className="flex items-center gap-2"><span className={`font-mono text-sm tracking-widest ${T.text}`}>{rid}</span>{currentRoom?.id===rid&&<span className="text-[9px] bg-blue-500/20 text-blue-400 px-2 py-0.5 rounded-full font-bold">ACTIVE</span>}</div>
                 <div className="flex items-center gap-2">{currentRoom?.id!==rid&&<button onClick={()=>{switchRoom(rid);setShowInviteModal(false);setShowSwitchRoom(false);}} className="text-[10px] text-blue-400 hover:text-blue-300 font-medium uppercase tracking-wider">Switch</button>}<button onClick={()=>leaveRoom(rid)} className="text-[10px] text-gray-600 hover:text-red-400 font-medium uppercase tracking-wider">Leave</button></div>
               </div>
@@ -2192,9 +2192,9 @@ function VersaAppMain() {
             <div className="space-y-2 mb-4">{lastWeekData.scores.map((s,i) => {
               const medals = ['🥇','🥈','🥉']; const isMe = s.member.id === currentUser.id;
               return (
-                <div key={s.member.id} className={'rounded-xl p-3 border transition-all '+(isMe?'bg-blue-600/10 border-blue-500/20':darkMode?'bg-white/[0.02] border-white/[0.04]':'bg-gray-50 border-gray-200')}>
+                <div key={s.member.id} className={'rounded-xl p-3 border transition-all '+(isMe?'bg-blue-600/10 border-blue-500/20':darkMode?'bg-[#182544] border-[#1e3050]':'bg-gray-50 border-gray-200')}>
                   <div className="flex items-center justify-between mb-2">
-                    <div className="flex items-center gap-2"><span className="text-sm">{i<3?medals[i]:(i+1)+'.'}</span><Avatar user={s.member} size={22} className={isMe?'bg-blue-500/20 text-blue-400':'bg-white/[0.06] text-gray-400'}/><span className={'text-sm font-semibold '+(isMe?'text-blue-300':darkMode?'text-gray-300':'text-gray-700')}>{s.member.username}</span></div>
+                    <div className="flex items-center gap-2"><span className="text-sm">{i<3?medals[i]:(i+1)+'.'}</span><Avatar user={s.member} size={22} className={isMe?'bg-blue-500/20 text-blue-400':'bg-[#1e3050] text-gray-400'}/><span className={'text-sm font-semibold '+(isMe?'text-blue-300':darkMode?'text-[#9aaec0]':'text-[#4a6080]')}>{s.member.username}</span></div>
                     <span className={`text-sm font-bold ${T.text}`}>{s.pts} pts</span>
                   </div>
                   <div className="flex flex-wrap gap-2">{allCatNames.map(c=>(
@@ -2238,7 +2238,7 @@ function VersaAppMain() {
 
             {/* Wheel display */}
             <div className="relative mx-auto mb-6" style={{width:280,height:280}}>
-              <div className={`w-full h-full rounded-full border-4 border-white/[0.1] overflow-hidden relative`} style={{transform:`rotate(${wheelSpinning?3600+Math.random()*360:0}deg)`,transition:wheelSpinning?'transform 4s cubic-bezier(0.17,0.67,0.12,0.99)':'none'}}>
+              <div className={`w-full h-full rounded-full border-4 border-[#2a4060] overflow-hidden relative`} style={{transform:`rotate(${wheelSpinning?3600+Math.random()*360:0}deg)`,transition:wheelSpinning?'transform 4s cubic-bezier(0.17,0.67,0.12,0.99)':'none'}}>
                 {PUNISHMENTS.map((p,i)=>{
                   const angle = (360/PUNISHMENTS.length)*i;
                   const colors = ['#3b82f6','#ef4444','#10b981','#f59e0b','#8b5cf6','#ec4899','#06b6d4','#f97316','#6366f1','#14b8a6','#e11d48','#a855f7'];
@@ -2279,7 +2279,7 @@ function VersaAppMain() {
               </button>
             ) : (
               <div className="flex gap-2">
-                <button onClick={()=>{setWheelResult(null);}} className="flex-1 px-4 py-3 border border-white/[0.08] text-gray-400 rounded-xl text-sm font-medium hover:bg-white/[0.04]">Spin Again</button>
+                <button onClick={()=>{setWheelResult(null);}} className="flex-1 px-4 py-3 border border-[#2a4060] text-gray-400 rounded-xl text-sm font-medium hover:bg-[#1e2e50]">Spin Again</button>
                 <button onClick={async()=>{
                   const text = `🎰 Versa Punishment Wheel\n\n${lastWeekData.scores[lastWeekData.scores.length-1].member.username} lost and has to:\n${wheelResult}\n\nJoin us: ${window.location.origin}?join=${currentRoom?.code}`;
                   if(navigator.share){try{await navigator.share({title:'Vers Punishment',text});}catch{}}else{navigator.clipboard.writeText(text);setCopied(true);setTimeout(()=>setCopied(false),2000);}
@@ -2325,7 +2325,7 @@ function VersaAppMain() {
                       {lastWeekData.scores.map((s,i) => {
                         const medals = ['🥇','🥈','🥉'];
                         return (
-                          <div key={s.member.id} className={`flex items-center justify-between p-3 rounded-xl ${i===0?(storyTheme==='neon'?'bg-purple-500/20 border border-purple-500/30':'bg-blue-500/10 border border-blue-500/20'):(storyTheme==='light'?'bg-gray-50':'bg-white/[0.03]')} ${i>0?'border '+(storyTheme==='light'?'border-gray-100':'border-white/[0.04]'):''}`}>
+                          <div key={s.member.id} className={`flex items-center justify-between p-3 rounded-xl ${i===0?(storyTheme==='neon'?'bg-purple-500/20 border border-purple-500/30':'bg-blue-500/10 border border-blue-500/20'):(storyTheme==='light'?'bg-gray-50':'bg-[#151d30]')} ${i>0?'border '+(storyTheme==='light'?'border-gray-100':'border-[#1e3050]'):''}`}>
                             <div className="flex items-center gap-3">
                               <span className="text-lg">{i<3?medals[i]:(i+1)+'.'}</span>
                               <div>
@@ -2382,8 +2382,8 @@ function VersaAppMain() {
 
             {/* Nav + Save */}
             <div className="flex gap-2 mt-4">
-              <button onClick={()=>setStoryCardIdx(p=>Math.max(0,p-1))} disabled={storyCardIdx===0} className={`flex-1 py-2.5 rounded-xl text-sm font-medium transition-all disabled:opacity-20 ${darkMode?'text-gray-400 border border-white/[0.06]':'text-gray-500 border border-gray-200'}`}>← Prev</button>
-              <button onClick={()=>setStoryCardIdx(p=>Math.min(2,p+1))} disabled={storyCardIdx===2} className={`flex-1 py-2.5 rounded-xl text-sm font-medium transition-all disabled:opacity-20 ${darkMode?'text-gray-400 border border-white/[0.06]':'text-gray-500 border border-gray-200'}`}>Next →</button>
+              <button onClick={()=>setStoryCardIdx(p=>Math.max(0,p-1))} disabled={storyCardIdx===0} className={`flex-1 py-2.5 rounded-xl text-sm font-medium transition-all disabled:opacity-20 ${darkMode?'text-gray-400 border border-[#223858]':'text-gray-500 border border-gray-200'}`}>← Prev</button>
+              <button onClick={()=>setStoryCardIdx(p=>Math.min(2,p+1))} disabled={storyCardIdx===2} className={`flex-1 py-2.5 rounded-xl text-sm font-medium transition-all disabled:opacity-20 ${darkMode?'text-gray-400 border border-[#223858]':'text-gray-500 border border-gray-200'}`}>Next →</button>
             </div>
             <button onClick={async()=>{
               try{
@@ -2423,7 +2423,7 @@ function VersaAppMain() {
             const color = getColor(pts);
             const isToday = ds === getToday();
             cells.push(
-              <div key={ds} className={`w-[10px] h-[10px] rounded-[2px] ${!color?(darkMode?'bg-white/[0.04]':'bg-gray-100'):''} ${isToday?'ring-1 ring-white/30':''}`} style={color?{backgroundColor:color}:{}} title={`${formatDate(ds)}: ${pts} pts`}/>
+              <div key={ds} className={`w-[10px] h-[10px] rounded-[2px] ${!color?(darkMode?'bg-[#1e2e50]':'bg-gray-100'):''} ${isToday?'ring-1 ring-white/30':''}`} style={color?{backgroundColor:color}:{}} title={`${formatDate(ds)}: ${pts} pts`}/>
             );
           }
           return cells;
@@ -2450,7 +2450,7 @@ function VersaAppMain() {
           {v: Object.values(heatMapData).reduce((a,b)=>a+b,0), l: 'Total Points'},
           {v: streakData.streak||0, l: 'Current Streak'}
         ].map((s,i)=>(
-          <div key={i} className={`text-center p-3 rounded-xl ${darkMode?'bg-white/[0.03] border border-white/[0.04]':'bg-gray-50 border border-gray-200'}`}>
+          <div key={i} className={`text-center p-3 rounded-xl ${darkMode?'bg-[#151d30] border border-[#1e3050]':'bg-gray-50 border border-gray-200'}`}>
             <div className="text-lg font-black text-[#5b7cf5]">{s.v}</div>
             <div className={`text-[9px] ${T.textDim} tracking-wider uppercase`}>{s.l}</div>
           </div>
@@ -2472,7 +2472,7 @@ function VersaAppMain() {
                 { v: insightsData.avgPtsPerDay, l: 'Avg pts/day', c: 'text-purple-400', icon: '⚡' },
                 { v: insightsData.bestStreak+'d', l: 'Best streak', c: 'text-[#e8864a]', icon: '🏆' },
               ].map((s,i) => (
-                <div key={i} className={`p-3 rounded-xl ${darkMode?'bg-white/[0.03] border border-white/[0.04]':'bg-gray-50 border border-gray-200'}`}>
+                <div key={i} className={`p-3 rounded-xl ${darkMode?'bg-[#151d30] border border-[#1e3050]':'bg-gray-50 border border-gray-200'}`}>
                   <div className="text-sm mb-0.5">{s.icon}</div>
                   <div className={`text-lg font-black ${s.c}`}>{s.v}</div>
                   <div className={`text-[9px] ${T.textDim} tracking-wider uppercase`}>{s.l}</div>
@@ -2481,14 +2481,14 @@ function VersaAppMain() {
             </div>
 
             {/* Most consistent habit */}
-            <div className={`p-4 rounded-xl mb-4 ${darkMode?'bg-white/[0.03] border border-white/[0.04]':'bg-gray-50 border border-gray-200'}`}>
+            <div className={`p-4 rounded-xl mb-4 ${darkMode?'bg-[#151d30] border border-[#1e3050]':'bg-gray-50 border border-gray-200'}`}>
               <div className={`text-[10px] ${T.textDim} tracking-wider uppercase mb-1`}>Most Consistent Habit</div>
               <div className={`text-sm font-bold ${darkMode?'text-white':'text-gray-900'}`}>{insightsData.bestHabitName}</div>
               <div className={`text-xs ${T.textDim}`}>{insightsData.bestHabitDays} out of {insightsData.activeDays} active days</div>
             </div>
 
             {/* Weekly pattern bar chart */}
-            <div className={`p-4 rounded-xl mb-4 ${darkMode?'bg-white/[0.03] border border-white/[0.04]':'bg-gray-50 border border-gray-200'}`}>
+            <div className={`p-4 rounded-xl mb-4 ${darkMode?'bg-[#151d30] border border-[#1e3050]':'bg-gray-50 border border-gray-200'}`}>
               <div className={`text-[10px] ${T.textDim} tracking-wider uppercase mb-3`}>Weekly Pattern</div>
               <div className="flex items-end justify-between gap-1 h-20">
                 {insightsData.weekdayNames.map((day,i) => {
@@ -2512,7 +2512,7 @@ function VersaAppMain() {
                 { v: insightsData.completionRate+'%', l: 'Active Rate' },
                 { v: insightsData.totalPts, l: 'Total Pts' },
               ].map((s,i) => (
-                <div key={i} className={`text-center p-2 rounded-lg ${darkMode?'bg-white/[0.02]':'bg-gray-50'}`}>
+                <div key={i} className={`text-center p-2 rounded-lg ${darkMode?'bg-[#182544]':'bg-gray-50'}`}>
                   <div className={`text-sm font-bold ${darkMode?'text-white':'text-gray-800'}`}>{s.v}</div>
                   <div className={`text-[8px] ${T.textDim} tracking-wider uppercase`}>{s.l}</div>
                 </div>
@@ -2546,7 +2546,7 @@ function VersaAppMain() {
               <button key={h.id} onClick={()=>{
                 setCustomBoardHabits(prev=>selected?prev.filter(id=>id!==h.id):[...prev,h.id]);
               }} className={`w-full text-left p-3 rounded-xl border transition-all flex items-center gap-3 ${
-                selected ? ct.bdr+' '+ct.bgS : darkMode?'border-white/[0.04] bg-white/[0.02] hover:bg-white/[0.03]':'border-gray-200 bg-white hover:bg-gray-50'
+                selected ? ct.bdr+' '+ct.bgS : darkMode?'border-[#1e3050] bg-[#182544] hover:bg-[#151d30]':'border-gray-200 bg-white hover:bg-gray-50'
               }`}>
                 <div className={`w-5 h-5 rounded-md border-2 flex items-center justify-center text-xs ${
                   selected?ct.bg+' border-transparent text-white':'border-gray-600'
@@ -2560,7 +2560,7 @@ function VersaAppMain() {
           })}
         </div>
         {/* Inline add habit */}
-        <details className={`mb-4 rounded-xl border overflow-hidden ${darkMode?'border-white/[0.06] bg-white/[0.02]':'border-gray-200 bg-gray-50'}`}>
+        <details className={`mb-4 rounded-xl border overflow-hidden ${darkMode?'border-[#223858] bg-[#182544]':'border-gray-200 bg-gray-50'}`}>
           <summary className={`px-4 py-2.5 cursor-pointer text-xs font-medium ${T.textDim} hover:${T.text} transition-colors`}><Plus size={12} className="inline mr-1"/>Add a new habit</summary>
           <div className="px-4 pb-4 pt-2 space-y-3">
             <input value={newHabit.name} onChange={e=>setNewHabit(p=>({...p,name:e.target.value}))} placeholder="Habit name" className={inputCls} maxLength={30}/>
@@ -2602,7 +2602,7 @@ function VersaAppMain() {
       <Modal show={showRoomSettings} onClose={()=>setShowRoomSettings(false)} wide dark={darkMode}>
         <ModalHeader title="Room Settings" onClose={()=>setShowRoomSettings(false)} icon={<Crown size={16} className="text-[#e8864a]"/>} dark={darkMode}/>
         <div className={`text-[10px] ${T.textDim} mb-4 flex items-center gap-2`}>
-          <span className="font-mono tracking-wider bg-white/[0.06] px-2 py-1 rounded">{currentRoom?.code}</span>
+          <span className="font-mono tracking-wider bg-[#1e3050] px-2 py-1 rounded">{currentRoom?.code}</span>
           <span>·</span>
           <span>You are the room creator</span>
         </div>
@@ -2615,7 +2615,7 @@ function VersaAppMain() {
               const isMe = m.id === currentUser.id;
               const isCreator = m.id === (roomCreatedBy || currentRoom?.createdBy);
               return (
-                <div key={m.id} className={`flex items-center justify-between p-3 rounded-xl border ${darkMode?'border-white/[0.06] bg-white/[0.02]':'border-gray-200 bg-gray-50'}`}>
+                <div key={m.id} className={`flex items-center justify-between p-3 rounded-xl border ${darkMode?'border-[#223858] bg-[#182544]':'border-gray-200 bg-gray-50'}`}>
                   <div className="flex items-center gap-3">
                     <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-black ${isCreator?'bg-[#e8864a]/20 text-[#e8864a]':'bg-blue-500/20 text-blue-400'}`}>{m.photoURL?<img src={m.photoURL} className="w-8 h-8 rounded-full object-cover" referrerPolicy="no-referrer"/>:m.username?.charAt(0)?.toUpperCase()}</div>
                     <div>
@@ -2642,7 +2642,7 @@ function VersaAppMain() {
               <h3 className={`text-xs font-bold ${T.textDim} tracking-wider uppercase mb-2`}>Removed</h3>
               <div className="space-y-2">
                 {roomMembers.filter(m=>kickedIds.includes(m.id)).map(m => (
-                  <div key={m.id} className={`flex items-center justify-between p-3 rounded-xl border opacity-50 ${darkMode?'border-white/[0.06] bg-white/[0.02]':'border-gray-200 bg-gray-50'}`}>
+                  <div key={m.id} className={`flex items-center justify-between p-3 rounded-xl border opacity-50 ${darkMode?'border-[#223858] bg-[#182544]':'border-gray-200 bg-gray-50'}`}>
                     <div className="flex items-center gap-3">
                       <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-black bg-red-500/20 text-red-400">{m.username?.charAt(0)?.toUpperCase()}</div>
                       <span className={`text-sm font-medium ${darkMode?'text-gray-400':'text-gray-500'}`}>{m.username}</span>
@@ -2659,8 +2659,8 @@ function VersaAppMain() {
         <div>
           <h3 className={`text-xs font-bold ${T.textMuted} tracking-wider uppercase mb-3`}>Room Actions</h3>
           <div className="space-y-2">
-            {roomStakes&&<button onClick={clearStake} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border transition-all text-left ${darkMode?'border-white/[0.06] bg-white/[0.02] hover:bg-white/[0.04] text-gray-300':'border-gray-200 bg-gray-50 hover:bg-gray-100 text-gray-700'}`}><Zap size={15} className="text-red-400 shrink-0"/><div><span className="text-sm">Remove Stake</span><div className={`text-[10px] ${T.textDim}`}>Clear the current room stake</div></div></button>}
-            <button onClick={clearAllHabits} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border transition-all text-left ${darkMode?'border-white/[0.06] bg-white/[0.02] hover:bg-red-500/5 text-gray-300':'border-gray-200 bg-gray-50 hover:bg-red-50 text-gray-700'}`}><X size={15} className="text-red-400 shrink-0"/><div><span className="text-sm">Clear All Habits</span><div className={`text-[10px] ${T.textDim}`}>Delete every habit in this room</div></div></button>
+            {roomStakes&&<button onClick={clearStake} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border transition-all text-left ${darkMode?'border-[#223858] bg-[#182544] hover:bg-[#1e2e50] text-gray-300':'border-gray-200 bg-gray-50 hover:bg-gray-100 text-gray-700'}`}><Zap size={15} className="text-red-400 shrink-0"/><div><span className="text-sm">Remove Stake</span><div className={`text-[10px] ${T.textDim}`}>Clear the current room stake</div></div></button>}
+            <button onClick={clearAllHabits} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border transition-all text-left ${darkMode?'border-[#223858] bg-[#182544] hover:bg-red-500/5 text-gray-300':'border-gray-200 bg-gray-50 hover:bg-red-50 text-gray-700'}`}><X size={15} className="text-red-400 shrink-0"/><div><span className="text-sm">Clear All Habits</span><div className={`text-[10px] ${T.textDim}`}>Delete every habit in this room</div></div></button>
           </div>
         </div>
 
