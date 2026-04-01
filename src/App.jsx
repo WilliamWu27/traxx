@@ -1091,19 +1091,19 @@ function VersaAppMain() {
     const ex = getExisting(hid);
     const triggerMaxed = () => { setConfettiTrigger(v=>v+1); setMaxedHabit(hid); setTimeout(()=>setMaxedHabit(null),1500); };
 
-    // Roll for mystery bonus
+    // Roll for mystery bonus (based on base points, streak multiplier only applies to leaderboard)
     const bonus = rollBonus();
-    const baseWithStreak = Math.round(h.points * streakMulti.multi);
-    const finalPts = bonus ? baseWithStreak * bonus.multi : baseWithStreak;
+    const basePts = h.points;
+    const bonusExtra = bonus ? Math.round(basePts * bonus.multi) - basePts : 0;
 
     // Optimistic update — immediately update local state
     if (ex) {
       if (!h.isRepeatable && ex.count >= 1) return;
-      setCompletions(prev => prev.map(c => c.id === ex.id ? { ...c, count: c.count + 1, habitPoints: baseWithStreak, bonusPoints: bonus ? (c.bonusPoints||0) + (finalPts - baseWithStreak) : c.bonusPoints||0 } : c));
+      setCompletions(prev => prev.map(c => c.id === ex.id ? { ...c, count: c.count + 1, habitPoints: basePts, bonusPoints: bonus ? (c.bonusPoints||0) + bonusExtra : c.bonusPoints||0 } : c));
       if (!h.isRepeatable && ex.count + 1 >= 1) triggerMaxed();
     } else {
       const cid = currentUser.id+'_'+hid+'_'+t;
-      setCompletions(prev => [...prev, { id: cid, userId: currentUser.id, habitId: hid, roomId: currentRoom.id, date: t, count: 1, habitName: h.name, habitPoints: baseWithStreak, habitCategory: h.category, streakMultiplier: streakMulti.multi, bonusPoints: bonus ? finalPts - baseWithStreak : 0 }]);
+      setCompletions(prev => [...prev, { id: cid, userId: currentUser.id, habitId: hid, roomId: currentRoom.id, date: t, count: 1, habitName: h.name, habitPoints: basePts, habitCategory: h.category, streakMultiplier: streakMulti.multi, bonusPoints: bonusExtra }]);
       if (max === 1) triggerMaxed();
     }
 
@@ -1112,8 +1112,8 @@ function VersaAppMain() {
         if (h.isRepeatable || ex.count < 1) {
           await supabase.from('completions').update({
             count: ex.count+1,
-            habit_points: baseWithStreak,
-            ...(bonus ? { bonus_points: (ex.bonusPoints||0) + (finalPts - baseWithStreak) } : {}),
+            habit_points: basePts,
+            ...(bonus ? { bonus_points: (ex.bonusPoints||0) + bonusExtra } : {}),
             streak_multiplier: streakMulti.multi
           }).eq('id', ex.id);
         }
@@ -1121,9 +1121,9 @@ function VersaAppMain() {
         const cid = currentUser.id+'_'+hid+'_'+t;
         await supabase.from('completions').insert({
           id: cid, user_id: currentUser.id, habit_id: hid, room_id: currentRoom.id, date: t, count: 1,
-          habit_name: h.name, habit_points: baseWithStreak, habit_category: h.category,
+          habit_name: h.name, habit_points: basePts, habit_category: h.category,
           streak_multiplier: streakMulti.multi,
-          ...(bonus ? { bonus_points: finalPts - baseWithStreak } : {})
+          ...(bonus ? { bonus_points: bonusExtra } : {})
         });
       }
       // Show bonus notification
@@ -1134,10 +1134,11 @@ function VersaAppMain() {
       }
       // Post to activity feed
       const newCount = ex ? ex.count + 1 : 1;
+      const displayPts = basePts + bonusExtra;
       const streakTag = streakMulti.multi > 1 ? ` 🔥${streakMulti.label}` : '';
       const feedText = bonus
-        ? `${h.name} (+${finalPts}) ${bonus.label}${streakTag}`
-        : `${h.name} (+${baseWithStreak})${streakTag}`;
+        ? `${h.name} (+${displayPts}) ${bonus.label}${streakTag}`
+        : `${h.name} (+${basePts})${streakTag}`;
       if (newCount >= max) {
         postActivity(`Maxed out ${h.name}! 💎${streakTag}`, bonus);
       } else if (newCount === 1 || Math.random() < 0.3) {
@@ -1189,29 +1190,34 @@ function VersaAppMain() {
   };
 
   // ─── SCORING ───
+  // Base points (no streak multiplier) — used for daily goal, freeze, general display
   const getCatPts = (uid, cat) => completions.filter(c=>c.userId===uid&&c.date===getToday()).reduce((s,c)=>{ const h=habits.find(x=>x.id===c.habitId); if((h?.category||c.habitCategory)===cat) return s+((c.habitPoints||h?.points||0)*(c.count||1))+(c.bonusPoints||0); return s; },0);
+  const getTodayPts = (uid) => completions.filter(c=>c.userId===uid&&c.date===getToday()).reduce((s,c)=>{ return s+((c.habitPoints||habits.find(x=>x.id===c.habitId)?.points||0)*(c.count||1))+(c.bonusPoints||0); },0);
+  const getWeeklyPts = (uid) => { const ws=getWeekStart(),we=getWeekEnd(); return allCompletions.filter(c=>c.userId===uid&&c.date>=ws&&c.date<=we).reduce((s,c)=>{ return s+((c.habitPoints||habits.find(x=>x.id===c.habitId)?.points||0)*(c.count||1))+(c.bonusPoints||0); },0); };
+  // Leaderboard points (with streak multiplier applied) — used for leaderboard & crystals
+  const getTodayPtsLB = (uid) => completions.filter(c=>c.userId===uid&&c.date===getToday()).reduce((s,c)=>{ const bp=(c.habitPoints||habits.find(x=>x.id===c.habitId)?.points||0); const sm=c.streakMultiplier||1; return s+Math.round(bp*sm*(c.count||1))+(c.bonusPoints||0); },0);
+  const getWeeklyPtsLB = (uid) => { const ws=getWeekStart(),we=getWeekEnd(); return allCompletions.filter(c=>c.userId===uid&&c.date>=ws&&c.date<=we).reduce((s,c)=>{ const bp=(c.habitPoints||habits.find(x=>x.id===c.habitId)?.points||0); const sm=c.streakMultiplier||1; return s+Math.round(bp*sm*(c.count||1))+(c.bonusPoints||0); },0); };
+  const getCatPtsLB = (uid, cat) => completions.filter(c=>c.userId===uid&&c.date===getToday()).reduce((s,c)=>{ const h=habits.find(x=>x.id===c.habitId); if((h?.category||c.habitCategory)===cat){ const bp=(c.habitPoints||h?.points||0); const sm=c.streakMultiplier||1; return s+Math.round(bp*sm*(c.count||1))+(c.bonusPoints||0); } return s; },0);
   const getTodayCrystals = (uid) => {
     const cr = {}; allCatNames.forEach(c => cr[c] = false);
     // Solo mode: earn crystal if you beat yesterday's category points
     if (activeMembers.length < 2) {
-      allCatNames.forEach(cat => { if(getCatPts(uid,cat) > 0) cr[cat] = true; });
+      allCatNames.forEach(cat => { if(getCatPtsLB(uid,cat) > 0) cr[cat] = true; });
       return cr;
     }
     allCatNames.forEach(cat => {
       let mx=0, w=null;
-      activeMembers.forEach(m=>{ const p=getCatPts(m.id,cat); if(p>mx){mx=p;w=m;}else if(p===mx&&p>0)w=null; });
+      activeMembers.forEach(m=>{ const p=getCatPtsLB(m.id,cat); if(p>mx){mx=p;w=m;}else if(p===mx&&p>0)w=null; });
       if(w&&w.id===uid) cr[cat]=true;
     });
     return cr;
   };
-  const getTodayPts = (uid) => completions.filter(c=>c.userId===uid&&c.date===getToday()).reduce((s,c)=>{ return s+((c.habitPoints||habits.find(x=>x.id===c.habitId)?.points||0)*(c.count||1))+(c.bonusPoints||0); },0);
-  const getWeeklyPts = (uid) => { const ws=getWeekStart(),we=getWeekEnd(); return allCompletions.filter(c=>c.userId===uid&&c.date>=ws&&c.date<=we).reduce((s,c)=>{ return s+((c.habitPoints||habits.find(x=>x.id===c.habitId)?.points||0)*(c.count||1))+(c.bonusPoints||0); },0); };
   const getWeeklyCrystals = (uid) => {
     let t=0; const ws=getWeekStart(), td=getToday();
     const dates=[...new Set(allCompletions.filter(c=>c.date>=ws&&c.date<=td).map(c=>c.date))];
     dates.forEach(date=>{ allCatNames.forEach(cat=>{
       let mx=0, w=null;
-      activeMembers.forEach(m=>{ const p=allCompletions.filter(c=>c.userId===m.id&&c.date===date).reduce((s,c)=>{const h=habits.find(x=>x.id===c.habitId);if(h&&h.category===cat)return s+(h.points*(c.count||1));return s;},0); if(p>mx){mx=p;w=m;}else if(p===mx&&p>0)w=null; });
+      activeMembers.forEach(m=>{ const p=allCompletions.filter(c=>c.userId===m.id&&c.date===date).reduce((s,c)=>{const h=habits.find(x=>x.id===c.habitId);if(h&&h.category===cat){ const sm=c.streakMultiplier||1; return s+Math.round(h.points*sm*(c.count||1)); }return s;},0); if(p>mx){mx=p;w=m;}else if(p===mx&&p>0)w=null; });
       if(w&&w.id===uid) t++;
     }); });
     return t;
@@ -1219,7 +1225,7 @@ function VersaAppMain() {
   const getCount = (hid) => { const e=getExisting(hid); return e?.count||0; };
   const DAILY_TARGET = 400;
   const getDailyProgress = () => { if(!currentUser||!currentRoom)return 0; const pts=getTodayPts(currentUser.id); return Math.min(pts/DAILY_TARGET,1); };
-  const getLeaderboard = () => activeMembers.map(m=>({member:m,todayPts:getTodayPts(m.id),weeklyPts:getWeeklyPts(m.id),crystals:getTodayCrystals(m.id),weeklyCrystals:getWeeklyCrystals(m.id)})).sort((a,b)=>leaderboardTab==='today'?b.todayPts-a.todayPts:b.weeklyPts-a.weeklyPts);
+  const getLeaderboard = () => activeMembers.map(m=>({member:m,todayPts:getTodayPtsLB(m.id),weeklyPts:getWeeklyPtsLB(m.id),crystals:getTodayCrystals(m.id),weeklyCrystals:getWeeklyCrystals(m.id)})).sort((a,b)=>leaderboardTab==='today'?b.todayPts-a.todayPts:b.weeklyPts-a.weeklyPts);
 
   const DEFAULT_CATEGORIES = [
     { name:'Study', colorIdx:0, icon:'📚' },
@@ -1293,7 +1299,17 @@ function VersaAppMain() {
   // ─── NOTIFICATIONS STATE ───
   const [notifPermission, setNotifPermission] = useState(() => ('Notification' in window) ? Notification.permission : 'default');
   const [showNotifSettings, setShowNotifSettings] = useState(false);
-  const DEFAULT_NOTIF_PREFS = { dailyNudge: true, streakRisk: true, lastChance: true, behindYesterday: true, rivalPassed: true, rivalTear: true, rivalGrinding: true, reactions: true, progressMilestones: true, streakMilestones: true, weeklyWinner: true, duoStreaks: true, lastPlace: true };
+  const [expandedNotif, setExpandedNotif] = useState(null);
+  const DEFAULT_NOTIF_PREFS = {
+    dailyNudge: true, dailyNudgeHour: 15, dailyNudgeMin: 30,
+    streakRisk: true, streakRiskHour: 20, streakRiskMin: 0, streakRiskThreshold: 200,
+    lastChance: true, lastChanceHour: 22, lastChanceMin: 0,
+    behindYesterday: true, behindYesterdayFreq: 30, behindYesterdayStartHour: 10,
+    lastPlace: true, lastPlaceHour: 18, lastPlaceMin: 0,
+    rivalPassed: true, rivalTear: true, rivalGrinding: true,
+    reactions: true,
+    progressMilestones: true, streakMilestones: true, weeklyWinner: true, duoStreaks: true
+  };
   const [notifPrefs, setNotifPrefs] = useState(() => { try { const s = localStorage.getItem('versa-notif-prefs'); return s ? { ...DEFAULT_NOTIF_PREFS, ...JSON.parse(s) } : { ...DEFAULT_NOTIF_PREFS }; } catch { return { ...DEFAULT_NOTIF_PREFS }; } });
   const updateNotifPref = (key, val) => { setNotifPrefs(prev => { const next = { ...prev, [key]: val }; try { localStorage.setItem('versa-notif-prefs', JSON.stringify(next)); } catch {} return next; }); };
   const prevCompletionsRef = useRef([]);
@@ -1383,32 +1399,37 @@ function VersaAppMain() {
       const hour = now.getHours();
       const mins = now.getMinutes();
       const today = getToday();
-      // Daily nudge — 3:30 PM if 0 pts
-      if (notifPrefs.dailyNudge && hour === 15 && mins >= 30 && mins < 35 && myPts === 0) {
+      const nH = notifPrefs.dailyNudgeHour ?? 15, nM = notifPrefs.dailyNudgeMin ?? 30;
+      // Daily nudge — configurable time, if 0 pts
+      if (notifPrefs.dailyNudge && hour === nH && mins >= nM && mins < nM + 5 && myPts === 0) {
         const k = 'versa-nudge-'+today;
         if (!sessionStorage.getItem(k)) { sendLocalNotification('📋 Don\'t forget to log today', 'Your rivals might already be ahead.', 'daily-nudge'); sessionStorage.setItem(k,'1'); }
       }
-      // Streak at risk — 8 PM if <200 pts and active streak
-      if (notifPrefs.streakRisk && hour === 20 && myPts < 200 && streakData.streak > 0) {
+      const srH = notifPrefs.streakRiskHour ?? 20, srM = notifPrefs.streakRiskMin ?? 0, srT = notifPrefs.streakRiskThreshold ?? 200;
+      // Streak at risk — configurable time and threshold
+      if (notifPrefs.streakRisk && hour === srH && mins >= srM && mins < srM + 5 && myPts < srT && streakData.streak > 0) {
         const k = 'versa-s8-'+today;
-        if (!sessionStorage.getItem(k)) { sendLocalNotification('⚠️ Your '+streakData.streak+'-day streak is at risk', 'Log 200pts before midnight.', 'streak-8pm'); sessionStorage.setItem(k,'1'); }
+        if (!sessionStorage.getItem(k)) { sendLocalNotification('⚠️ Your '+streakData.streak+'-day streak is at risk', 'Log '+srT+'pts before midnight.', 'streak-risk'); sessionStorage.setItem(k,'1'); }
       }
-      // Last chance — 8 PM (4 hours left) if <200 pts and active streak
-      if (notifPrefs.lastChance && hour === 20 && myPts < 200 && streakData.streak > 0) {
+      const lcH = notifPrefs.lastChanceHour ?? 22, lcM = notifPrefs.lastChanceMin ?? 0;
+      const hoursLeft = 24 - lcH - (lcM > 0 ? 1 : 0);
+      // Last chance — configurable time
+      if (notifPrefs.lastChance && hour === lcH && mins >= lcM && mins < lcM + 5 && myPts < srT && streakData.streak > 0) {
         const k = 'versa-s10-'+today;
-        if (!sessionStorage.getItem(k)) { sendLocalNotification('🚨 4 hours left!', (streakFreeze>0?'Freeze will save you.':'No freeze — this is it.'), 'streak-last-chance'); sessionStorage.setItem(k,'1'); }
+        if (!sessionStorage.getItem(k)) { sendLocalNotification('🚨 '+hoursLeft+' hours left!', (streakFreeze>0?'Freeze will save you.':'No freeze — this is it.'), 'streak-last-chance'); sessionStorage.setItem(k,'1'); }
       }
-      // Behind from yesterday — fires every 30 min when behind
+      const byFreq = (notifPrefs.behindYesterdayFreq ?? 30) * 60000;
+      const byStart = notifPrefs.behindYesterdayStartHour ?? 10;
+      // Behind from yesterday — configurable frequency and start hour
       if (notifPrefs.behindYesterday && yesterdayPoints > 0) {
         const nowMs = Date.now();
-        if (nowMs - behindYesterdayRef.current >= 1800000) { // 30 min throttle
-          // Estimate yesterday's points at same time of day
-          // Use proportional: (hours elapsed today / 24) * yesterdayPoints
+        if (nowMs - behindYesterdayRef.current >= byFreq) {
           const elapsedHours = hour + mins / 60;
           const yesterdayAtThisTime = Math.round((elapsedHours / 24) * yesterdayPoints);
-          if (myPts < yesterdayAtThisTime && yesterdayAtThisTime > 0 && elapsedHours >= 10) {
+          if (myPts < yesterdayAtThisTime && yesterdayAtThisTime > 0 && elapsedHours >= byStart) {
             const diff = yesterdayAtThisTime - myPts;
-            const k = 'versa-behind-'+today+'-'+hour+'-'+(mins<30?'0':'30');
+            const halfHourSlot = Math.floor((hour * 60 + mins) / (notifPrefs.behindYesterdayFreq ?? 30));
+            const k = 'versa-behind-'+today+'-'+halfHourSlot;
             if (!sessionStorage.getItem(k)) {
               sendLocalNotification('📉 You\'re behind yesterday', diff+' pts behind where you were this time yesterday.', 'behind-yesterday');
               sessionStorage.setItem(k,'1');
@@ -1417,8 +1438,9 @@ function VersaAppMain() {
           }
         }
       }
-      // Last place — Sunday 6 PM
-      if (notifPrefs.lastPlace && now.getDay()===0 && hour===18 && activeMembers.length>1) {
+      const lpH = notifPrefs.lastPlaceHour ?? 18, lpM = notifPrefs.lastPlaceMin ?? 0;
+      // Last place — Sunday, configurable time
+      if (notifPrefs.lastPlace && now.getDay()===0 && hour===lpH && mins >= lpM && mins < lpM + 5 && activeMembers.length>1) {
         const k = 'versa-lp-'+today;
         if (!sessionStorage.getItem(k)) {
           const lb = activeMembers.map(m=>({id:m.id,pts:allCompletions.filter(c=>c.userId===m.id).reduce((s,c)=>s+((c.habitPoints||0)*(c.count||1))+(c.bonusPoints||0),0)})).sort((a,b)=>b.pts-a.pts);
@@ -2230,32 +2252,118 @@ function VersaAppMain() {
       </Modal>
 
       {/* Notification Settings */}
-      <Modal show={showNotifSettings} onClose={()=>setShowNotifSettings(false)} dark={darkMode}>
-        <ModalHeader title="Notification Settings" onClose={()=>setShowNotifSettings(false)} dark={darkMode}/>
-        <div className="space-y-4">
-          {[{section:'Streak Protection',items:[{key:'dailyNudge',label:'Daily Nudge',desc:'Reminder at 3:30 PM if no points logged',icon:'📋'},{key:'streakRisk',label:'Streak at Risk',desc:'8 PM warning if under 200pts with active streak',icon:'⚠️'},{key:'lastChance',label:'Last Chance',desc:'8 PM final alert — 4 hours left',icon:'🚨'},{key:'behindYesterday',label:'Behind Yesterday',desc:'Every 30 min when behind yesterday\'s pace',icon:'📉'},{key:'lastPlace',label:'Last Place Warning',desc:'Sunday 6 PM if you\'re last on the leaderboard',icon:'😬'}]},{section:'Competition',items:[{key:'rivalPassed',label:'Rival Passed You',desc:'When a rival overtakes your daily points',icon:'🔥'},{key:'rivalTear',label:'Rival on a Tear',desc:'When a rival hits 5, 10, 15… completions',icon:'💪'},{key:'rivalGrinding',label:'Rival Grinding',desc:'When a rival logs a habit while you\'re away',icon:'👀'}]},{section:'Social',items:[{key:'reactions',label:'Reactions',desc:'When someone reacts to your activity',icon:'💬'}]},{section:'Milestones',items:[{key:'progressMilestones',label:'Daily Progress',desc:'50%, 75%, and 100% of daily target',icon:'🎯'},{key:'streakMilestones',label:'Streak Milestones',desc:'3, 7, 14, 30, 60, 100 day streaks',icon:'🔥'},{key:'duoStreaks',label:'Duo Streaks',desc:'Mutual streak milestones with rivals',icon:'🔗'},{key:'weeklyWinner',label:'Weekly Winner',desc:'Monday notification if you won the week',icon:'🏆'}]}].map(group=>(
-            <div key={group.section}>
-              <div className={`text-[10px] font-bold tracking-wider uppercase mb-2 ${T.textMuted}`}>{group.section}</div>
-              <div className={`${T.bgCard} rounded-xl border ${T.border} divide-y ${darkMode?'divide-[#223858]':'divide-gray-100'}`}>
-                {group.items.map(item=>(
-                  <div key={item.key} className="flex items-center justify-between px-4 py-3">
-                    <div className="flex items-center gap-3 flex-1 min-w-0">
-                      <span className="text-base flex-shrink-0">{item.icon}</span>
-                      <div className="min-w-0">
-                        <div className={`text-sm font-medium ${T.text}`}>{item.label}</div>
-                        <div className="text-[10px] text-gray-500 leading-tight">{item.desc}</div>
-                      </div>
-                    </div>
-                    <button onClick={()=>updateNotifPref(item.key,!notifPrefs[item.key])} className={'relative w-10 h-5.5 rounded-full transition-all flex-shrink-0 ml-3 '+(notifPrefs[item.key]?'bg-[#5b7cf5]':(darkMode?'bg-[#223858]':'bg-gray-200'))} style={{width:'40px',height:'22px'}}>
-                      <div className={'absolute top-[3px] w-4 h-4 rounded-full bg-white transition-all shadow-sm '+(notifPrefs[item.key]?'left-[20px]':'left-[3px]')}/>
-                    </button>
+      <Modal show={showNotifSettings} onClose={()=>{setShowNotifSettings(false);setExpandedNotif(null);}} dark={darkMode}>
+        <ModalHeader title="Notification Settings" onClose={()=>{setShowNotifSettings(false);setExpandedNotif(null);}} dark={darkMode}/>
+        {(() => {
+          const fmtTime = (h,m) => { const ampm = h>=12?'PM':'AM'; const h12 = h%12||12; return h12+':'+(m<10?'0':'')+m+' '+ampm; };
+          const timeOptions = []; for(let h=0;h<24;h++) for(let m=0;m<60;m+=15) timeOptions.push({h,m,label:fmtTime(h,m)});
+          const freqOptions = [{v:15,l:'Every 15 min'},{v:30,l:'Every 30 min'},{v:60,l:'Every hour'},{v:120,l:'Every 2 hours'}];
+          const thresholdOptions = [{v:80,l:'80 pts (20%)'},{v:100,l:'100 pts (25%)'},{v:150,l:'150 pts (38%)'},{v:200,l:'200 pts (50%)'},{v:300,l:'300 pts (75%)'}];
+          const startHourOptions = []; for(let h=6;h<=16;h++) startHourOptions.push({v:h,l:fmtTime(h,0)});
+          const selCls = `text-xs px-2 py-1.5 rounded-lg border ${darkMode?'bg-[#0f1b2d] border-[#264060] text-white':'bg-white border-gray-200 text-gray-800'} focus:outline-none focus:border-[#5b7cf5]/50`;
+          const groups = [
+            {section:'Streak Protection',items:[
+              {key:'dailyNudge',label:'Daily Nudge',icon:'📋',settings:[{type:'time',hourKey:'dailyNudgeHour',minKey:'dailyNudgeMin',label:'Notify at'}]},
+              {key:'streakRisk',label:'Streak at Risk',icon:'⚠️',settings:[{type:'time',hourKey:'streakRiskHour',minKey:'streakRiskMin',label:'Notify at'},{type:'threshold',prefKey:'streakRiskThreshold',label:'If under'}]},
+              {key:'lastChance',label:'Last Chance',icon:'🚨',settings:[{type:'time',hourKey:'lastChanceHour',minKey:'lastChanceMin',label:'Notify at'}]},
+              {key:'behindYesterday',label:'Behind Yesterday',icon:'📉',settings:[{type:'freq',prefKey:'behindYesterdayFreq',label:'Check every'},{type:'startHour',prefKey:'behindYesterdayStartHour',label:'Start after'}]},
+              {key:'lastPlace',label:'Last Place Warning',icon:'😬',settings:[{type:'time',hourKey:'lastPlaceHour',minKey:'lastPlaceMin',label:'Notify at (Sun)'}]}
+            ]},
+            {section:'Competition',items:[
+              {key:'rivalPassed',label:'Rival Passed You',icon:'🔥',settings:[]},
+              {key:'rivalTear',label:'Rival on a Tear',icon:'💪',settings:[]},
+              {key:'rivalGrinding',label:'Rival Grinding',icon:'👀',settings:[]}
+            ]},
+            {section:'Social',items:[
+              {key:'reactions',label:'Reactions',icon:'💬',settings:[]}
+            ]},
+            {section:'Milestones',items:[
+              {key:'progressMilestones',label:'Daily Progress',icon:'🎯',settings:[]},
+              {key:'streakMilestones',label:'Streak Milestones',icon:'🔥',settings:[]},
+              {key:'duoStreaks',label:'Duo Streaks',icon:'🔗',settings:[]},
+              {key:'weeklyWinner',label:'Weekly Winner',icon:'🏆',settings:[]}
+            ]}
+          ];
+          const descMap = {dailyNudge:'Reminder if no points logged',streakRisk:'Warning if under threshold with active streak',lastChance:'Final alert before midnight',behindYesterday:'Fires when behind yesterday\'s pace',lastPlace:'Sunday alert if you\'re last on leaderboard',rivalPassed:'When a rival overtakes your daily points',rivalTear:'When a rival hits 5, 10, 15… completions',rivalGrinding:'When a rival logs while you\'re away',reactions:'When someone reacts to your activity',progressMilestones:'50%, 75%, and 100% of daily target',streakMilestones:'3, 7, 14, 30, 60, 100 day streaks',duoStreaks:'Mutual streak milestones with rivals',weeklyWinner:'Monday notification if you won the week'};
+          const getSummary = (item) => {
+            if (!notifPrefs[item.key]) return 'Off';
+            const parts = [];
+            item.settings.forEach(s => {
+              if (s.type==='time') parts.push(fmtTime(notifPrefs[s.hourKey]??15, notifPrefs[s.minKey]??0));
+              if (s.type==='freq') parts.push('Every '+(notifPrefs[s.prefKey]??30)+'min');
+              if (s.type==='threshold') parts.push('<'+(notifPrefs[s.prefKey]??200)+'pts');
+              if (s.type==='startHour') parts.push('After '+fmtTime(notifPrefs[s.prefKey]??10,0));
+            });
+            return parts.length > 0 ? parts.join(' · ') : 'On';
+          };
+          return (
+            <div className="space-y-4">
+              {groups.map(group=>(
+                <div key={group.section}>
+                  <div className={`text-[10px] font-bold tracking-wider uppercase mb-2 ${T.textMuted}`}>{group.section}</div>
+                  <div className={`${T.bgCard} rounded-xl border ${T.border} divide-y ${darkMode?'divide-[#223858]':'divide-gray-100'}`}>
+                    {group.items.map(item=>{
+                      const isExpanded = expandedNotif === item.key;
+                      const hasSettings = item.settings.length > 0;
+                      return (
+                        <div key={item.key}>
+                          <div className={`flex items-center justify-between px-4 py-3 ${hasSettings && notifPrefs[item.key] ? 'cursor-pointer' : ''} ${isExpanded ? (darkMode?'bg-[#1e3050]/50':'bg-gray-50') : ''}`}
+                            onClick={()=>{ if(hasSettings && notifPrefs[item.key]) setExpandedNotif(isExpanded?null:item.key); }}>
+                            <div className="flex items-center gap-3 flex-1 min-w-0">
+                              <span className="text-base flex-shrink-0">{item.icon}</span>
+                              <div className="min-w-0">
+                                <div className={`text-sm font-medium ${T.text}`}>{item.label}</div>
+                                <div className="text-[10px] text-gray-500 leading-tight">{hasSettings ? getSummary(item) : descMap[item.key]}</div>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-2 flex-shrink-0 ml-2">
+                              {hasSettings && notifPrefs[item.key] && <ChevronDown size={12} className={`text-gray-500 transition-transform ${isExpanded?'rotate-180':''}`}/>}
+                              <button onClick={(e)=>{e.stopPropagation();updateNotifPref(item.key,!notifPrefs[item.key]);if(!notifPrefs[item.key]===false)setExpandedNotif(null);}} className={'relative rounded-full transition-all '+(notifPrefs[item.key]?'bg-[#5b7cf5]':(darkMode?'bg-[#223858]':'bg-gray-200'))} style={{width:'40px',height:'22px'}}>
+                                <div className={'absolute top-[3px] w-4 h-4 rounded-full bg-white transition-all shadow-sm '+(notifPrefs[item.key]?'left-[20px]':'left-[3px]')}/>
+                              </button>
+                            </div>
+                          </div>
+                          {isExpanded && notifPrefs[item.key] && item.settings.length > 0 && (
+                            <div className={`px-4 pb-3 pt-1 ${darkMode?'bg-[#1e3050]/30':'bg-gray-50/80'}`}>
+                              <div className="flex flex-wrap gap-3">
+                                {item.settings.map((s,si)=>(
+                                  <div key={si} className="flex flex-col gap-1">
+                                    <label className={`text-[9px] font-bold tracking-wider uppercase ${T.textDim}`}>{s.label}</label>
+                                    {s.type==='time' && (
+                                      <select value={(notifPrefs[s.hourKey]??15)*100+(notifPrefs[s.minKey]??0)} onChange={e=>{const v=parseInt(e.target.value);updateNotifPref(s.hourKey,Math.floor(v/100));updateNotifPref(s.minKey,v%100);}} className={selCls}>
+                                        {timeOptions.map(t=><option key={t.h*100+t.m} value={t.h*100+t.m}>{t.label}</option>)}
+                                      </select>
+                                    )}
+                                    {s.type==='freq' && (
+                                      <select value={notifPrefs[s.prefKey]??30} onChange={e=>updateNotifPref(s.prefKey,parseInt(e.target.value))} className={selCls}>
+                                        {freqOptions.map(f=><option key={f.v} value={f.v}>{f.l}</option>)}
+                                      </select>
+                                    )}
+                                    {s.type==='threshold' && (
+                                      <select value={notifPrefs[s.prefKey]??200} onChange={e=>updateNotifPref(s.prefKey,parseInt(e.target.value))} className={selCls}>
+                                        {thresholdOptions.map(t=><option key={t.v} value={t.v}>{t.l}</option>)}
+                                      </select>
+                                    )}
+                                    {s.type==='startHour' && (
+                                      <select value={notifPrefs[s.prefKey]??10} onChange={e=>updateNotifPref(s.prefKey,parseInt(e.target.value))} className={selCls}>
+                                        {startHourOptions.map(t=><option key={t.v} value={t.v}>{t.l}</option>)}
+                                      </select>
+                                    )}
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
                   </div>
-                ))}
-              </div>
+                </div>
+              ))}
+              {notifPermission!=='granted'&&<div className={`mt-2 p-3 ${T.bgCard} rounded-xl border border-[#e8864a]/30 text-center`}><p className="text-[#e8864a] text-xs font-medium">⚠️ Push notifications are not enabled. Enable them in your profile to receive these alerts.</p></div>}
             </div>
-          ))}
-          {notifPermission!=='granted'&&<div className={`mt-2 p-3 ${T.bgCard} rounded-xl border border-[#e8864a]/30 text-center`}><p className="text-[#e8864a] text-xs font-medium">⚠️ Push notifications are not enabled. Enable them above in your profile to receive these alerts.</p></div>}
-        </div>
+          );
+        })()}
       </Modal>
 
       {/* Invite & Rooms */}
