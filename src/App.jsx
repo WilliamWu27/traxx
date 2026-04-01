@@ -340,7 +340,7 @@ function VersaAppMain() {
           const active = data.active_room || (rooms.length > 0 ? rooms[0] : null);
           if (active) {
             const { data: rd } = await supabase.from('rooms').select('*').eq('id', active).maybeSingle();
-            if (rd) { setCurrentRoom({ id: rd.id, ...rd, code: rd.code || rd.id }); setView('dashboard'); }
+            if (rd) { setCurrentRoom({ id: rd.id, ...rd, code: rd.code || rd.id }); setRoomKicked(rd.kicked || []); setRoomCreatedBy(rd.created_by || null); setView('dashboard'); }
             else setShowRoomModal(true);
           } else setShowRoomModal(true);
         } else {
@@ -480,6 +480,8 @@ function VersaAppMain() {
       } catch {}
     };
     load();
+    const sub = supabase.channel('room-kicked-'+currentRoom.id).on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'rooms', filter: 'id=eq.'+currentRoom.id }, ()=>setTimeout(load,300)).subscribe();
+    return () => supabase.removeChannel(sub);
   }, [currentRoom?.id]);
 
   // ─── LAST WEEK DATA (for recap) ───
@@ -1800,7 +1802,7 @@ function VersaAppMain() {
               const ahead = r.pts > myPts;
               const ms = mutualStreaks[r.member.id] || 0;
               return (
-                <div key={r.member.id} className={`flex items-center gap-2 px-3 py-2 rounded-xl border shrink-0 ${ahead?(darkMode?'border-red-500/20 bg-red-500/5':'border-red-200 bg-red-50'):(darkMode?'border-emerald-500/20 bg-emerald-500/5':'border-emerald-200 bg-emerald-50')}`}>
+                <div key={r.member.id} onClick={()=>setShowCompetitor(r.member)} className={`flex items-center gap-2 px-3 py-2 rounded-xl border shrink-0 cursor-pointer active:scale-[0.97] transition-all ${ahead?(darkMode?'border-red-500/20 bg-red-500/5':'border-red-200 bg-red-50'):(darkMode?'border-emerald-500/20 bg-emerald-500/5':'border-emerald-200 bg-emerald-50')}`}>
                   <div className="relative">
                     <Avatar user={r.member} size={22} className={ahead?'bg-red-500/20 text-red-400':'bg-emerald-500/20 text-emerald-400'}/>
                     {ms > 0 && <div className={`absolute -bottom-1 -right-1 w-4 h-4 rounded-full flex items-center justify-center text-[7px] font-black text-white ${ms>=7?'bg-gradient-to-r from-orange-500 to-red-500':ms>=3?'bg-orange-500':'bg-[#e8864a]'}`}>{ms}</div>}
@@ -1862,7 +1864,7 @@ function VersaAppMain() {
                         </div>
                       </div>
                       <div className="flex items-center gap-1.5 shrink-0">
-                        {cnt > 0 && !editMode && <button onClick={()=>handleDecrement(h.id)} className={`w-8 h-8 rounded-full flex items-center justify-center transition-all active:scale-90 ${darkMode?'bg-[#1e3050] text-[#7a8ba8] hover:bg-[#264060]':'bg-gray-100 text-gray-400 hover:bg-gray-200'}`}><MinusIcon size={14}/></button>}
+                        {cnt > 0 && !editMode && <button onClick={()=>handleDecrement(h.id)} className={`w-6 h-6 rounded-full flex items-center justify-center transition-all active:scale-90 opacity-30 hover:opacity-70 ${darkMode?'text-[#4a6080] hover:bg-[#1e3050]':'text-gray-300 hover:bg-gray-100'}`}><MinusIcon size={11}/></button>}
                         {!maxed && !editMode && <button onClick={()=>handleIncrement(h.id)} className={`w-10 h-10 rounded-full flex items-center justify-center transition-all active:scale-90 shadow-lg text-white font-bold ${t.bg} hover:opacity-90`} style={{boxShadow:`0 4px 14px ${t.neon}40`}}><Plus size={18}/></button>}
                         {maxed && !editMode && <div className={`w-10 h-10 rounded-full flex items-center justify-center ${t.bg} text-white`}><Check size={18}/></div>}
                         {editMode && <><button onClick={()=>openEditHabit(h)} className="text-blue-400 p-1.5"><Edit3 size={14}/></button><button onClick={()=>deleteHabit(h.id)} className="text-red-400 p-1.5"><Trash2 size={14}/></button></>}
@@ -2182,8 +2184,78 @@ function VersaAppMain() {
 
       {/* Competitor */}
       <Modal show={!!showCompetitor} onClose={()=>setShowCompetitor(null)} dark={darkMode}>
-        {showCompetitor&&<><ModalHeader title={showCompetitor.username} onClose={()=>setShowCompetitor(null)} dark={darkMode}/>
-        <div className="space-y-3"><div className="grid grid-cols-3 gap-3">{allCatNames.map(c=><div key={c} className={'text-center p-4 rounded-xl border '+getCT(c).bgS+' '+getCT(c).bdr}><div className={'text-2xl font-black '+getCT(c).txt}>{getCatPts(showCompetitor.id,c)}</div><div className="text-[9px] text-gray-600 mt-1 tracking-wider uppercase">{c}</div></div>)}</div><div className="text-center p-5 bg-gradient-to-r from-blue-600/20 to-indigo-600/20 rounded-xl border border-blue-500/20"><div className="text-3xl font-black">{getTodayPts(showCompetitor.id)}</div><div className="text-[10px] text-gray-500 mt-1 tracking-wider uppercase">Total Today</div></div></div></>}
+        {showCompetitor&&(()=>{
+          const uid = showCompetitor.id;
+          const theirPts = getTodayPts(uid);
+          const theirWeekPts = getWeeklyPts(uid);
+          const theirComps = completions.filter(c=>c.userId===uid&&c.date===getToday());
+          const ms = mutualStreaks[uid] || 0;
+          const ahead = theirPts > myPts;
+          const diff = Math.abs(theirPts - myPts);
+          return <><ModalHeader title={showCompetitor.username} onClose={()=>setShowCompetitor(null)} dark={darkMode}/>
+
+          {/* Comparison bar */}
+          <div className={`p-4 rounded-xl mb-4 ${ahead?(darkMode?'bg-red-500/5 border border-red-500/15':'bg-red-50 border border-red-200'):(darkMode?'bg-emerald-500/5 border border-emerald-500/15':'bg-emerald-50 border border-emerald-200')}`}>
+            <div className="flex items-center justify-between mb-2">
+              <span className={`text-xs font-medium ${darkMode?'text-[#7a8ba8]':'text-[#6b7e96]'}`}>You</span>
+              <span className={`text-[10px] font-bold ${ahead?'text-red-400':'text-emerald-400'}`}>{ahead?'Behind by '+diff:'Ahead by '+diff}</span>
+              <span className={`text-xs font-medium ${darkMode?'text-[#7a8ba8]':'text-[#6b7e96]'}`}>{showCompetitor.username}</span>
+            </div>
+            <div className="flex items-center gap-3">
+              <span className="text-lg font-black text-blue-400 w-12 text-right">{myPts}</span>
+              <div className={`flex-1 h-2 rounded-full overflow-hidden ${darkMode?'bg-[#1e3050]':'bg-gray-200'}`}>
+                <div className="h-full bg-blue-400 rounded-full transition-all" style={{width:((myPts+theirPts)>0?myPts/(myPts+theirPts)*100:50)+'%'}}/>
+              </div>
+              <span className={`text-lg font-black w-12 ${ahead?'text-red-400':'text-emerald-400'}`}>{theirPts}</span>
+            </div>
+          </div>
+
+          {/* Category breakdown */}
+          <div className="grid grid-cols-3 gap-2 mb-4">{allCatNames.map(c=>{
+            const myC = getCatPts(currentUser.id,c), theirC = getCatPts(uid,c);
+            const ct = getCT(c);
+            return <div key={c} className={'text-center p-3 rounded-xl border '+ct.bgS+' '+ct.bdr}>
+              <div className={'text-xl font-black '+ct.txt}>{theirC}</div>
+              <div className="text-[9px] text-gray-600 mt-0.5 tracking-wider uppercase">{c}</div>
+              <div className={`text-[9px] mt-1 font-bold ${theirC>myC?'text-red-400':theirC<myC?'text-emerald-400':'text-gray-600'}`}>{theirC>myC?'+'+( theirC-myC):theirC<myC?''+(theirC-myC):'tied'}</div>
+            </div>;
+          })}</div>
+
+          {/* What they logged today */}
+          <div className={`rounded-xl border p-4 mb-4 ${darkMode?'border-[#223858] bg-[#182544]':'border-gray-200 bg-gray-50'}`}>
+            <div className={`text-[10px] font-bold tracking-wider uppercase mb-3 ${darkMode?'text-[#4a6080]':'text-[#9aaec0]'}`}>Logged today</div>
+            {theirComps.length > 0 ? (
+              <div className="space-y-2">{theirComps.map(c=>{
+                const h = habits.find(x=>x.id===c.habitId);
+                const cat = h?.category || c.habitCategory || 'Study';
+                const ct = getCT(cat);
+                const pts = (c.habitPoints || h?.points || 0) * (c.count || 1) + (c.bonusPoints || 0);
+                return <div key={c.id} className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className={`w-1.5 h-1.5 rounded-full ${ct.bg}`}/>
+                    <span className={`text-sm ${darkMode?'text-[#9aaec0]':'text-[#4a6080]'}`}>{h?.name || c.habitName || 'Unknown'}</span>
+                    {c.count > 1 && <span className={`text-[10px] font-bold ${ct.txt}`}>×{c.count}</span>}
+                  </div>
+                  <span className={`text-sm font-bold ${ct.txt}`}>{pts}</span>
+                </div>;
+              })}</div>
+            ) : (
+              <div className={`text-sm text-center py-3 ${darkMode?'text-[#4a6080]':'text-[#9aaec0]'}`}>Nothing logged yet</div>
+            )}
+          </div>
+
+          {/* Weekly + mutual streak */}
+          <div className="flex gap-2">
+            <div className={`flex-1 text-center p-3 rounded-xl border ${darkMode?'border-[#223858] bg-[#182544]':'border-gray-200 bg-gray-50'}`}>
+              <div className="text-lg font-black text-emerald-400">{theirWeekPts}</div>
+              <div className="text-[9px] text-gray-600 tracking-wider uppercase">This week</div>
+            </div>
+            {ms > 0 && <div className={`flex-1 text-center p-3 rounded-xl border ${darkMode?'border-[#e8864a]/20 bg-[#e8864a]/5':'border-orange-200 bg-orange-50'}`}>
+              <div className="text-lg font-black text-[#e8864a]">🔗 {ms}d</div>
+              <div className="text-[9px] text-gray-600 tracking-wider uppercase">Duo streak</div>
+            </div>}
+          </div>
+        </>;})()}
       </Modal>
 
       {/* Weekly Recap */}
@@ -2637,7 +2709,7 @@ function VersaAppMain() {
                       <div className={`text-[10px] ${T.textDim}`}>{m.email}</div>
                     </div>
                   </div>
-                  {!isMe && (
+                  {!isMe && isRoomCreator && (
                     <div className="flex items-center gap-1.5">
                       <button onClick={()=>transferOwnership(m.id)} className={`text-[9px] px-2 py-1 rounded-lg font-medium transition-all ${darkMode?'text-gray-600 hover:text-[#e8864a] hover:bg-[#e8864a]/10':'text-gray-400 hover:text-[#e8864a] hover:bg-[#e8864a]/8'}`}>Transfer</button>
                       <button onClick={()=>kickMember(m.id)} className={`text-[9px] px-2 py-1 rounded-lg font-medium transition-all ${darkMode?'text-gray-600 hover:text-red-400 hover:bg-red-500/10':'text-gray-400 hover:text-red-600 hover:bg-red-50'}`}>Remove</button>
@@ -2657,7 +2729,7 @@ function VersaAppMain() {
                       <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-black bg-red-500/20 text-red-400">{m.username?.charAt(0)?.toUpperCase()}</div>
                       <span className={`text-sm font-medium ${darkMode?'text-gray-400':'text-gray-500'}`}>{m.username}</span>
                     </div>
-                    <button onClick={async()=>{try{await supabase.from('rooms').update({kicked:(roomKicked||[]).filter(x=>x!==m.id)}).eq('id',currentRoom.id);setRoomKicked(prev=>prev.filter(x=>x!==m.id));}catch{}}} className={`text-[9px] px-2 py-1 rounded-lg font-medium transition-all ${darkMode?'text-gray-600 hover:text-emerald-400 hover:bg-emerald-500/10':'text-gray-400 hover:text-emerald-600 hover:bg-emerald-50'}`}>Restore</button>
+                    {isRoomCreator && <button onClick={async()=>{try{await supabase.from('rooms').update({kicked:(roomKicked||[]).filter(x=>x!==m.id)}).eq('id',currentRoom.id);setRoomKicked(prev=>prev.filter(x=>x!==m.id));}catch{}}} className={`text-[9px] px-2 py-1 rounded-lg font-medium transition-all ${darkMode?'text-gray-600 hover:text-emerald-400 hover:bg-emerald-500/10':'text-gray-400 hover:text-emerald-600 hover:bg-emerald-50'}`}>Restore</button>}
                   </div>
                 ))}
               </div>
