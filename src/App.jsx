@@ -1954,6 +1954,12 @@ function VersaAppMain() {
                 <button onClick={()=>{setHistoryDate(getYesterday());loadHistoryDate(getYesterday());setShowHistory(true);}} className={`text-[10px] font-bold uppercase px-3 py-1.5 rounded-lg transition-all ${T.textDim} hover:text-gray-400`}>📅 History</button>
                 {lastWeekData&&<button onClick={()=>setShowWeeklyRecap(true)} className={`text-[10px] font-bold uppercase px-3 py-1.5 rounded-lg transition-all ${T.textDim} hover:text-purple-400`}>📊 Recap</button>}
               </div>
+              <div className={`mt-3 pt-3 border-t ${darkMode?'border-[#223858]':'border-gray-200'} text-[9px] font-mono ${T.textDim} space-y-1`}>
+                <div>Room: {currentRoom?.id} | Members: {roomMembers.length} | Active: {activeMembers.length} | Kicked: {roomKicked.length}</div>
+                <div>Habits: {habits.length} | Today comps: {completions.length} | Week comps: {allCompletions.length}</div>
+                <div>My pts: {myPts} | Rivals: {rivalStatus.length} | Winner: {weeklyWinner?.member?.username||'none'} ({weeklyWinner?.pts||0})</div>
+                <div>Members: {activeMembers.map(m=>m.username+'('+getTodayPts(m.id)+')').join(', ')}</div>
+              </div>
             </div>
           )}
         </div>
