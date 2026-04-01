@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Clock, Plus, X, LogOut, Copy, Check, UserPlus, HelpCircle, Trophy, User, Flame, Zap, Star, TrendingUp, ArrowLeftRight, Edit3, Calendar, ChevronLeft, ChevronRight, Crown, Target, ArrowUp, ArrowDown, Minus as MinusIcon, GripVertical, BarChart3, Sun, Moon, ChevronDown, Trash2, Settings } from 'lucide-react';
+import { Clock, Plus, X, LogOut, Copy, Check, UserPlus, HelpCircle, Trophy, User, Flame, Zap, Star, TrendingUp, ArrowLeftRight, Edit3, Calendar, ChevronLeft, ChevronRight, Crown, Target, ArrowUp, ArrowDown, Minus as MinusIcon, GripVertical, BarChart3, Sun, Moon, ChevronDown, Trash2, Settings, Bell } from 'lucide-react';
 import { supabase } from './supabase';
 
 // ─── PUSH NOTIFICATIONS ───
@@ -1292,10 +1292,15 @@ function VersaAppMain() {
 
   // ─── NOTIFICATIONS STATE ───
   const [notifPermission, setNotifPermission] = useState(() => ('Notification' in window) ? Notification.permission : 'default');
+  const [showNotifSettings, setShowNotifSettings] = useState(false);
+  const DEFAULT_NOTIF_PREFS = { dailyNudge: true, streakRisk: true, lastChance: true, behindYesterday: true, rivalPassed: true, rivalTear: true, rivalGrinding: true, reactions: true, progressMilestones: true, streakMilestones: true, weeklyWinner: true, duoStreaks: true, lastPlace: true };
+  const [notifPrefs, setNotifPrefs] = useState(() => { try { const s = localStorage.getItem('versa-notif-prefs'); return s ? { ...DEFAULT_NOTIF_PREFS, ...JSON.parse(s) } : { ...DEFAULT_NOTIF_PREFS }; } catch { return { ...DEFAULT_NOTIF_PREFS }; } });
+  const updateNotifPref = (key, val) => { setNotifPrefs(prev => { const next = { ...prev, [key]: val }; try { localStorage.setItem('versa-notif-prefs', JSON.stringify(next)); } catch {} return next; }); };
   const prevCompletionsRef = useRef([]);
   const prevActivityRef = useRef([]);
   const notifThrottleRef = useRef({});
   const duoMilestoneRef = useRef({});
+  const behindYesterdayRef = useRef(0);
 
   const throttledNotify = (title, body, tag) => {
     const now = Date.now();
@@ -1340,11 +1345,11 @@ function VersaAppMain() {
         const rivalPts = completions.filter(c => c.userId === latest.userId).reduce((s, c) => s + ((c.habitPoints||0) * (c.count||1)) + (c.bonusPoints||0), 0);
         const prevRivalPts = prev.filter(c => c.userId === latest.userId).reduce((s, c) => s + ((c.habitPoints||0) * (c.count||1)) + (c.bonusPoints||0), 0);
         const rivalCount = completions.filter(c => c.userId === latest.userId).reduce((s, c) => s + (c.count||1), 0);
-        if (rivalPts > myPts && prevRivalPts <= myPts && myPts > 0) {
+        if (notifPrefs.rivalPassed && rivalPts > myPts && prevRivalPts <= myPts && myPts > 0) {
           throttledNotify('🔥 '+member.username+' passed you!', rivalPts+' pts vs your '+myPts+'. Time to grind.', 'rival-pass-'+latest.userId);
-        } else if (rivalCount >= 5 && rivalCount % 5 === 0) {
+        } else if (notifPrefs.rivalTear && rivalCount >= 5 && rivalCount % 5 === 0) {
           throttledNotify(member.username+' is on a tear 💪', rivalCount+' habits logged today.', 'rival-tear-'+latest.userId);
-        } else if (document.hidden && habit) {
+        } else if (notifPrefs.rivalGrinding && document.hidden && habit) {
           throttledNotify(member.username+' is grinding', habit.name+' (+'+(habit.points||10)+')', 'rival-log');
         }
       }
@@ -1354,7 +1359,7 @@ function VersaAppMain() {
 
   // Reactions on your activity
   useEffect(() => {
-    if (!currentUser || notifPermission !== 'granted' || !activityFeed.length) return;
+    if (!currentUser || notifPermission !== 'granted' || !notifPrefs.reactions || !activityFeed.length) return;
     const prev = prevActivityRef.current;
     if (!prev.length) { prevActivityRef.current = activityFeed; return; }
     activityFeed.forEach(a => {
@@ -1370,25 +1375,50 @@ function VersaAppMain() {
     prevActivityRef.current = activityFeed;
   }, [activityFeed, notifPermission]);
 
-  // Protection: streak warnings, daily nudge, last place
+  // Protection: streak warnings, daily nudge, last place, behind yesterday
   useEffect(() => {
     if (!currentUser || notifPermission !== 'granted') return;
     const check = () => {
-      const hour = new Date().getHours();
+      const now = new Date();
+      const hour = now.getHours();
+      const mins = now.getMinutes();
       const today = getToday();
-      if (hour === 18 && myPts === 0) {
+      // Daily nudge — 3:30 PM if 0 pts
+      if (notifPrefs.dailyNudge && hour === 15 && mins >= 30 && mins < 35 && myPts === 0) {
         const k = 'versa-nudge-'+today;
         if (!sessionStorage.getItem(k)) { sendLocalNotification('📋 Don\'t forget to log today', 'Your rivals might already be ahead.', 'daily-nudge'); sessionStorage.setItem(k,'1'); }
       }
-      if (hour === 20 && myPts < 80 && streakData.streak > 0) {
+      // Streak at risk — 8 PM if <200 pts and active streak
+      if (notifPrefs.streakRisk && hour === 20 && myPts < 200 && streakData.streak > 0) {
         const k = 'versa-s8-'+today;
-        if (!sessionStorage.getItem(k)) { sendLocalNotification('⚠️ Your '+streakData.streak+'-day streak is at risk', 'Log 80pts before midnight.', 'streak-8pm'); sessionStorage.setItem(k,'1'); }
+        if (!sessionStorage.getItem(k)) { sendLocalNotification('⚠️ Your '+streakData.streak+'-day streak is at risk', 'Log 200pts before midnight.', 'streak-8pm'); sessionStorage.setItem(k,'1'); }
       }
-      if (hour === 22 && myPts < 80 && streakData.streak > 0) {
+      // Last chance — 8 PM (4 hours left) if <200 pts and active streak
+      if (notifPrefs.lastChance && hour === 20 && myPts < 200 && streakData.streak > 0) {
         const k = 'versa-s10-'+today;
-        if (!sessionStorage.getItem(k)) { sendLocalNotification('🚨 2 hours left!', (streakFreeze>0?'Freeze will save you.':'No freeze — this is it.'), 'streak-10pm'); sessionStorage.setItem(k,'1'); }
+        if (!sessionStorage.getItem(k)) { sendLocalNotification('🚨 4 hours left!', (streakFreeze>0?'Freeze will save you.':'No freeze — this is it.'), 'streak-last-chance'); sessionStorage.setItem(k,'1'); }
       }
-      if (new Date().getDay()===0 && hour===18 && activeMembers.length>1) {
+      // Behind from yesterday — fires every 30 min when behind
+      if (notifPrefs.behindYesterday && yesterdayPoints > 0) {
+        const nowMs = Date.now();
+        if (nowMs - behindYesterdayRef.current >= 1800000) { // 30 min throttle
+          // Estimate yesterday's points at same time of day
+          // Use proportional: (hours elapsed today / 24) * yesterdayPoints
+          const elapsedHours = hour + mins / 60;
+          const yesterdayAtThisTime = Math.round((elapsedHours / 24) * yesterdayPoints);
+          if (myPts < yesterdayAtThisTime && yesterdayAtThisTime > 0 && elapsedHours >= 10) {
+            const diff = yesterdayAtThisTime - myPts;
+            const k = 'versa-behind-'+today+'-'+hour+'-'+(mins<30?'0':'30');
+            if (!sessionStorage.getItem(k)) {
+              sendLocalNotification('📉 You\'re behind yesterday', diff+' pts behind where you were this time yesterday.', 'behind-yesterday');
+              sessionStorage.setItem(k,'1');
+              behindYesterdayRef.current = nowMs;
+            }
+          }
+        }
+      }
+      // Last place — Sunday 6 PM
+      if (notifPrefs.lastPlace && now.getDay()===0 && hour===18 && activeMembers.length>1) {
         const k = 'versa-lp-'+today;
         if (!sessionStorage.getItem(k)) {
           const lb = activeMembers.map(m=>({id:m.id,pts:allCompletions.filter(c=>c.userId===m.id).reduce((s,c)=>s+((c.habitPoints||0)*(c.count||1))+(c.bonusPoints||0),0)})).sort((a,b)=>b.pts-a.pts);
@@ -1399,11 +1429,11 @@ function VersaAppMain() {
     check();
     const iv = setInterval(check, 300000);
     return () => clearInterval(iv);
-  }, [notifPermission, myPts, streakData.streak]);
+  }, [notifPermission, myPts, streakData.streak, notifPrefs, yesterdayPoints]);
 
   // Celebration: won the week — only on Monday (day after reset)
   useEffect(() => {
-    if (!currentUser || !lastWeekData || notifPermission !== 'granted') return;
+    if (!currentUser || !lastWeekData || notifPermission !== 'granted' || !notifPrefs.weeklyWinner) return;
     const day = new Date().getDay(); // 0=Sun, 1=Mon
     if (day !== 1) return; // Only fire on Monday
     const key = 'versa-weekwin-' + getWeekStart();
@@ -1416,7 +1446,7 @@ function VersaAppMain() {
 
   // Celebration: duo streak milestones
   useEffect(() => {
-    if (!currentUser || notifPermission !== 'granted') return;
+    if (!currentUser || notifPermission !== 'granted' || !notifPrefs.duoStreaks) return;
     Object.entries(mutualStreaks).forEach(([uid, days]) => {
       const last = duoMilestoneRef.current[uid]||0;
       const crossed = [3,7,14,30].find(m => days >= m && last < m);
@@ -1430,7 +1460,7 @@ function VersaAppMain() {
   // Personal: progress milestones (independent — no rival needed)
   const prevProgressRef = useRef(0);
   useEffect(() => {
-    if (!currentUser || notifPermission !== 'granted' || !habits.length) return;
+    if (!currentUser || notifPermission !== 'granted' || !notifPrefs.progressMilestones || !habits.length) return;
     const prev = prevProgressRef.current;
     const prog = dailyProg;
     const today = getToday();
@@ -1452,7 +1482,7 @@ function VersaAppMain() {
   // Personal: streak milestones (independent)
   const prevStreakNotifRef = useRef(0);
   useEffect(() => {
-    if (!currentUser || notifPermission !== 'granted') return;
+    if (!currentUser || notifPermission !== 'granted' || !notifPrefs.streakMilestones) return;
     const streak = streakData.streak || 0;
     const prev = prevStreakNotifRef.current;
     const milestones = [3, 7, 14, 30, 60, 100];
@@ -2172,6 +2202,7 @@ function VersaAppMain() {
           <button onClick={()=>{setShowProfile(false);setShowStakes(true);}} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border transition-all ${darkMode?'border-[#223858] bg-[#182544] hover:bg-[#1e2e50] text-gray-300':'border-gray-200 bg-gray-50 hover:bg-gray-100 text-gray-700'}`}><Zap size={16} className="text-red-400"/><span className="text-sm">Stakes</span></button>
           {lastWeekData&&<button onClick={()=>{setShowProfile(false);setShowWeeklyRecap(true);}} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border transition-all ${darkMode?'border-[#223858] bg-[#182544] hover:bg-[#1e2e50] text-gray-300':'border-gray-200 bg-gray-50 hover:bg-gray-100 text-gray-700'}`}><BarChart3 size={16} className="text-purple-400"/><span className="text-sm">Weekly Recap</span></button>}
           <button onClick={()=>{setShowProfile(false);setShowHelp(true);}} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border transition-all ${darkMode?'border-[#223858] bg-[#182544] hover:bg-[#1e2e50] text-gray-300':'border-gray-200 bg-gray-50 hover:bg-gray-100 text-gray-700'}`}><HelpCircle size={16} className="text-gray-400"/><span className="text-sm">How Versa Works</span></button>
+          <button onClick={()=>{setShowProfile(false);setShowNotifSettings(true);}} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border transition-all ${darkMode?'border-[#223858] bg-[#182544] hover:bg-[#1e2e50] text-gray-300':'border-gray-200 bg-gray-50 hover:bg-gray-100 text-gray-700'}`}><Bell size={16} className="text-[#e8864a]"/><span className="text-sm">Customize Notifications</span></button>
           <button onClick={()=>supabase.auth.signOut()} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border transition-all ${darkMode?'border-[#223858] bg-[#182544] hover:bg-red-500/5 text-red-400':'border-gray-200 bg-gray-50 hover:bg-red-50 text-red-500'}`}><LogOut size={16}/><span className="text-sm">Sign Out</span></button>
         </div>
       </Modal>
@@ -2194,6 +2225,35 @@ function VersaAppMain() {
             <div key={i} className={`${T.bgCard} rounded-xl p-4 border ${T.border}`}><p className={`font-bold ${T.text} mb-1`}>{s.i} {s.t}</p><p>{s.d}</p></div>
           ))}
           <div className={`${T.bgCard} rounded-xl p-4 border ${T.border}`}><p className={`font-bold ${T.text} mb-2`}>Categories</p><div className="space-y-1.5">{allCatNames.map(c=>{const ct=getCT(c);return(<div key={c} className="flex items-center gap-2"><div className={'w-3 h-3 rounded-full '+ct.bg+' shadow-sm '+ct.glow}/><span><strong className={ct.txt}>{c}</strong></span></div>);})}</div></div>
+        </div>
+      </Modal>
+
+      {/* Notification Settings */}
+      <Modal show={showNotifSettings} onClose={()=>setShowNotifSettings(false)} dark={darkMode}>
+        <ModalHeader title="Notification Settings" onClose={()=>setShowNotifSettings(false)} dark={darkMode}/>
+        <div className="space-y-4">
+          {[{section:'Streak Protection',items:[{key:'dailyNudge',label:'Daily Nudge',desc:'Reminder at 3:30 PM if no points logged',icon:'📋'},{key:'streakRisk',label:'Streak at Risk',desc:'8 PM warning if under 200pts with active streak',icon:'⚠️'},{key:'lastChance',label:'Last Chance',desc:'8 PM final alert — 4 hours left',icon:'🚨'},{key:'behindYesterday',label:'Behind Yesterday',desc:'Every 30 min when behind yesterday\'s pace',icon:'📉'},{key:'lastPlace',label:'Last Place Warning',desc:'Sunday 6 PM if you\'re last on the leaderboard',icon:'😬'}]},{section:'Competition',items:[{key:'rivalPassed',label:'Rival Passed You',desc:'When a rival overtakes your daily points',icon:'🔥'},{key:'rivalTear',label:'Rival on a Tear',desc:'When a rival hits 5, 10, 15… completions',icon:'💪'},{key:'rivalGrinding',label:'Rival Grinding',desc:'When a rival logs a habit while you\'re away',icon:'👀'}]},{section:'Social',items:[{key:'reactions',label:'Reactions',desc:'When someone reacts to your activity',icon:'💬'}]},{section:'Milestones',items:[{key:'progressMilestones',label:'Daily Progress',desc:'50%, 75%, and 100% of daily target',icon:'🎯'},{key:'streakMilestones',label:'Streak Milestones',desc:'3, 7, 14, 30, 60, 100 day streaks',icon:'🔥'},{key:'duoStreaks',label:'Duo Streaks',desc:'Mutual streak milestones with rivals',icon:'🔗'},{key:'weeklyWinner',label:'Weekly Winner',desc:'Monday notification if you won the week',icon:'🏆'}]}].map(group=>(
+            <div key={group.section}>
+              <div className={`text-[10px] font-bold tracking-wider uppercase mb-2 ${T.textMuted}`}>{group.section}</div>
+              <div className={`${T.bgCard} rounded-xl border ${T.border} divide-y ${darkMode?'divide-[#223858]':'divide-gray-100'}`}>
+                {group.items.map(item=>(
+                  <div key={item.key} className="flex items-center justify-between px-4 py-3">
+                    <div className="flex items-center gap-3 flex-1 min-w-0">
+                      <span className="text-base flex-shrink-0">{item.icon}</span>
+                      <div className="min-w-0">
+                        <div className={`text-sm font-medium ${T.text}`}>{item.label}</div>
+                        <div className="text-[10px] text-gray-500 leading-tight">{item.desc}</div>
+                      </div>
+                    </div>
+                    <button onClick={()=>updateNotifPref(item.key,!notifPrefs[item.key])} className={'relative w-10 h-5.5 rounded-full transition-all flex-shrink-0 ml-3 '+(notifPrefs[item.key]?'bg-[#5b7cf5]':(darkMode?'bg-[#223858]':'bg-gray-200'))} style={{width:'40px',height:'22px'}}>
+                      <div className={'absolute top-[3px] w-4 h-4 rounded-full bg-white transition-all shadow-sm '+(notifPrefs[item.key]?'left-[20px]':'left-[3px]')}/>
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
+          {notifPermission!=='granted'&&<div className={`mt-2 p-3 ${T.bgCard} rounded-xl border border-[#e8864a]/30 text-center`}><p className="text-[#e8864a] text-xs font-medium">⚠️ Push notifications are not enabled. Enable them above in your profile to receive these alerts.</p></div>}
         </div>
       </Modal>
 
