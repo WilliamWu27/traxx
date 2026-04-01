@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Clock, Plus, X, LogOut, Copy, Check, UserPlus, HelpCircle, Trophy, User, Flame, Zap, Star, TrendingUp, ArrowLeftRight, Edit3, Calendar, ChevronLeft, ChevronRight, Crown, Target, ArrowUp, ArrowDown, Minus as MinusIcon, GripVertical, BarChart3, Sun, Moon, ChevronDown, Trash2 } from 'lucide-react';
+import { Clock, Plus, X, LogOut, Copy, Check, UserPlus, HelpCircle, Trophy, User, Flame, Zap, Star, TrendingUp, ArrowLeftRight, Edit3, Calendar, ChevronLeft, ChevronRight, Crown, Target, ArrowUp, ArrowDown, Minus as MinusIcon, GripVertical, BarChart3, Sun, Moon, ChevronDown, Trash2, Settings } from 'lucide-react';
 import { supabase } from './supabase';
 
 // ─── PUSH NOTIFICATIONS ───
@@ -185,6 +185,8 @@ function VersaAppMain() {
   const [devMode, setDevMode] = useState(() => {
     try { return localStorage.getItem('versa-devmode') === 'true'; } catch { return false; }
   });
+  const [showSettingsMenu, setShowSettingsMenu] = useState(false);
+  const logoTapRef = useRef({ count: 0, timer: null });
   const toggleDevMode = () => { const next = !devMode; setDevMode(next); try { localStorage.setItem('versa-devmode', next ? 'true' : 'false'); } catch {} };
   const [showHistory, setShowHistory] = useState(false);
   const [showEditHabit, setShowEditHabit] = useState(null);
@@ -1741,11 +1743,30 @@ function VersaAppMain() {
         <div className="max-w-2xl mx-auto px-4 py-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <h1 className="text-lg font-black tracking-[0.15em]">VERSA</h1>
+              <h1 onClick={()=>{logoTapRef.current.count++;clearTimeout(logoTapRef.current.timer);if(logoTapRef.current.count>=3){logoTapRef.current.count=0;toggleDevMode();}else{logoTapRef.current.timer=setTimeout(()=>{logoTapRef.current.count=0;},600);}}} className="text-lg font-black tracking-[0.15em] cursor-default select-none">VERSA</h1>
               {streakData.streak>0&&<div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full ${darkMode?'bg-[#e8864a]/15':'bg-[#e8864a]/10'}`}><Flame size={13} className="text-[#e8864a]"/><span className="text-[#e8864a] text-sm font-bold">{streakData.streak}</span>{streakMulti.multi>1&&<span className={`text-[9px] font-bold ${streakMulti.color}`}>{streakMulti.label}</span>}{streakFreeze>0&&<span className="text-xs">🛡️</span>}</div>}
             </div>
             <div className="flex items-center gap-2">
               <button onClick={toggleTheme} className={`p-2 rounded-xl ${darkMode?'hover:bg-[#1e3050]':'hover:bg-gray-100'} transition-colors`}>{darkMode?<Sun size={16} className="text-gray-500"/>:<Moon size={16} className="text-gray-400"/>}</button>
+              <div className="relative">
+                <button onClick={()=>setShowSettingsMenu(!showSettingsMenu)} className={`p-2 rounded-xl transition-colors ${showSettingsMenu?(darkMode?'bg-[#1e3050] text-white':'bg-gray-200 text-gray-900'):(darkMode?'hover:bg-[#1e3050]':'hover:bg-gray-100')}`}><Settings size={16} className={showSettingsMenu?(darkMode?'text-white':'text-gray-900'):'text-gray-500'}/></button>
+                {showSettingsMenu && <>
+                  <div className="fixed inset-0 z-40" onClick={()=>setShowSettingsMenu(false)}/>
+                  <div className={`absolute right-0 top-full mt-2 w-56 rounded-2xl border shadow-xl z-50 overflow-hidden ${darkMode?'bg-[#182544] border-[#223858]':'bg-white border-gray-200'}`}>
+                    <div className="py-1">
+                      <button onClick={()=>{setShowAddHabit(true);setShowSettingsMenu(false);}} className={`w-full flex items-center gap-3 px-4 py-3 text-sm transition-all ${darkMode?'text-[#9aaec0] hover:bg-[#1e3050]':'text-gray-700 hover:bg-gray-50'}`}><Plus size={15} className="text-blue-400"/>Add Habit</button>
+                      <button onClick={()=>{setShowAddCategory(true);setShowSettingsMenu(false);}} className={`w-full flex items-center gap-3 px-4 py-3 text-sm transition-all ${darkMode?'text-[#9aaec0] hover:bg-[#1e3050]':'text-gray-700 hover:bg-gray-50'}`}><Plus size={15} className="text-purple-400"/>Add Category</button>
+                      {habits.length>0&&<button onClick={()=>{setEditMode(!editMode);setShowSettingsMenu(false);}} className={`w-full flex items-center gap-3 px-4 py-3 text-sm transition-all ${editMode?'text-blue-400':(darkMode?'text-[#9aaec0] hover:bg-[#1e3050]':'text-gray-700 hover:bg-gray-50')}`}><Edit3 size={15} className={editMode?'text-blue-400':'text-gray-500'}/>{editMode?'Done Editing':'Edit Habits'}</button>}
+                      <button onClick={()=>{setCustomBoardHabits(myBoardIds||habits.map(h=>h.id));setShowCustomBoard(true);setShowSettingsMenu(false);}} className={`w-full flex items-center gap-3 px-4 py-3 text-sm transition-all ${darkMode?'text-[#9aaec0] hover:bg-[#1e3050]':'text-gray-700 hover:bg-gray-50'}`}><Target size={15} className="text-indigo-400"/>My Board</button>
+                      <div className={`mx-3 my-1 border-t ${darkMode?'border-[#223858]':'border-gray-100'}`}/>
+                      <button onClick={()=>{loadHeatMap();setShowSettingsMenu(false);}} className={`w-full flex items-center gap-3 px-4 py-3 text-sm transition-all ${darkMode?'text-[#9aaec0] hover:bg-[#1e3050]':'text-gray-700 hover:bg-gray-50'}`}><BarChart3 size={15} className="text-[#4aba7a]"/>Heat Map</button>
+                      <button onClick={()=>{loadInsights();setShowSettingsMenu(false);}} className={`w-full flex items-center gap-3 px-4 py-3 text-sm transition-all ${darkMode?'text-[#9aaec0] hover:bg-[#1e3050]':'text-gray-700 hover:bg-gray-50'}`}><TrendingUp size={15} className="text-blue-400"/>Insights</button>
+                      <button onClick={()=>{setHistoryDate(getYesterday());loadHistoryDate(getYesterday());setShowHistory(true);setShowSettingsMenu(false);}} className={`w-full flex items-center gap-3 px-4 py-3 text-sm transition-all ${darkMode?'text-[#9aaec0] hover:bg-[#1e3050]':'text-gray-700 hover:bg-gray-50'}`}><Calendar size={15} className="text-gray-500"/>History</button>
+                      {lastWeekData&&<button onClick={()=>{setShowWeeklyRecap(true);setShowSettingsMenu(false);}} className={`w-full flex items-center gap-3 px-4 py-3 text-sm transition-all ${darkMode?'text-[#9aaec0] hover:bg-[#1e3050]':'text-gray-700 hover:bg-gray-50'}`}><BarChart3 size={15} className="text-purple-400"/>Weekly Recap</button>}
+                    </div>
+                  </div>
+                </>}
+              </div>
               <button onClick={()=>setShowProfile(true)} className={`p-2 rounded-xl ${darkMode?'hover:bg-[#1e3050]':'hover:bg-gray-100'} transition-colors`}>{currentUser.photoURL?<img src={currentUser.photoURL} className="w-7 h-7 rounded-full object-cover" referrerPolicy="no-referrer"/>:<User size={16} className={T.textMuted}/>}</button>
             </div>
           </div>
@@ -1939,32 +1960,17 @@ function VersaAppMain() {
           {isRoomCreator&&<button onClick={()=>setShowRoomSettings(true)} className={`flex items-center gap-1.5 px-3 py-2 rounded-full text-[11px] font-bold transition-all active:scale-[0.97] ${darkMode?'bg-[#e8864a]/10 text-[#e8864a] border border-[#e8864a]/20':'bg-[#e8864a]/8 text-[#e8864a] border border-[#e8864a]/20'}`}><Crown size={12}/></button>}
         </div>
 
-        {/* Settings */}
-        <div className="mb-4">
-          <div className="flex justify-center">
-            <button onClick={toggleDevMode} className={`text-[10px] font-bold tracking-wider uppercase px-4 py-2 rounded-full transition-all ${devMode?(darkMode?'bg-[#5b7cf5]/10 text-[#5b7cf5] border border-[#5b7cf5]/20':'bg-[#5b7cf5]/8 text-[#5b7cf5] border border-[#5b7cf5]/20'):(darkMode?'text-gray-600 hover:text-gray-400':'text-gray-400 hover:text-gray-600')}`}>⚙️ Settings</button>
-          </div>
-          {devMode && (
-            <div className={`mt-3 p-4 rounded-2xl border ${darkMode?'border-[#223858] bg-[#5b7cf5]/5':'border-[#dce4ee] bg-[#5b7cf5]/5'}`}>
-              <div className="flex items-center justify-center gap-2 flex-wrap">
-                <button onClick={()=>setShowAddHabit(true)} className={`text-[10px] font-bold uppercase px-3 py-1.5 rounded-lg transition-all ${T.textDim} hover:text-blue-400`}>➕ Habit</button>
-                <button onClick={()=>setShowAddCategory(true)} className={`text-[10px] font-bold uppercase px-3 py-1.5 rounded-lg transition-all ${T.textDim} hover:text-purple-400`}>➕ Category</button>
-                {habits.length>0&&<button onClick={()=>setEditMode(!editMode)} className={'text-[10px] font-bold uppercase px-3 py-1.5 rounded-lg transition-all '+(editMode?'bg-blue-500/20 text-blue-400':T.textDim+' hover:text-gray-400')}>{editMode?'Done':'✏️ Edit'}</button>}
-                <button onClick={()=>{setCustomBoardHabits(myBoardIds||habits.map(h=>h.id));setShowCustomBoard(true);}} className={`text-[10px] font-bold uppercase px-3 py-1.5 rounded-lg transition-all ${T.textDim} hover:text-indigo-400`}>🎯 Board</button>
-                <button onClick={loadHeatMap} className={`text-[10px] font-bold uppercase px-3 py-1.5 rounded-lg transition-all ${T.textDim} hover:text-purple-400`}>📊 Map</button>
-                <button onClick={loadInsights} className={`text-[10px] font-bold uppercase px-3 py-1.5 rounded-lg transition-all ${T.textDim} hover:text-blue-400`}>📈 Insights</button>
-                <button onClick={()=>{setHistoryDate(getYesterday());loadHistoryDate(getYesterday());setShowHistory(true);}} className={`text-[10px] font-bold uppercase px-3 py-1.5 rounded-lg transition-all ${T.textDim} hover:text-gray-400`}>📅 History</button>
-                {lastWeekData&&<button onClick={()=>setShowWeeklyRecap(true)} className={`text-[10px] font-bold uppercase px-3 py-1.5 rounded-lg transition-all ${T.textDim} hover:text-purple-400`}>📊 Recap</button>}
-              </div>
-              <div className={`mt-3 pt-3 border-t ${darkMode?'border-[#223858]':'border-gray-200'} text-[9px] font-mono ${T.textDim} space-y-1`}>
-                <div>Room: {currentRoom?.id} | Members: {roomMembers.length} | Active: {activeMembers.length} | Kicked: {roomKicked.length}</div>
-                <div>Habits: {habits.length} | Today comps: {completions.length} | Week comps: {allCompletions.length}</div>
-                <div>My pts: {myPts} | Rivals: {rivalStatus.length} | Winner: {weeklyWinner?.member?.username||'none'} ({weeklyWinner?.pts||0})</div>
-                <div>Members: {activeMembers.map(m=>m.username+'('+getTodayPts(m.id)+')').join(', ')}</div>
-              </div>
+        {/* Debug (triple-tap VERSA logo to toggle) */}
+        {devMode && (
+          <div className={`mb-4 p-3 rounded-2xl border ${darkMode?'border-[#223858] bg-[#5b7cf5]/5':'border-[#dce4ee] bg-[#5b7cf5]/5'}`}>
+            <div className={`text-[9px] font-mono ${T.textDim} space-y-1`}>
+              <div>Room: {currentRoom?.id} | Members: {roomMembers.length} | Active: {activeMembers.length} | Kicked: {roomKicked.length}</div>
+              <div>Habits: {habits.length} | Today comps: {completions.length} | Week comps: {allCompletions.length}</div>
+              <div>My pts: {myPts} | Rivals: {rivalStatus.length} | Winner: {weeklyWinner?.member?.username||'none'} ({weeklyWinner?.pts||0})</div>
+              <div>Members: {activeMembers.map(m=>m.username+'('+getTodayPts(m.id)+')').join(', ')}</div>
             </div>
-          )}
-        </div>
+          </div>
+        )}
       </div>
 
       {/* ═══ MODALS ═══ */}
