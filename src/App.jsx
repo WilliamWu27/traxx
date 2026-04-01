@@ -1295,7 +1295,6 @@ function VersaAppMain() {
   const prevCompletionsRef = useRef([]);
   const prevActivityRef = useRef([]);
   const notifThrottleRef = useRef({});
-  const weekWinNotifiedRef = useRef(false);
   const duoMilestoneRef = useRef({});
 
   const throttledNotify = (title, body, tag) => {
@@ -1402,12 +1401,16 @@ function VersaAppMain() {
     return () => clearInterval(iv);
   }, [notifPermission, myPts, streakData.streak]);
 
-  // Celebration: won the week
+  // Celebration: won the week — only on Monday (day after reset)
   useEffect(() => {
-    if (!currentUser || !lastWeekData || weekWinNotifiedRef.current || notifPermission !== 'granted') return;
+    if (!currentUser || !lastWeekData || notifPermission !== 'granted') return;
+    const day = new Date().getDay(); // 0=Sun, 1=Mon
+    if (day !== 1) return; // Only fire on Monday
+    const key = 'versa-weekwin-' + getWeekStart();
+    try { if (localStorage.getItem(key)) return; } catch {}
     if (lastWeekData.scores.length > 0 && lastWeekData.scores[0].member.id === currentUser.id) {
-      weekWinNotifiedRef.current = true;
       throttledNotify('🏆 You won the week!', lastWeekData.scores[0].pts+' pts — you dominated.', 'week-win');
+      try { localStorage.setItem(key, '1'); } catch {}
     }
   }, [lastWeekData, notifPermission]);
 
@@ -1423,6 +1426,48 @@ function VersaAppMain() {
       }
     });
   }, [mutualStreaks, notifPermission]);
+
+  // Personal: progress milestones (independent — no rival needed)
+  const prevProgressRef = useRef(0);
+  useEffect(() => {
+    if (!currentUser || notifPermission !== 'granted' || !habits.length) return;
+    const prev = prevProgressRef.current;
+    const prog = dailyProg;
+    const today = getToday();
+    if (prev < 0.5 && prog >= 0.5 && prog < 1) {
+      const k = 'versa-50-' + today;
+      if (!sessionStorage.getItem(k)) { throttledNotify('💪 Halfway there!', myPts + ' pts — keep pushing to 100%.', 'progress-50'); sessionStorage.setItem(k, '1'); }
+    }
+    if (prev < 0.75 && prog >= 0.75 && prog < 1) {
+      const k = 'versa-75-' + today;
+      if (!sessionStorage.getItem(k)) { throttledNotify('🔥 75% done!', myPts + ' pts — almost there.', 'progress-75'); sessionStorage.setItem(k, '1'); }
+    }
+    if (prev < 1 && prog >= 1) {
+      const k = 'versa-100-' + today;
+      if (!sessionStorage.getItem(k)) { throttledNotify('🎯 100% — Daily target crushed!', myPts + ' pts today. Legend.', 'progress-100'); sessionStorage.setItem(k, '1'); }
+    }
+    prevProgressRef.current = prog;
+  }, [dailyProg, notifPermission]);
+
+  // Personal: streak milestones (independent)
+  const prevStreakNotifRef = useRef(0);
+  useEffect(() => {
+    if (!currentUser || notifPermission !== 'granted') return;
+    const streak = streakData.streak || 0;
+    const prev = prevStreakNotifRef.current;
+    const milestones = [3, 7, 14, 30, 60, 100];
+    const crossed = milestones.find(m => streak >= m && prev < m);
+    if (crossed) {
+      const k = 'versa-streak-' + crossed;
+      try {
+        if (!localStorage.getItem(k)) {
+          throttledNotify('🔥 ' + crossed + '-day streak!', 'You\'ve been consistent for ' + crossed + ' days straight.', 'streak-milestone-' + crossed);
+          localStorage.setItem(k, '1');
+        }
+      } catch {}
+    }
+    prevStreakNotifRef.current = streak;
+  }, [streakData.streak, notifPermission]);
 
   // ─── LOADING ───
   if (authLoading) return (
