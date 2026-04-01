@@ -373,7 +373,8 @@ function VersaAppMain() {
     
     // Fetch habits
     const fetchHabits = async () => {
-      const { data } = await supabase.from('habits').select('*').eq('room_id', currentRoom.id);
+      const { data, error } = await supabase.from('habits').select('*').eq('room_id', currentRoom.id);
+      if (error) { console.error('Fetch habits error:', error); return; }
       if (data) setHabits(data.map(h => ({ ...h, id: h.id, roomId: h.room_id, isRepeatable: h.is_repeatable, createdBy: h.created_by })));
     };
     fetchHabits();
@@ -382,7 +383,8 @@ function VersaAppMain() {
     // Fetch today's completions
     const today = getToday();
     const fetchCompletions = async () => {
-      const { data } = await supabase.from('completions').select('*').eq('room_id', currentRoom.id).eq('date', today);
+      const { data, error } = await supabase.from('completions').select('*').eq('room_id', currentRoom.id).eq('date', today);
+      if (error) { console.error('Fetch completions error:', error); return; }
       if (data) setCompletions(data.map(c => ({ ...c, id: c.id, userId: c.user_id, habitId: c.habit_id, roomId: c.room_id, habitName: c.habit_name, habitCategory: c.habit_category, habitPoints: c.habit_points, bonusPoints: c.bonus_points, streakMultiplier: c.streak_multiplier })));
     };
     fetchCompletions();
@@ -391,7 +393,8 @@ function VersaAppMain() {
     // Fetch weekly completions
     const ws = getWeekStart(), we = getWeekEnd();
     const fetchWeekly = async () => {
-      const { data } = await supabase.from('completions').select('*').eq('room_id', currentRoom.id).gte('date', ws).lte('date', we);
+      const { data, error } = await supabase.from('completions').select('*').eq('room_id', currentRoom.id).gte('date', ws).lte('date', we);
+      if (error) { console.error('Fetch weekly error:', error); return; }
       if (data) setAllCompletions(data.map(c => ({ ...c, id: c.id, userId: c.user_id, habitId: c.habit_id, roomId: c.room_id, habitName: c.habit_name, habitCategory: c.habit_category, habitPoints: c.habit_points, bonusPoints: c.bonus_points })));
     };
     fetchWeekly();
@@ -399,7 +402,8 @@ function VersaAppMain() {
 
     // Fetch members (users who have this room in their rooms array)
     const fetchMembers = async () => {
-      const { data } = await supabase.from('users').select('*').contains('rooms', [currentRoom.id]);
+      const { data, error } = await supabase.from('users').select('*').contains('rooms', [currentRoom.id]);
+      if (error) { console.error('Fetch members error:', error); return; }
       if (data) setRoomMembers(data.map(u => ({ ...u, id: u.id, username: u.username, email: u.email, photoURL: u.photo_url, roomId: u.active_room, streakFreeze: u.streak_freeze, emailReminders: u.email_reminders })));
     };
     fetchMembers();
@@ -489,9 +493,9 @@ function VersaAppMain() {
         if (!comps.length) { setLastWeekData(null); return; }
         const scores = activeMembers.map(m => {
           const mc = comps.filter(c=>c.userId===m.id);
-          const pts = mc.reduce((s,c)=>{const h=habits.find(x=>x.id===c.habitId);return s+((h?.points||c.habitPoints||0)*(c.count||1));},0);
+          const pts = mc.reduce((s,c)=>{const h=habits.find(x=>x.id===c.habitId);return s+((c.habitPoints||h?.points||0)*(c.count||1))+(c.bonusPoints||0);},0);
           const catPts = {}; allCatNames.forEach(c => catPts[c] = 0);
-          mc.forEach(c=>{const h=habits.find(x=>x.id===c.habitId);const cat=h?.category||c.habitCategory||'Study';catPts[cat]+=(h?.points||c.habitPoints||0)*(c.count||1);});
+          mc.forEach(c=>{const h=habits.find(x=>x.id===c.habitId);const cat=h?.category||c.habitCategory||'Study';catPts[cat]+=((c.habitPoints||h?.points||0)*(c.count||1))+(c.bonusPoints||0);});
           const activeDays = [...new Set(mc.map(c=>c.date))].length;
           return {member:m, pts, catPts, activeDays, completions:mc.length};
         }).sort((a,b)=>b.pts-a.pts);
@@ -644,7 +648,7 @@ function VersaAppMain() {
       member: m,
       pts: allCompletions.filter(c=>c.userId===m.id && c.date>=ws && c.date<=today).reduce((s,c)=>{
         const h = habits.find(hb=>hb.id===c.habitId);
-        return s + ((h?.points || c.habitPoints || 0) * (c.count||1));
+        return s + ((c.habitPoints || h?.points || 0) * (c.count||1)) + (c.bonusPoints||0);
       },0)
     })).sort((a,b)=>b.pts-a.pts);
     if (scores.length > 0 && scores[0].pts > 0) {
@@ -659,9 +663,9 @@ function VersaAppMain() {
     const today = getToday();
     const rivals = activeMembers.filter(m=>m.id!==currentUser.id).map(m => {
       const todayComps = completions.filter(c=>c.userId===m.id&&c.date===today);
-      const pts = todayComps.reduce((s,c)=>{const h=habits.find(x=>x.id===c.habitId);return s+((h?.points||c.habitPoints||0)*(c.count||1));},0);
+      const pts = todayComps.reduce((s,c)=>{const h=habits.find(x=>x.id===c.habitId);return s+((c.habitPoints||h?.points||0)*(c.count||1))+(c.bonusPoints||0);},0);
       const habitCount = todayComps.length;
-      const weekPts = allCompletions.filter(c=>c.userId===m.id&&c.date>=getWeekStart()&&c.date<=getWeekEnd()).reduce((s,c)=>{const h=habits.find(x=>x.id===c.habitId);return s+((h?.points||c.habitPoints||0)*(c.count||1));},0);
+      const weekPts = allCompletions.filter(c=>c.userId===m.id&&c.date>=getWeekStart()&&c.date<=getWeekEnd()).reduce((s,c)=>{const h=habits.find(x=>x.id===c.habitId);return s+((c.habitPoints||h?.points||0)*(c.count||1))+(c.bonusPoints||0);},0);
       return { member: m, pts, habitCount, weekPts };
     }).sort((a,b)=>b.pts-a.pts);
     setRivalStatus(rivals);
@@ -701,7 +705,7 @@ function VersaAppMain() {
       const lastIdx = lastWeekData.scores.findIndex(s=>s.member.id===uid);
       if (lastIdx === lastWeekData.scores.length - 1 && lastWeekData.scores.length > 1) return { role: 'Underdog', icon: '🔥', color: 'text-red-400' };
     }
-    const myWeekPts = allCompletions.filter(c=>c.userId===uid&&c.date>=getWeekStart()&&c.date<=getWeekEnd()).reduce((s,c)=>{const h=habits.find(x=>x.id===c.habitId);return s+((h?.points||c.habitPoints||0)*(c.count||1));},0);
+    const myWeekPts = allCompletions.filter(c=>c.userId===uid&&c.date>=getWeekStart()&&c.date<=getWeekEnd()).reduce((s,c)=>{const h=habits.find(x=>x.id===c.habitId);return s+((c.habitPoints||h?.points||0)*(c.count||1))+(c.bonusPoints||0);},0);
     if (weeklyWinner && myWeekPts > 0 && myWeekPts >= (weeklyWinner.pts * 0.8)) return { role: 'Challenger', icon: '⚔️', color: 'text-purple-400' };
     return null;
   };
@@ -729,7 +733,7 @@ function VersaAppMain() {
       let bestHabit = null, bestHabitDays = 0;
       Object.entries(habitDays).forEach(([hid, days]) => { if (days.size > bestHabitDays) { bestHabitDays = days.size; bestHabit = hid; } });
       const bestHabitName = habits.find(h=>h.id===bestHabit)?.name || comps.find(c=>c.habitId===bestHabit)?.habitName || 'Unknown';
-      const totalPts = comps.reduce((s,c) => s + ((c.habitPoints||0)*(c.count||1)), 0);
+      const totalPts = comps.reduce((s,c) => s + ((c.habitPoints||0)*(c.count||1)) + (c.bonusPoints||0), 0);
       const avgPtsPerDay = activeDays > 0 ? Math.round(totalPts / activeDays) : 0;
       const completionRate = Math.round((activeDays / 60) * 100);
       const bestStreak = (() => {
@@ -2041,7 +2045,7 @@ function VersaAppMain() {
             })}
             <div className="pt-2 border-t border-[#223858] flex justify-between items-center">
               <span className="text-sm text-gray-500">Total</span>
-              <span className="text-lg font-black text-white">{historyCompletions.filter(c=>c.userId===currentUser.id).reduce((s,c)=>{const h=habits.find(x=>x.id===c.habitId);return s+((h?.points||c.habitPoints||0)*(c.count||1));},0)} pts</span>
+              <span className="text-lg font-black text-white">{historyCompletions.filter(c=>c.userId===currentUser.id).reduce((s,c)=>{const h=habits.find(x=>x.id===c.habitId);return s+((c.habitPoints||h?.points||0)*(c.count||1))+(c.bonusPoints||0);},0)} pts</span>
             </div>
           </div>
         )}
