@@ -172,6 +172,8 @@ function VersaAppMain() {
   const [showHelp, setShowHelp] = useState(false);
   const [showLeaderboard, setShowLeaderboard] = useState(false);
   const [showProfile, setShowProfile] = useState(false);
+  const [editingUsername, setEditingUsername] = useState(false);
+  const [editUsernameVal, setEditUsernameVal] = useState('');
   const [showStakes, setShowStakes] = useState(false);
   const [showSwitchRoom, setShowSwitchRoom] = useState(false);
   const [showRoomSettings, setShowRoomSettings] = useState(false);
@@ -179,6 +181,13 @@ function VersaAppMain() {
   const [roomCreatedBy, setRoomCreatedBy] = useState(null);
   const [onboardingStep, setOnboardingStep] = useState(0);
   const [showOnboardingTour, setShowOnboardingTour] = useState(false);
+  const hasCompletedOnboarding = useRef((() => {
+    try { return localStorage.getItem('versa-onboarding-done') === 'true'; } catch { return false; }
+  })());
+  const markOnboardingDone = () => {
+    hasCompletedOnboarding.current = true;
+    try { localStorage.setItem('versa-onboarding-done', 'true'); } catch {}
+  };
   const [showPunishmentWheel, setShowPunishmentWheel] = useState(false);
   const [wheelSpinning, setWheelSpinning] = useState(false);
   const [wheelResult, setWheelResult] = useState(null);
@@ -332,8 +341,11 @@ function VersaAppMain() {
       if (!mounted) return;
       if (!user) { setCurrentUser(null); setAuthLoading(false); return; }
       try {
-        const { data: ud } = await supabase.from('users').select('*').eq('id', user.id).maybeSingle();
+        const { data: ud, error: udErr } = await supabase.from('users').select('*').eq('id', user.id).maybeSingle();
         if (!mounted) return;
+        // If the query errored (network issue, timeout), don't proceed to the new-user
+        // branch — that would wipe the user's rooms with an upsert of rooms: []
+        if (udErr) { console.error('User profile fetch error:', udErr); setAuthLoading(false); return; }
         if (ud) {
           const data = { id: user.id, ...ud, photoURL: ud.photo_url || user.user_metadata?.avatar_url };
           setCurrentUser(data);
@@ -346,10 +358,28 @@ function VersaAppMain() {
             else setShowRoomModal(true);
           } else setShowRoomModal(true);
         } else {
+          // Truly new user — use insert (not upsert) so we never overwrite existing data
           const username = user.user_metadata?.full_name || user.email?.split('@')[0] || 'User';
-          await supabase.from('users').upsert({ id: user.id, username, email: user.email, photo_url: user.user_metadata?.avatar_url, rooms: [], streak_freeze: 0 });
-          setCurrentUser({ id: user.id, username, email: user.email, photoURL: user.user_metadata?.avatar_url, rooms: [] });
-          setShowRoomModal(true);
+          const { error: insertErr } = await supabase.from('users').insert({ id: user.id, username, email: user.email, photo_url: user.user_metadata?.avatar_url, rooms: [], streak_freeze: 0 });
+          if (insertErr) {
+            // Insert failed — profile likely exists already (race condition). Re-fetch it.
+            const { data: ud2 } = await supabase.from('users').select('*').eq('id', user.id).maybeSingle();
+            if (ud2) {
+              const data2 = { id: user.id, ...ud2, photoURL: ud2.photo_url || user.user_metadata?.avatar_url };
+              setCurrentUser(data2);
+              const rooms2 = data2.rooms || [];
+              setUserRooms(rooms2);
+              const active2 = data2.active_room || (rooms2.length > 0 ? rooms2[0] : null);
+              if (active2) {
+                const { data: rd2 } = await supabase.from('rooms').select('*').eq('id', active2).maybeSingle();
+                if (rd2) { setCurrentRoom({ id: rd2.id, ...rd2, code: rd2.code || rd2.id }); setRoomKicked(rd2.kicked || []); setRoomCreatedBy(rd2.created_by || null); setView('dashboard'); }
+                else setShowRoomModal(true);
+              } else setShowRoomModal(true);
+            } else setShowRoomModal(true);
+          } else {
+            setCurrentUser({ id: user.id, username, email: user.email, photoURL: user.user_metadata?.avatar_url, rooms: [] });
+            setShowRoomModal(true);
+          }
         }
       } catch (err) { console.error('Auth error:', err); }
       if (mounted) setAuthLoading(false);
@@ -361,7 +391,9 @@ function VersaAppMain() {
     }).catch(() => { if (mounted) setAuthLoading(false); });
 
     // Listen for changes (login, logout, token refresh)
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      // Skip re-running full handleUser on token refresh if we're already set up
+      if (event === 'TOKEN_REFRESHED') return;
       handleUser(session?.user || null);
     });
 
@@ -1728,7 +1760,7 @@ function VersaAppMain() {
                 <span>Share the code with friends to start competing</span>
               </div>
             </div>
-            <button onClick={async()=>{await createRoom(); setShowInviteModal(false); setOnboardingStep(0); setShowOnboardingTour(true);}} disabled={loading} className={btnPrimary+' bg-[#5b7cf5] text-white shadow-lg shadow-[#5b7cf5]/15 rounded-2xl'}>{loading?'Creating...':'Create Room'}</button>
+            <button onClick={async()=>{await createRoom(); setShowInviteModal(false); if (!hasCompletedOnboarding.current) { setOnboardingStep(0); setShowOnboardingTour(true); }}} disabled={loading} className={btnPrimary+' bg-[#5b7cf5] text-white shadow-lg shadow-[#5b7cf5]/15 rounded-2xl'}>{loading?'Creating...':'Create Room'}</button>
             <button onClick={()=>setOnboardingStep(0)} className="w-full text-gray-600 text-xs hover:text-gray-400 transition-colors text-center">← Back</button>
             {error&&<p className="text-red-400 text-xs text-center">{error}</p>}
           </div>
@@ -1745,7 +1777,7 @@ function VersaAppMain() {
             <div className="bg-[#151d30] border border-[#223858] rounded-2xl p-5">
               <input type="text" placeholder="ABCDEF" value={roomCode} onChange={e=>setRoomCode(e.target.value.toUpperCase())} className="w-full px-4 py-4 bg-[#1e2e50] border border-[#2a4060] rounded-xl focus:outline-none focus:border-blue-500/50 text-white placeholder-gray-600 text-lg font-mono tracking-[0.4em] text-center" maxLength={6} autoFocus/>
             </div>
-            <button onClick={async()=>{await joinRoom(); setOnboardingStep(0); setShowOnboardingTour(true);}} disabled={loading||roomCode.length<4} className={btnPrimary+' bg-gradient-to-r from-orange-500 to-red-500 text-white shadow-lg shadow-orange-500/20 rounded-2xl disabled:opacity-40'}>{loading?'Joining...':'Join Room'}</button>
+            <button onClick={async()=>{await joinRoom(); if (!hasCompletedOnboarding.current) { setOnboardingStep(0); setShowOnboardingTour(true); }}} disabled={loading||roomCode.length<4} className={btnPrimary+' bg-gradient-to-r from-orange-500 to-red-500 text-white shadow-lg shadow-orange-500/20 rounded-2xl disabled:opacity-40'}>{loading?'Joining...':'Join Room'}</button>
             <button onClick={()=>setOnboardingStep(0)} className="w-full text-gray-600 text-xs hover:text-gray-400 transition-colors text-center">← Back</button>
             {error&&<p className="text-red-400 text-xs text-center">{error}</p>}
           </div>
@@ -1791,7 +1823,7 @@ function VersaAppMain() {
 
               {/* Actions */}
               <div className="flex gap-3">
-                <button onClick={()=>{setShowOnboardingTour(false); setOnboardingStep(0);}} className="flex-1 py-3 rounded-xl text-sm font-medium text-gray-500 hover:text-gray-300 transition-colors">Skip</button>
+                <button onClick={()=>{setShowOnboardingTour(false); setOnboardingStep(0); markOnboardingDone();}} className="flex-1 py-3 rounded-xl text-sm font-medium text-gray-500 hover:text-gray-300 transition-colors">Skip</button>
                 <button onClick={()=>{
                   if (onboardingStep < tourSteps.length - 1) {
                     setOnboardingStep(onboardingStep + 1);
@@ -1799,6 +1831,7 @@ function VersaAppMain() {
                     setShowOnboardingTour(false);
                     setOnboardingStep(0);
                     setShowInviteModal(true);
+                    markOnboardingDone();
                   }
                 }} className="flex-1 py-3 rounded-xl text-sm font-bold bg-[#5b7cf5] text-white shadow-lg shadow-[#5b7cf5]/15 active:scale-[0.98]">
                   {onboardingStep < tourSteps.length - 1 ? 'Next' : 'Start Tracking'}
@@ -2212,8 +2245,8 @@ function VersaAppMain() {
 
       {/* Profile */}
       <Modal show={showProfile} onClose={()=>setShowProfile(false)} dark={darkMode}>
-        <ModalHeader title="Profile" onClose={()=>setShowProfile(false)} dark={darkMode}/>
-        <div className="text-center mb-6"><div className="relative inline-block">{currentUser.photoURL?<img src={currentUser.photoURL} className="w-20 h-20 rounded-full object-cover border-2 border-blue-500/30" referrerPolicy="no-referrer"/>:<><ProgressRing progress={dailyProg} size={80} stroke={4} color={dailyProg>=1?'#10b981':'#3b82f6'}/><div className="absolute inset-0 flex items-center justify-center"><span className="text-xl font-black">{Math.round(dailyProg*100)}%</span></div></>}</div><h3 className="text-xl font-bold mt-3">{currentUser.username}</h3><p className="text-gray-600 text-xs">{currentUser.email}</p></div>
+        <ModalHeader title="Profile" onClose={()=>{setShowProfile(false);setEditingUsername(false);}} dark={darkMode}/>
+        <div className="text-center mb-6"><div className="relative inline-block">{currentUser.photoURL?<img src={currentUser.photoURL} className="w-20 h-20 rounded-full object-cover border-2 border-blue-500/30" referrerPolicy="no-referrer"/>:<><ProgressRing progress={dailyProg} size={80} stroke={4} color={dailyProg>=1?'#10b981':'#3b82f6'}/><div className="absolute inset-0 flex items-center justify-center"><span className="text-xl font-black">{Math.round(dailyProg*100)}%</span></div></>}</div>{editingUsername?<div className="flex items-center justify-center gap-2 mt-3"><input type="text" value={editUsernameVal} onChange={e=>setEditUsernameVal(e.target.value)} maxLength={20} className={`px-3 py-1.5 rounded-lg text-center text-sm font-bold border focus:outline-none focus:border-blue-500/50 ${darkMode?'bg-[#1e2e50] border-[#2a4060] text-white':'bg-gray-100 border-gray-200 text-gray-900'}`} autoFocus onKeyDown={e=>{if(e.key==='Enter'){const val=editUsernameVal.trim();if(val&&val!==currentUser.username){supabase.from('users').update({username:val}).eq('id',currentUser.id).then(({error:err})=>{if(!err){setCurrentUser(p=>({...p,username:val}));setSuccessMsg('Username updated!');setTimeout(()=>setSuccessMsg(''),2000);}else setError('Failed to update');});}setEditingUsername(false);}if(e.key==='Escape')setEditingUsername(false);}}/><button onClick={()=>{const val=editUsernameVal.trim();if(val&&val!==currentUser.username){supabase.from('users').update({username:val}).eq('id',currentUser.id).then(({error:err})=>{if(!err){setCurrentUser(p=>({...p,username:val}));setSuccessMsg('Username updated!');setTimeout(()=>setSuccessMsg(''),2000);}else setError('Failed to update');});}setEditingUsername(false);}} className="px-3 py-1.5 bg-[#5b7cf5] text-white text-xs font-bold rounded-lg active:scale-[0.97]">Save</button><button onClick={()=>setEditingUsername(false)} className="px-2 py-1.5 text-gray-500 text-xs hover:text-gray-300">✕</button></div>:<div className="flex items-center justify-center gap-2 mt-3"><h3 className="text-xl font-bold">{currentUser.username}</h3><button onClick={()=>{setEditUsernameVal(currentUser.username);setEditingUsername(true);}} className={`p-1 rounded-md transition-colors ${darkMode?'hover:bg-white/10 text-gray-500 hover:text-gray-300':'hover:bg-gray-200 text-gray-400 hover:text-gray-600'}`}><Edit3 size={14}/></button></div>}<p className="text-gray-600 text-xs">{currentUser.email}</p></div>
         <div className="grid grid-cols-4 gap-2 mb-4">{[{v:streakData.streak||0,l:'Streak',c:'text-[#e8864a]',i:<Flame size={16} className="text-[#e8864a] mx-auto mb-1"/>},{v:streakFreeze>0?'🛡️':'—',l:'Freeze',c:streakFreeze>0?'text-cyan-400':'text-gray-600',i:null},{v:myPts,l:'Today',c:'text-blue-400',i:<Star size={16} className="text-blue-400 mx-auto mb-1"/>},{v:getWeeklyPts(currentUser.id),l:'Week',c:'text-emerald-400',i:<TrendingUp size={16} className="text-emerald-400 mx-auto mb-1"/>}].map((s,i)=><div key={i} className={`text-center p-3 ${T.bgCard} rounded-xl border ${T.border}`}>{s.i}<div className={'text-xl font-black '+s.c}>{s.v}</div><div className="text-[9px] text-gray-600 tracking-wider uppercase mt-0.5">{s.l}</div></div>)}</div>
         <div className="grid grid-cols-2 gap-3 mb-4"><div className={`text-center p-3 ${T.bgCard} rounded-xl border ${T.border}`}><div className="text-lg font-black text-purple-400">{streakData.activeDays||0}</div><div className="text-[9px] text-gray-600 tracking-wider uppercase mt-0.5">Active Days</div></div><div className={`text-center p-3 ${T.bgCard} rounded-xl border ${T.border}`}><div className="text-lg font-black text-cyan-400">{streakData.totalCompletions||0}</div><div className="text-[9px] text-gray-600 tracking-wider uppercase mt-0.5">Completions</div></div></div>
         <div className={`p-3 ${T.bgCard} rounded-xl border ${T.border}`}><div className="text-[9px] text-gray-600 tracking-wider uppercase mb-2">Crystals</div><div className="flex justify-center gap-4">{allCatNames.map(c=><div key={c} className="text-center"><div className={'w-6 h-6 rounded-full mx-auto mb-1 transition-all '+(myCr[c]?getCT(c).bg+' shadow-md '+getCT(c).glow:'bg-[#1e3050]')}/><span className="text-[9px] text-gray-600">{c}</span></div>)}</div></div>
