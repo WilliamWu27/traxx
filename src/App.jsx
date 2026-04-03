@@ -1065,10 +1065,8 @@ function VersaAppMain() {
     if (!confirm('Delete this habit?')) return;
     // Optimistic update
     setHabits(prev => prev.filter(h => h.id !== hid));
-    setCompletions(prev => prev.filter(c => c.habitId !== hid));
     try {
       await supabase.from('habits').delete().eq('id', hid);
-      await supabase.from('completions').delete().eq('habit_id', hid).eq('room_id', currentRoom.id);
     } catch (err) { console.error('Delete habit error:', err); }
   };
   const openEditHabit = (habit) => { setEditHabitData({ name: habit.name, category: habit.category, points: Math.abs(habit.points || 10), isNegative: (habit.points || 0) < 0, isRepeatable: habit.isRepeatable, unit: habit.unit || '', description: habit.description || '' }); setShowEditHabit(habit.id); };
