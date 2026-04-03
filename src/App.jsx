@@ -1894,7 +1894,7 @@ function VersaAppMain() {
 
         {/* ═══ RIVAL PILLS ═══ */}
         {rivalStatus.length > 0 && (
-          <div className="flex items-center gap-2 mb-5 overflow-x-auto pb-1 -mx-1 px-1">
+          <div className="flex items-center gap-2 mb-5 overflow-x-auto pb-1 pt-3 -mt-3 -mx-1 px-1">
             {rivalStatus.slice(0, 5).map((r, idx) => {
               const isMe = r.member.id === currentUser.id;
               const ahead = isMe ? false : r.pts > myPts;
@@ -1902,7 +1902,7 @@ function VersaAppMain() {
               const isWinning = idx === 0 && r.pts > 0;
               return (
                 <div key={r.member.id} onClick={() => setShowCompetitor(r.member)} className={`relative flex items-center gap-2 px-3 py-2 rounded-xl border shrink-0 cursor-pointer active:scale-[0.97] transition-all ${isWinning ? (darkMode ? 'border-yellow-500/50 bg-yellow-500/10 shadow-[0_0_15px_rgba(234,179,8,0.2)]' : 'border-yellow-400 bg-yellow-50 shadow-[0_0_15px_rgba(250,204,21,0.4)]') : ahead ? (darkMode ? 'border-red-500/20 bg-red-500/5' : 'border-red-200 bg-red-50') : (darkMode ? 'border-emerald-500/20 bg-emerald-500/5' : 'border-emerald-200 bg-emerald-50')}`}>
-                  {isWinning && <div className="absolute -top-3 -right-2 text-xl drop-shadow-lg z-10 animate-bounce">👑</div>}
+                  {isWinning && <div className="absolute -top-3 -right-1 text-lg drop-shadow-md z-10">👑</div>}
                   <div className="relative">
                     <Avatar user={r.member} size={22} className={isWinning ? 'bg-yellow-500/20 text-yellow-500' : ahead ? 'bg-red-500/20 text-red-400' : 'bg-emerald-500/20 text-emerald-400'} />
                     {ms > 0 && <div className={`absolute -bottom-1 -right-1 w-4 h-4 rounded-full flex items-center justify-center text-[7px] font-black text-white ${ms >= 7 ? 'bg-gradient-to-r from-orange-500 to-red-500' : ms >= 3 ? 'bg-orange-500' : 'bg-[#e8864a]'}`}>{ms}</div>}
