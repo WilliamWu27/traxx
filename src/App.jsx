@@ -323,8 +323,8 @@ function VersaAppMain() {
   const loadDefaultHabits = async () => {
     const defaultHabits = [
       // STUDY — time-based
-      { name: 'Deep work', category: 'Study', points: 10, is_repeatable: true, unit: 'per 30 min' },
-      { name: 'Read', category: 'Study', points: 10, is_repeatable: true, unit: 'per 30 min' },
+      { name: 'Deep work', category: 'Study', points: 15, is_repeatable: true, unit: 'per 30 min' },
+      { name: 'Read', category: 'Study', points: 15, is_repeatable: true, unit: 'per 30 min' },
       // STUDY — completion-based
       { name: 'Small task', category: 'Study', points: 10, is_repeatable: true },
       { name: 'Big task', category: 'Study', points: 30, is_repeatable: true },
@@ -332,10 +332,10 @@ function VersaAppMain() {
       { name: 'Hit the gym', category: 'Health', points: 20, is_repeatable: true, unit: 'per 30 min' },
       { name: 'Slept 7+ hours', category: 'Health', points: 30, is_repeatable: false },
       { name: 'Woke up before 7', category: 'Health', points: 30, is_repeatable: false },
-      { name: 'Clean eating', category: 'Health', points: 10, is_repeatable: true, unit: 'per meal' },
+      { name: 'Junk food', category: 'Health', points: -15, is_repeatable: true, unit: 'per meal/snack' },
       // FOCUS — screen time, substances, mindset
-      { name: 'Screen time under 2.5hrs', category: 'Focus', points: 30, is_repeatable: false },
-      { name: 'No vaping / substances', category: 'Focus', points: 30, is_repeatable: false },
+      { name: '30 mins screen time', category: 'Focus', points: -10, is_repeatable: true, unit: 'per 30 min' },
+      { name: 'Hitting the yart', category: 'Focus', points: -30, is_repeatable: true, unit: 'per instance' },
       { name: 'Work done before 9pm', category: 'Focus', points: 30, is_repeatable: false },
       { name: 'Journaled', category: 'Focus', points: 10, is_repeatable: true, unit: 'per 5 min' },
     ];
@@ -1833,7 +1833,9 @@ function VersaAppMain() {
               <h1 onClick={() => { logoTapRef.current.count++; clearTimeout(logoTapRef.current.timer); if (logoTapRef.current.count >= 3) { logoTapRef.current.count = 0; toggleDevMode(); } else { logoTapRef.current.timer = setTimeout(() => { logoTapRef.current.count = 0; }, 600); } }} className="text-lg font-black tracking-[0.15em] cursor-default select-none">VERSA</h1>
               {streakData.streak > 0 && <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full ${darkMode ? 'bg-[#e8864a]/15' : 'bg-[#e8864a]/10'}`}><Flame size={13} className="text-[#e8864a]" /><span className="text-[#e8864a] text-sm font-bold">{streakData.streak}</span>{streakMulti.multi > 1 && <span className={`text-[9px] font-bold ${streakMulti.color}`}>{streakMulti.label}</span>}{streakFreeze > 0 && <span className="text-xs">🛡️</span>}</div>}
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1.5">
+              <button onClick={() => setShowInviteModal(true)} className={`flex items-center gap-1.5 px-3 py-1.5 mr-1 rounded-full text-[11px] font-bold transition-all active:scale-[0.97] ${darkMode ? 'bg-blue-500/10 text-blue-400 border border-blue-500/20' : 'bg-blue-50 text-blue-600 border border-blue-200'}`}><UserPlus size={13} />Rooms</button>
+              <button onClick={() => setShowLeaderboard(true)} className={`p-2 rounded-xl ${darkMode ? 'hover:bg-[#1e3050]' : 'hover:bg-gray-100'} transition-colors`}><Trophy size={16} className="text-[#e8864a]" /></button>
               <button onClick={toggleTheme} className={`p-2 rounded-xl ${darkMode ? 'hover:bg-[#1e3050]' : 'hover:bg-gray-100'} transition-colors`}>{darkMode ? <Sun size={16} className="text-gray-500" /> : <Moon size={16} className="text-gray-400" />}</button>
               <div className="relative">
                 <button onClick={() => setShowSettingsMenu(!showSettingsMenu)} className={`p-2 rounded-xl transition-colors ${showSettingsMenu ? (darkMode ? 'bg-[#1e3050] text-white' : 'bg-gray-200 text-gray-900') : (darkMode ? 'hover:bg-[#1e3050]' : 'hover:bg-gray-100')}`}><Settings size={16} className={showSettingsMenu ? (darkMode ? 'text-white' : 'text-gray-900') : 'text-gray-500'} /></button>
@@ -1845,6 +1847,7 @@ function VersaAppMain() {
                       <button onClick={() => { setShowAddCategory(true); setShowSettingsMenu(false); }} className={`w-full flex items-center gap-3 px-4 py-3 text-sm transition-all ${darkMode ? 'text-[#9aaec0] hover:bg-[#1e3050]' : 'text-gray-700 hover:bg-gray-50'}`}><Plus size={15} className="text-purple-400" />Add Category</button>
                       {habits.length > 0 && <button onClick={() => { setEditMode(!editMode); setShowSettingsMenu(false); }} className={`w-full flex items-center gap-3 px-4 py-3 text-sm transition-all ${editMode ? 'text-blue-400' : (darkMode ? 'text-[#9aaec0] hover:bg-[#1e3050]' : 'text-gray-700 hover:bg-gray-50')}`}><Edit3 size={15} className={editMode ? 'text-blue-400' : 'text-gray-500'} />{editMode ? 'Done Editing' : 'Edit Habits'}</button>}
                       <button onClick={() => { setCustomBoardHabits(myBoardIds || habits.map(h => h.id)); setShowCustomBoard(true); setShowSettingsMenu(false); }} className={`w-full flex items-center gap-3 px-4 py-3 text-sm transition-all ${darkMode ? 'text-[#9aaec0] hover:bg-[#1e3050]' : 'text-gray-700 hover:bg-gray-50'}`}><Target size={15} className="text-indigo-400" />My Board</button>
+                      {isRoomCreator && <button onClick={() => { setShowRoomSettings(true); setShowSettingsMenu(false); }} className={`w-full flex items-center gap-3 px-4 py-3 text-sm transition-all ${darkMode ? 'text-[#9aaec0] hover:bg-[#1e3050]' : 'text-gray-700 hover:bg-gray-50'}`}><Crown size={15} className="text-[#e8864a]" />Room Settings</button>}
                       <div className={`mx-3 my-1 border-t ${darkMode ? 'border-[#223858]' : 'border-gray-100'}`} />
                       <button onClick={() => { loadHeatMap(); setShowSettingsMenu(false); }} className={`w-full flex items-center gap-3 px-4 py-3 text-sm transition-all ${darkMode ? 'text-[#9aaec0] hover:bg-[#1e3050]' : 'text-gray-700 hover:bg-gray-50'}`}><BarChart3 size={15} className="text-[#4aba7a]" />Heat Map</button>
                       <button onClick={() => { loadInsights(); setShowSettingsMenu(false); }} className={`w-full flex items-center gap-3 px-4 py-3 text-sm transition-all ${darkMode ? 'text-[#9aaec0] hover:bg-[#1e3050]' : 'text-gray-700 hover:bg-gray-50'}`}><TrendingUp size={15} className="text-blue-400" />Insights</button>
@@ -2028,12 +2031,7 @@ function VersaAppMain() {
           </div>
         )}
 
-        {/* Quick actions */}
-        <div className="flex items-center justify-center gap-2 mb-4 flex-wrap">
-          <button onClick={() => setShowLeaderboard(true)} className={`flex items-center gap-1.5 px-4 py-2 rounded-full text-[11px] font-bold transition-all active:scale-[0.97] ${darkMode ? 'bg-[#e8864a]/10 text-[#e8864a] border border-[#e8864a]/20' : 'bg-[#e8864a]/8 text-[#e8864a] border border-[#e8864a]/20'}`}><Trophy size={13} />Leaderboard</button>
-          <button onClick={() => setShowInviteModal(true)} className={`flex items-center gap-1.5 px-4 py-2 rounded-full text-[11px] font-bold transition-all active:scale-[0.97] ${darkMode ? 'bg-blue-500/10 text-blue-400 border border-blue-500/20' : 'bg-blue-50 text-blue-600 border border-blue-200'}`}><UserPlus size={13} />Rooms</button>
-          {isRoomCreator && <button onClick={() => setShowRoomSettings(true)} className={`flex items-center gap-1.5 px-3 py-2 rounded-full text-[11px] font-bold transition-all active:scale-[0.97] ${darkMode ? 'bg-[#e8864a]/10 text-[#e8864a] border border-[#e8864a]/20' : 'bg-[#e8864a]/8 text-[#e8864a] border border-[#e8864a]/20'}`}><Crown size={12} /></button>}
-        </div>
+
 
         {/* Debug (triple-tap VERSA logo to toggle) */}
         {devMode && (
