@@ -206,7 +206,7 @@ function VersaAppMain() {
   const [userRooms, setUserRooms] = useState([]);
   const [roomStakes, setRoomStakes] = useState(null);
   const [newStake, setNewStake] = useState({ type: 'custom', description: '', duration: 'weekly' });
-  const [newHabit, setNewHabit] = useState({ name: '', category: 'Study', points: 10, isRepeatable: false, unit: '', description: '' });
+  const [newHabit, setNewHabit] = useState({ name: '', category: 'Study', points: 10, isRepeatable: false, unit: '', description: '', isNegative: false });
   const [historyDate, setHistoryDate] = useState(null);
   const [editHabitData, setEditHabitData] = useState({});
   const [weeklyWinner, setWeeklyWinner] = useState(null);
@@ -248,6 +248,14 @@ function VersaAppMain() {
 
   const [dailyTarget, setDailyTarget] = useState(400);
   const [streakTarget, setStreakTarget] = useState(80);
+
+  const getDynamicStreakTarget = (baseTarget, multi) => {
+    if (multi >= 3) return Math.round(baseTarget * 4.5);
+    if (multi >= 2.5) return Math.round(baseTarget * 3.5);
+    if (multi >= 2) return Math.round(baseTarget * 2.5);
+    if (multi >= 1.5) return Math.round(baseTarget * 1.75);
+    return baseTarget;
+  };
 
   useEffect(() => {
     if (currentUser) {
@@ -546,12 +554,15 @@ function VersaAppMain() {
         // Calculate which dates hit 20% of daily target (60pts)
         const qualifyingDates = new Set();
         const datePts = {};
+        const dateMultis = {};
         allDocs.forEach(d => {
           if (!datePts[d.date]) datePts[d.date] = 0;
           datePts[d.date] += ((d.habitPoints || habits.find(h => h.id === d.habitId)?.points || 0) * (d.count || 1)) + (d.bonusPoints || 0);
+          if ((d.streak_multiplier || 1) > (dateMultis[d.date] || 0)) dateMultis[d.date] = d.streak_multiplier || 1;
         });
         Object.entries(datePts).forEach(([date, pts]) => {
-          if (pts >= streakTarget) qualifyingDates.add(date);
+          const multi = dateMultis[date] || 1;
+          if (pts >= getDynamicStreakTarget(streakTarget, multi)) qualifyingDates.add(date);
         });
 
         const dates = [...qualifyingDates].sort().reverse();
@@ -621,17 +632,19 @@ function VersaAppMain() {
         const { data: snapData2 } = await supabase.from('completions').select('*').eq('room_id', currentRoom.id).gte('date', formatDateStr(ago));
         const allDocs = (snapData2 || []).map(d => ({ ...d, userId: d.user_id, habitPoints: d.habit_points, bonusPoints: d.bonus_points }));
 
-        // Build a map of userId -> Set of qualifying dates (streakTarget+ pts)
+        // Build a map of userId -> Set of qualifying dates (dynamic streakTarget+ pts)
         const userDates = {};
-        activeMembers.forEach(m => { userDates[m.id] = {}; });
+        const userDateMultis = {};
+        activeMembers.forEach(m => { userDates[m.id] = {}; userDateMultis[m.id] = {}; });
         allDocs.forEach(d => {
           if (!userDates[d.userId]) return;
-          if (!userDates[d.userId][d.date]) userDates[d.userId][d.date] = 0;
+          if (!userDates[d.userId][d.date]) { userDates[d.userId][d.date] = 0; userDateMultis[d.userId][d.date] = 1; }
           userDates[d.userId][d.date] += ((d.habitPoints || 0) * (d.count || 1)) + (d.bonusPoints || 0);
+          if ((d.streak_multiplier || 1) > userDateMultis[d.userId][d.date]) userDateMultis[d.userId][d.date] = d.streak_multiplier || 1;
         });
         const userQualDates = {};
         Object.entries(userDates).forEach(([uid, dates]) => {
-          userQualDates[uid] = new Set(Object.entries(dates).filter(([_, pts]) => pts >= streakTarget).map(([date]) => date));
+          userQualDates[uid] = new Set(Object.entries(dates).filter(([date, pts]) => pts >= getDynamicStreakTarget(streakTarget, userDateMultis[uid]?.[date] || 1)).map(([date]) => date));
         });
 
         // For each pair (me + rival), count consecutive days both qualified
@@ -688,9 +701,9 @@ function VersaAppMain() {
 
   // ─── RIVAL STATUS (what your competition is doing today) ───
   useEffect(() => {
-    if (!currentUser || !currentRoom || activeMembers.length < 2) { setRivalStatus([]); return; }
+    if (!currentUser || !currentRoom || activeMembers.length < 1) { setRivalStatus([]); return; }
     const today = getToday();
-    const rivals = activeMembers.filter(m => m.id !== currentUser.id).map(m => {
+    const rivals = activeMembers.map(m => {
       const todayComps = completions.filter(c => c.userId === m.id && c.date === today);
       const pts = todayComps.reduce((s, c) => { const h = habits.find(x => x.id === c.habitId); return s + ((c.habitPoints || h?.points || 0) * (c.count || 1)) + (c.bonusPoints || 0); }, 0);
       const habitCount = todayComps.length;
@@ -1016,12 +1029,13 @@ function VersaAppMain() {
   const addHabit = async () => {
     if (!newHabit.name.trim()) return;
     const hid = currentRoom.id + '_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8);
+    const finalPoints = (parseInt(newHabit.points) || 10) * (newHabit.isNegative ? -1 : 1);
     // Optimistic update
-    setHabits(prev => [...prev, { id: hid, name: newHabit.name.trim(), category: newHabit.category, points: parseInt(newHabit.points) || 10, isRepeatable: newHabit.isRepeatable, unit: newHabit.unit?.trim() || null, description: newHabit.description?.trim() || null, roomId: currentRoom.id, createdBy: currentUser.id }]);
-    setNewHabit({ name: '', category: 'Study', points: 10, isRepeatable: false, unit: '', description: '' }); setShowAddHabit(false);
+    setHabits(prev => [...prev, { id: hid, name: newHabit.name.trim(), category: newHabit.category, points: finalPoints, isRepeatable: newHabit.isRepeatable, unit: newHabit.unit?.trim() || null, description: newHabit.description?.trim() || null, roomId: currentRoom.id, createdBy: currentUser.id }]);
+    setNewHabit({ name: '', category: 'Study', points: 10, isRepeatable: false, isNegative: false, unit: '', description: '' }); setShowAddHabit(false);
     try {
       await supabase.from('habits').insert({
-        id: hid, name: newHabit.name.trim(), category: newHabit.category, points: parseInt(newHabit.points) || 10,
+        id: hid, name: newHabit.name.trim(), category: newHabit.category, points: finalPoints,
         is_repeatable: newHabit.isRepeatable,
         unit: newHabit.unit?.trim() || null, description: newHabit.description?.trim() || null,
         room_id: currentRoom.id, created_by: currentUser.id
@@ -1035,13 +1049,14 @@ function VersaAppMain() {
   const saveEditHabit = async () => {
     if (!showEditHabit || !editHabitData.name?.trim()) return;
     const hid = showEditHabit;
+    const finalPoints = (parseInt(editHabitData.points) || 10) * (editHabitData.isNegative ? -1 : 1);
     // Optimistic update
-    setHabits(prev => prev.map(h => h.id === hid ? { ...h, name: editHabitData.name.trim(), category: editHabitData.category, points: parseInt(editHabitData.points) || 10, isRepeatable: editHabitData.isRepeatable, unit: editHabitData.unit?.trim() || null, description: editHabitData.description?.trim() || null } : h));
+    setHabits(prev => prev.map(h => h.id === hid ? { ...h, name: editHabitData.name.trim(), category: editHabitData.category, points: finalPoints, isRepeatable: editHabitData.isRepeatable, unit: editHabitData.unit?.trim() || null, description: editHabitData.description?.trim() || null } : h));
     setShowEditHabit(null);
     try {
       await supabase.from('habits').update({
         name: editHabitData.name.trim(), category: editHabitData.category,
-        points: parseInt(editHabitData.points) || 10, is_repeatable: editHabitData.isRepeatable,
+        points: finalPoints, is_repeatable: editHabitData.isRepeatable,
         unit: editHabitData.unit?.trim() || null, description: editHabitData.description?.trim() || null
       }).eq('id', hid);
     } catch { setError('Failed to save'); }
@@ -1056,7 +1071,7 @@ function VersaAppMain() {
       await supabase.from('completions').delete().eq('habit_id', hid).eq('room_id', currentRoom.id);
     } catch (err) { console.error('Delete habit error:', err); }
   };
-  const openEditHabit = (habit) => { setEditHabitData({ name: habit.name, category: habit.category, points: habit.points, isRepeatable: habit.isRepeatable, unit: habit.unit || '', description: habit.description || '' }); setShowEditHabit(habit.id); };
+  const openEditHabit = (habit) => { setEditHabitData({ name: habit.name, category: habit.category, points: Math.abs(habit.points || 10), isNegative: (habit.points || 0) < 0, isRepeatable: habit.isRepeatable, unit: habit.unit || '', description: habit.description || '' }); setShowEditHabit(habit.id); };
 
   // ─── COMPLETIONS (with embedded habit data for orphan-proofing) ───
   const getExisting = (hid) => { const t = getToday(); return completions.find(c => c.userId === currentUser.id && c.habitId === hid && c.date === t); };
@@ -1161,8 +1176,8 @@ function VersaAppMain() {
       const newCount = ex ? ex.count + 1 : 1;
       const streakTag = streakMulti.multi > 1 ? ` 🔥${streakMulti.label}` : '';
       const feedText = bonus
-        ? `${h.name} (+${baseWithStreak} ${bonus.label})${streakTag}`
-        : `${h.name} (+${baseWithStreak})${streakTag}`;
+        ? `${h.name} (${baseWithStreak > 0 ? '+' : ''}${baseWithStreak} ${bonus.label})${streakTag}`
+        : `${h.name} (${baseWithStreak > 0 ? '+' : ''}${baseWithStreak})${streakTag}`;
       if (newCount >= max) {
         postActivity(`Maxed out ${h.name}! 💎${streakTag}`, bonus);
       } else if (newCount === 1 || Math.random() < 0.3) {
@@ -1244,7 +1259,7 @@ function VersaAppMain() {
     return t;
   };
   const getCount = (hid) => { const e = getExisting(hid); return e?.count || 0; };
-  const getDailyProgress = () => { if (!currentUser || !currentRoom) return 0; const pts = getTodayPts(currentUser.id); return Math.min(pts / dailyTarget, 1); };
+  const getDailyProgress = () => { if (!currentUser || !currentRoom) return 0; const pts = getTodayPts(currentUser.id); return Math.max(0, Math.min(pts / dailyTarget, 1)); };
   const getLeaderboard = () => activeMembers.map(m => ({ member: m, todayPts: getTodayPts(m.id), weeklyPts: getWeeklyPts(m.id), crystals: getTodayCrystals(m.id), weeklyCrystals: getWeeklyCrystals(m.id) })).sort((a, b) => leaderboardTab === 'today' ? b.todayPts - a.todayPts : b.weeklyPts - a.weeklyPts);
 
   const DEFAULT_CATEGORIES = [
@@ -1406,11 +1421,12 @@ function VersaAppMain() {
         const k = 'versa-nudge-' + today;
         if (!sessionStorage.getItem(k)) { sendLocalNotification('📋 Don\'t forget to log today', 'Your rivals might already be ahead.', 'daily-nudge'); sessionStorage.setItem(k, '1'); }
       }
-      if (hour === 20 && myPts < streakTarget && streakData.streak > 0) {
+      const currentDynamicTarget = getDynamicStreakTarget(streakTarget, streakMulti.multi);
+      if (hour === 20 && myPts < currentDynamicTarget && streakData.streak > 0) {
         const k = 'versa-s8-' + today;
-        if (!sessionStorage.getItem(k)) { sendLocalNotification('⚠️ Your ' + streakData.streak + '-day streak is at risk', 'Log ' + streakTarget + 'pts before midnight.', 'streak-8pm'); sessionStorage.setItem(k, '1'); }
+        if (!sessionStorage.getItem(k)) { sendLocalNotification('⚠️ Your ' + streakData.streak + '-day streak is at risk', 'Log ' + currentDynamicTarget + 'pts before midnight.', 'streak-8pm'); sessionStorage.setItem(k, '1'); }
       }
-      if (hour === 22 && myPts < streakTarget && streakData.streak > 0) {
+      if (hour === 22 && myPts < currentDynamicTarget && streakData.streak > 0) {
         const k = 'versa-s10-' + today;
         if (!sessionStorage.getItem(k)) { sendLocalNotification('🚨 2 hours left!', (streakFreeze > 0 ? 'Freeze will save you.' : 'No freeze — this is it.'), 'streak-10pm'); sessionStorage.setItem(k, '1'); }
       }
@@ -1425,7 +1441,7 @@ function VersaAppMain() {
     check();
     const iv = setInterval(check, 300000);
     return () => clearInterval(iv);
-  }, [notifPermission, myPts, streakData.streak]);
+  }, [notifPermission, myPts, streakData.streak, streakMulti.multi, streakTarget]);
 
   // Celebration: won the week — only on Monday (day after reset)
   useEffect(() => {
@@ -1859,9 +1875,12 @@ function VersaAppMain() {
               <span className={`text-[10px] font-bold ${dailyProg >= 1 ? 'text-[#4aba7a]' : 'text-[#5b7cf5]'}`}>{Math.round(dailyProg * 100)}%</span>
             </div>
           </div>
-          <div className="mt-2">
+          <div className="mt-2 flex justify-center gap-3 items-center">
             {roomStakes ? (
-              <button onClick={() => setShowStakes(true)} className={`inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full text-xs font-semibold transition-all active:scale-[0.97] ${darkMode ? 'bg-red-500/10 text-red-400 border border-red-500/20' : 'bg-red-50 text-red-500 border border-red-200'}`}><Zap size={12} />{roomStakes.description}</button>
+              <div className="flex items-center gap-3">
+                <button onClick={() => setShowStakes(true)} className={`inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full text-xs font-semibold transition-all active:scale-[0.97] ${darkMode ? 'bg-red-500/10 text-red-400 border border-red-500/20' : 'bg-red-50 text-red-500 border border-red-200'}`}><Zap size={12} />{roomStakes.description}</button>
+                <span className={`text-[10px] ${T.textDim}`}>{getDaysUntilReset() > 0 ? getDaysUntilReset() + 'd left' : timeDisplay}</span>
+              </div>
             ) : dailyProg >= 1 ? (
               <p className="text-sm font-medium text-emerald-400">🎉 All done — nice work.</p>
             ) : (
@@ -1870,46 +1889,36 @@ function VersaAppMain() {
           </div>
         </div>
 
-        {/* ═══ CATEGORY CHIPS ═══ */}
-        <div className="grid grid-cols-3 gap-2 mb-6">
-          {allCatNames.map(c => {
-            const ct = getCT(c);
-            const pts = getCatPts(currentUser.id, c);
-            const hasCrystal = myCr[c];
-            return (
-              <div key={c} className={`relative rounded-2xl p-3 text-center transition-all ${hasCrystal ? ct.bgM + ' border ' + ct.bdr + ' shadow-lg ' + ct.glow : (darkMode ? 'bg-[#151d30] border border-[#223858]' : 'bg-white border border-gray-200 shadow-sm')}`}>
-                <div className="text-xl mb-0.5">{activeCategories.find(cat => cat.name === c)?.icon || '📋'}</div>
-                <div className={`text-lg font-black ${hasCrystal ? ct.txt : T.text}`}>{pts}</div>
-                <div className={`text-[9px] font-bold tracking-wider uppercase ${hasCrystal ? ct.txt : T.textDim}`}>{c}</div>
-                {hasCrystal && <div className="absolute -top-1 -right-1 text-sm">💎</div>}
-              </div>
-            );
-          })}
-        </div>
+
 
         {/* ═══ RIVAL PILLS ═══ */}
         {rivalStatus.length > 0 && (
           <div className="flex items-center gap-2 mb-5 overflow-x-auto pb-1 -mx-1 px-1">
-            {rivalStatus.slice(0, 4).map(r => {
-              const ahead = r.pts > myPts;
-              const ms = mutualStreaks[r.member.id] || 0;
+            {rivalStatus.slice(0, 5).map((r, idx) => {
+              const isMe = r.member.id === currentUser.id;
+              const ahead = isMe ? false : r.pts > myPts;
+              const ms = isMe ? 0 : (mutualStreaks[r.member.id] || 0);
+              const isWinning = idx === 0 && r.pts > 0;
               return (
-                <div key={r.member.id} onClick={() => setShowCompetitor(r.member)} className={`flex items-center gap-2 px-3 py-2 rounded-xl border shrink-0 cursor-pointer active:scale-[0.97] transition-all ${ahead ? (darkMode ? 'border-red-500/20 bg-red-500/5' : 'border-red-200 bg-red-50') : (darkMode ? 'border-emerald-500/20 bg-emerald-500/5' : 'border-emerald-200 bg-emerald-50')}`}>
+                <div key={r.member.id} onClick={() => setShowCompetitor(r.member)} className={`relative flex items-center gap-2 px-3 py-2 rounded-xl border shrink-0 cursor-pointer active:scale-[0.97] transition-all ${isWinning ? (darkMode ? 'border-yellow-500/50 bg-yellow-500/10 shadow-[0_0_15px_rgba(234,179,8,0.2)]' : 'border-yellow-400 bg-yellow-50 shadow-[0_0_15px_rgba(250,204,21,0.4)]') : ahead ? (darkMode ? 'border-red-500/20 bg-red-500/5' : 'border-red-200 bg-red-50') : (darkMode ? 'border-emerald-500/20 bg-emerald-500/5' : 'border-emerald-200 bg-emerald-50')}`}>
+                  {isWinning && <div className="absolute -top-3 -right-2 text-xl drop-shadow-lg z-10 animate-bounce">👑</div>}
                   <div className="relative">
-                    <Avatar user={r.member} size={22} className={ahead ? 'bg-red-500/20 text-red-400' : 'bg-emerald-500/20 text-emerald-400'} />
+                    <Avatar user={r.member} size={22} className={isWinning ? 'bg-yellow-500/20 text-yellow-500' : ahead ? 'bg-red-500/20 text-red-400' : 'bg-emerald-500/20 text-emerald-400'} />
                     {ms > 0 && <div className={`absolute -bottom-1 -right-1 w-4 h-4 rounded-full flex items-center justify-center text-[7px] font-black text-white ${ms >= 7 ? 'bg-gradient-to-r from-orange-500 to-red-500' : ms >= 3 ? 'bg-orange-500' : 'bg-[#e8864a]'}`}>{ms}</div>}
                   </div>
                   <div className="flex flex-col">
-                    <span className={`text-[11px] font-medium ${darkMode ? 'text-[#9aaec0]' : 'text-[#4a6080]'}`}>{r.member.username}</span>
+                    <span className={`text-[11px] ${isWinning ? 'font-bold text-yellow-600 dark:text-yellow-400' : 'font-medium ' + (darkMode ? 'text-[#9aaec0]' : 'text-[#4a6080]')}`}>
+                      {r.member.username}{isMe && <span className="opacity-70 font-normal"> (You)</span>}
+                    </span>
                     <div className="flex items-center gap-1.5">
-                      <span className={`text-[10px] font-bold ${ahead ? 'text-red-400' : 'text-emerald-400'}`}>{r.pts} pts</span>
+                      <span className={`text-[10px] font-bold ${isWinning ? 'text-yellow-600 dark:text-yellow-400' : ahead ? 'text-red-400' : 'text-emerald-400'}`}>{r.pts} pts</span>
                       {ms > 0 && <span className={`text-[9px] font-bold ${ms >= 7 ? 'text-[#e8864a]' : ms >= 3 ? 'text-[#e8864a]' : 'text-[#e8864a]/70'}`}>🔗{ms}d</span>}
                     </div>
                   </div>
                 </div>
               );
             })}
-            {myPts === 0 && rivalStatus.some(r => r.pts > 0) && <span className="text-[10px] text-red-400/70 shrink-0 font-medium">⚠️ They started</span>}
+            {myPts === 0 && rivalStatus.some(r => r.pts > 0 && r.member.id !== currentUser.id) && <span className="text-[10px] text-red-400/70 shrink-0 font-medium">⚠️ They started</span>}
           </div>
         )}
 
@@ -1920,7 +1929,10 @@ function VersaAppMain() {
           </div>
         )}
 
-        {!roomStakes && <div className="flex justify-center mb-4"><button onClick={() => setShowStakes(true)} className={`flex items-center gap-2 px-5 py-2 rounded-full text-xs font-bold transition-all active:scale-[0.97] ${darkMode ? 'bg-[#1e2e50] text-gray-500 border border-[#223858] hover:text-gray-300' : 'bg-gray-100 text-gray-400 border border-gray-200 hover:text-gray-600'}`}><Zap size={13} />Set Stakes</button></div>}
+        {!roomStakes && <div className="flex items-center justify-center gap-3 mb-4">
+          <button onClick={() => setShowStakes(true)} className={`flex items-center gap-2 px-5 py-2 rounded-full text-xs font-bold transition-all active:scale-[0.97] ${darkMode ? 'bg-[#1e2e50] text-gray-500 border border-[#223858] hover:text-gray-300' : 'bg-gray-100 text-gray-400 border border-gray-200 hover:text-gray-600'}`}><Zap size={13} />Set Stakes</button>
+          <span className={`text-[10px] ${T.textDim}`}>Reset in {getDaysUntilReset() > 0 ? getDaysUntilReset() + 'd' : timeDisplay}</span>
+        </div>}
 
         {devMode && boardRequests.length > 0 && boardRequests.map(br => (
           <div key={br.id} className={`mb-2 p-2.5 rounded-xl border ${darkMode ? 'bg-purple-500/5 border-purple-500/15' : 'bg-purple-50 border-purple-200'}`}>
@@ -1942,23 +1954,24 @@ function VersaAppMain() {
                 {catHabits.map(h => {
                   const cnt = getCount(h.id);
                   const done = cnt > 0;
+                  const isVice = h.points < 0;
                   const maxed = !h.isRepeatable && cnt >= 1;
                   return (
-                    <div key={h.id} className={`flex items-center gap-3 mb-1.5 rounded-2xl p-3 pl-0 overflow-hidden transition-all ${maxed ? (darkMode ? 'bg-gradient-to-r from-' + t.bg.replace('bg-', '') + '10 to-transparent' : 'bg-' + t.bg.replace('bg-', '').replace('500', '50')) : (darkMode ? 'bg-[#182544]' : 'bg-white')} ${darkMode ? 'border border-[#223858]' : 'border border-gray-100 shadow-sm'}`}>
-                      <div className={`w-1 self-stretch rounded-r-full ${done ? t.bg : 'bg-transparent'} transition-all`} />
+                    <div key={h.id} className={`flex items-center gap-3 mb-1.5 rounded-2xl p-3 pl-0 overflow-hidden transition-all ${maxed ? (darkMode ? 'bg-gradient-to-r from-' + (isVice ? 'red-500/' : t.bg.replace('bg-', '') + '') + '10 to-transparent' : (isVice ? 'bg-red-50' : 'bg-' + t.bg.replace('bg-', '').replace('500', '50'))) : (darkMode ? 'bg-[#182544]' : 'bg-white')} ${darkMode ? 'border border-[#223858]' : 'border border-gray-100 shadow-sm'}`}>
+                      <div className={`w-1 self-stretch rounded-r-full ${done ? (isVice ? 'bg-red-500' : t.bg) : 'bg-transparent'} transition-all`} />
                       <div className="min-w-0 flex-1">
                         <div className={`text-[13px] font-semibold ${done ? (darkMode ? 'text-white' : 'text-gray-900') : (darkMode ? 'text-[#7a8ba8]' : 'text-[#6b7e96]')}`}>{h.name}</div>
                         {h.description && <div className={`text-[10px] ${T.textDim} mt-0.5`}>{h.description}</div>}
                         <div className={`text-[10px] ${T.textDim} flex items-center gap-1.5 mt-0.5`}>
-                          <span>{h.points}pts</span>
+                          <span className={isVice ? 'text-red-400 font-bold' : ''}>{h.points > 0 ? '+' : ''}{h.points}pts</span>
                           {h.unit && <><span>·</span><span>{h.unit}</span></>}
-                          {h.isRepeatable && cnt > 0 && <><span>·</span><span className={'font-bold ' + t.txt}>×{cnt}</span></>}
+                          {h.isRepeatable && cnt > 0 && <><span>·</span><span className={'font-bold ' + (isVice ? 'text-red-400' : t.txt)}>×{cnt}</span></>}
                         </div>
                       </div>
                       <div className="flex items-center gap-1.5 shrink-0">
                         {cnt > 0 && !editMode && <button onClick={() => handleDecrement(h.id)} className={`w-6 h-6 rounded-full flex items-center justify-center transition-all active:scale-90 opacity-30 hover:opacity-70 ${darkMode ? 'text-[#4a6080] hover:bg-[#1e3050]' : 'text-gray-300 hover:bg-gray-100'}`}><MinusIcon size={11} /></button>}
-                        {!maxed && !editMode && <button onClick={() => handleIncrement(h.id)} className={`w-10 h-10 rounded-full flex items-center justify-center transition-all active:scale-90 shadow-lg text-white font-bold ${t.bg} hover:opacity-90`} style={{ boxShadow: `0 4px 14px ${t.neon}40` }}><Plus size={18} /></button>}
-                        {maxed && !editMode && <div className={`w-10 h-10 rounded-full flex items-center justify-center ${t.bg} text-white`}><Check size={18} /></div>}
+                        {!maxed && !editMode && <button onClick={() => handleIncrement(h.id)} className={`w-10 h-10 rounded-full flex items-center justify-center transition-all active:scale-90 shadow-lg text-white font-bold ${isVice ? 'bg-red-500/90' : t.bg} hover:opacity-90`} style={{ boxShadow: isVice ? '0 4px 14px rgba(239, 68, 68, 0.4)' : `0 4px 14px ${t.neon}40` }}>{isVice ? <MinusIcon size={18} strokeWidth={3} /> : <Plus size={18} strokeWidth={3} />}</button>}
+                        {maxed && !editMode && <div className={`w-10 h-10 rounded-full flex items-center justify-center ${isVice ? 'bg-red-500/90' : t.bg} text-white`}><Check size={18} /></div>}
                         {editMode && <><button onClick={() => openEditHabit(h)} className="text-blue-400 p-1.5"><Edit3 size={14} /></button><button onClick={() => deleteHabit(h.id)} className="text-red-400 p-1.5"><Trash2 size={14} /></button></>}
                       </div>
                     </div>
@@ -1977,16 +1990,7 @@ function VersaAppMain() {
           ) : null}
         </div>
 
-        {/* ═══ SECONDARY ═══ */}
-        <div className="grid grid-cols-3 gap-2 mb-4">
-          <div className={`rounded-2xl p-3 text-center ${darkMode ? 'bg-[#151d30] border border-[#223858]' : 'bg-white border border-gray-200 shadow-sm'}`}><div className="text-xl font-black text-blue-400">{myPts}</div><div className={`text-[9px] ${T.textDim} uppercase tracking-wider font-bold`}>Today</div></div>
-          <div className={`rounded-2xl p-3 text-center ${darkMode ? 'bg-[#151d30] border border-[#223858]' : 'bg-white border border-gray-200 shadow-sm'}`}><div className="text-xl font-black text-emerald-400">{getWeeklyPts(currentUser.id)}</div><div className={`text-[9px] ${T.textDim} uppercase tracking-wider font-bold`}>Week</div></div>
-          <div className={`rounded-2xl p-3 text-center ${darkMode ? 'bg-[#151d30] border border-[#223858]' : 'bg-white border border-gray-200 shadow-sm'}`}><div className="flex justify-center gap-2 mb-1">{allCatNames.map(c => <div key={c} className={`w-5 h-5 rounded-full transition-all ${myCr[c] ? getCT(c).bg + ' shadow-md ' + getCT(c).glow : (darkMode ? 'bg-[#1e3050]' : 'bg-gray-200')}`} />)}</div><div className={`text-[9px] ${T.textDim} uppercase tracking-wider font-bold`}>Crystals</div></div>
-        </div>
 
-        {weeklyWinner && <div className={`mb-3 p-3 rounded-2xl flex items-center justify-between ${darkMode ? 'bg-[#5b7cf5]/5 border border-[#5b7cf5]/10' : 'bg-[#5b7cf5]/5 border border-[#5b7cf5]/15'}`}><div className="flex items-center gap-2"><Crown size={14} className="text-[#e8864a]" /><span className={`text-xs font-medium ${darkMode ? 'text-[#5b7cf5]' : 'text-[#5b7cf5]'}`}>{weeklyWinner.member.username} leads · {weeklyWinner.pts} pts</span></div><span className={`text-[10px] ${T.textDim}`}>{weeklyWinner.daysLeft > 0 ? weeklyWinner.daysLeft + 'd left' : timeDisplay}</span></div>}
-
-        {weeklyWinner && weeklyWinner.daysLeft <= 1 && activeMembers.length > 1 && <div className={`mb-3 p-3 rounded-2xl text-center ${darkMode ? 'bg-gradient-to-r from-[#5b7cf5]/5 via-[#9b6bc8]/5 to-[#e8864a]/5 border border-[#5b7cf5]/10' : 'bg-gradient-to-r from-[#5b7cf5]/5 via-[#9b6bc8]/5 to-[#e8864a]/5 border border-[#5b7cf5]/15'}`}><div className={`text-sm font-bold ${darkMode ? 'text-[#5b7cf5]' : 'text-[#5b7cf5]'}`}>{weeklyWinner.daysLeft === 0 ? '⏰ Final Hours — ' + timeDisplay : '⚡ Final Day'}</div></div>}
 
         {/* ═══ ACTIVITY FEED (collapsible) ═══ */}
         {activityFeed.length > 0 && (
@@ -2058,7 +2062,10 @@ function VersaAppMain() {
           </div>
           <input type="text" placeholder="Time description (e.g. 30 min, per hour)" value={newHabit.unit} onChange={e => setNewHabit({ ...newHabit, unit: e.target.value })} className={inputCls} maxLength={20} />
           <input type="text" placeholder="Description (e.g. what counts?)" value={newHabit.description} onChange={e => setNewHabit({ ...newHabit, description: e.target.value })} className={inputCls} maxLength={60} />
-          <label className="flex items-center gap-3 py-1 cursor-pointer"><input type="checkbox" checked={newHabit.isRepeatable} onChange={e => setNewHabit({ ...newHabit, isRepeatable: e.target.checked })} className="w-4 h-4 rounded accent-blue-500" /><span className="text-sm text-gray-400">Repeatable</span></label>
+          <div className="flex gap-4">
+            <label className="flex items-center gap-3 py-1 cursor-pointer"><input type="checkbox" checked={newHabit.isRepeatable} onChange={e => setNewHabit({ ...newHabit, isRepeatable: e.target.checked })} className="w-4 h-4 rounded accent-blue-500" /><span className="text-sm text-gray-400">Repeatable</span></label>
+            <label className="flex items-center gap-3 py-1 cursor-pointer"><input type="checkbox" checked={newHabit.isNegative} onChange={e => setNewHabit({ ...newHabit, isNegative: e.target.checked })} className="w-4 h-4 rounded accent-red-500" /><span className="text-sm text-red-500">Vice (Subtracts)</span></label>
+          </div>
           {error && <p className="text-red-400 text-xs text-center">{error}</p>}
           <div className="flex gap-3 pt-2"><button onClick={() => setShowAddHabit(false)} className={`flex-1 px-4 py-3 border ${T.border} rounded-xl text-sm ${T.textMuted} hover:${T.bgCardHover}`}>Cancel</button><button onClick={addHabit} className="flex-1 px-4 py-3 bg-[#5b7cf5] text-white rounded-xl text-sm font-bold shadow-lg shadow-[#5b7cf5]/15 active:scale-[0.98]">Add</button></div>
         </div>
@@ -2075,7 +2082,10 @@ function VersaAppMain() {
           </div>
           <input type="text" placeholder="Time description (e.g. 30 min, per hour)" value={editHabitData.unit || ''} onChange={e => setEditHabitData({ ...editHabitData, unit: e.target.value })} className={inputCls} maxLength={20} />
           <input type="text" placeholder="Description (e.g. what counts?)" value={editHabitData.description || ''} onChange={e => setEditHabitData({ ...editHabitData, description: e.target.value })} className={inputCls} maxLength={60} />
-          <label className="flex items-center gap-3 py-1 cursor-pointer"><input type="checkbox" checked={editHabitData.isRepeatable || false} onChange={e => setEditHabitData({ ...editHabitData, isRepeatable: e.target.checked })} className="w-4 h-4 rounded accent-blue-500" /><span className="text-sm text-gray-400">Repeatable</span></label>
+          <div className="flex gap-4">
+            <label className="flex items-center gap-3 py-1 cursor-pointer"><input type="checkbox" checked={editHabitData.isRepeatable || false} onChange={e => setEditHabitData({ ...editHabitData, isRepeatable: e.target.checked })} className="w-4 h-4 rounded accent-blue-500" /><span className="text-sm text-gray-400">Repeatable</span></label>
+            <label className="flex items-center gap-3 py-1 cursor-pointer"><input type="checkbox" checked={editHabitData.isNegative || false} onChange={e => setEditHabitData({ ...editHabitData, isNegative: e.target.checked })} className="w-4 h-4 rounded accent-red-500" /><span className="text-sm text-red-500">Vice (Subtracts)</span></label>
+          </div>
           <div className="flex gap-3 pt-2"><button onClick={() => setShowEditHabit(null)} className={`flex-1 px-4 py-3 border ${T.border} rounded-xl text-sm ${T.textMuted} hover:${T.bgCardHover}`}>Cancel</button><button onClick={saveEditHabit} className="flex-1 px-4 py-3 bg-[#5b7cf5] text-white rounded-xl text-sm font-bold shadow-lg shadow-[#5b7cf5]/15 active:scale-[0.98]">Save</button></div>
         </div>
       </Modal>
@@ -2219,7 +2229,7 @@ function VersaAppMain() {
         <div className="space-y-3 text-sm text-gray-400">
           {[
             { i: '🎯', t: 'Track & Earn', d: 'Tap + to log habits. Each completion earns points. Hit ' + dailyTarget + 'pts for a perfect day.' },
-            { i: '🔥', t: 'Streaks', d: 'Log at least ' + streakTarget + 'pts daily to maintain your streak. Tiers: 3d→1.5× · 7d→2× · 14d→2.5× · 30d→3×. Miss a day and it resets.' },
+            { i: '🔥', t: 'Streaks', d: 'Log at least ' + streakTarget + 'pts daily to maintain your streak (this threshold scales exponentially harder at higher tiers!). Tiers: 3d→1.5× · 7d→2× · 14d→2.5× · 30d→3×.' },
             { i: '🛡️', t: 'Streak Freeze', d: 'Hit 90% (' + Math.round(dailyTarget * 0.9) + 'pts) in a day to bank a freeze. If you miss tomorrow, the freeze saves your streak. Max 1 at a time — unlog habits and you lose it.' },
             { i: '🎰', t: 'Mystery Bonus', d: '~10% chance on every tap: 1.25× (common), 1.5×, 2× (rare), 3× (epic), 5× (jackpot). Bonus points stack on top of streak multipliers.' },
             { i: '💎', t: 'Crystals', d: 'Score the most points in a category (Study, Health, Focus) to earn a crystal for the day. Ties = no crystal.' },
@@ -2283,10 +2293,10 @@ function VersaAppMain() {
           return <><ModalHeader title={showCompetitor.username} onClose={() => setShowCompetitor(null)} dark={darkMode} />
 
             {/* Comparison bar */}
-            <div className={`p-4 rounded-xl mb-4 ${ahead ? (darkMode ? 'bg-red-500/5 border border-red-500/15' : 'bg-red-50 border border-red-200') : (darkMode ? 'bg-emerald-500/5 border border-emerald-500/15' : 'bg-emerald-50 border border-emerald-200')}`}>
+            {uid !== currentUser.id && <div className={`p-4 rounded-xl mb-4 ${ahead ? (darkMode ? 'bg-red-500/5 border border-red-500/15' : 'bg-red-50 border border-red-200') : (darkMode ? 'bg-emerald-500/5 border border-emerald-500/15' : 'bg-emerald-50 border border-emerald-200')}`}>
               <div className="flex items-center justify-between mb-2">
                 <span className={`text-xs font-medium ${darkMode ? 'text-[#7a8ba8]' : 'text-[#6b7e96]'}`}>You</span>
-                <span className={`text-[10px] font-bold ${ahead ? 'text-red-400' : 'text-emerald-400'}`}>{ahead ? 'Behind by ' + diff : 'Ahead by ' + diff}</span>
+                <span className={`text-[10px] font-bold ${ahead ? 'text-red-400' : 'text-emerald-400'}`}>{ahead ? 'Behind by ' + diff : (diff === 0 ? 'Tied' : 'Ahead by ' + diff)}</span>
                 <span className={`text-xs font-medium ${darkMode ? 'text-[#7a8ba8]' : 'text-[#6b7e96]'}`}>{showCompetitor.username}</span>
               </div>
               <div className="flex items-center gap-3">
@@ -2296,7 +2306,7 @@ function VersaAppMain() {
                 </div>
                 <span className={`text-lg font-black w-12 ${ahead ? 'text-red-400' : 'text-emerald-400'}`}>{theirPts}</span>
               </div>
-            </div>
+            </div>}
 
             {/* Category breakdown */}
             <div className="grid grid-cols-3 gap-2 mb-4">{allCatNames.map(c => {
