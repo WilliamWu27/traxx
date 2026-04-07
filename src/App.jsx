@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Clock, Plus, X, LogOut, Copy, Check, UserPlus, HelpCircle, Trophy, User, Flame, Zap, Star, TrendingUp, ArrowLeftRight, Edit3, Calendar, ChevronLeft, ChevronRight, Crown, Target, ArrowUp, ArrowDown, Minus as MinusIcon, GripVertical, BarChart3, Sun, Moon, ChevronDown, Trash2, Settings } from 'lucide-react';
+import { Clock, Plus, X, LogOut, Copy, Check, UserPlus, HelpCircle, Trophy, User, Flame, Zap, Star, TrendingUp, ArrowLeftRight, Edit3, Calendar, ChevronLeft, ChevronRight, Crown, Target, ArrowUp, ArrowDown, Minus as MinusIcon, GripVertical, BarChart3, Sun, Moon, ChevronDown, Trash2, Settings, Home, CheckSquare, Users } from 'lucide-react';
 import { supabase } from './supabase';
 
-// ─── PUSH NOTIFICATIONS ───
+// â”€â”€â”€ PUSH NOTIFICATIONS â”€â”€â”€
 const VAPID_PUBLIC_KEY = 'BEcFKhe3DpVfW8crc-iYvCm8KGAfrZvqKS0ysp9QxEpUuhIpUw8u8qJlV7Pb73nKgyUkqxEmZ4mSjJ4BoyTXdvo';
 
 function urlBase64ToUint8Array(base64String) {
@@ -45,7 +45,7 @@ async function sendLocalNotification(title, body, tag) {
   }
 }
 
-// ─── CONFETTI ───
+// â”€â”€â”€ CONFETTI â”€â”€â”€
 function ConfettiCanvas({ trigger }) {
   const canvasRef = useRef(null);
   const animRef = useRef(null);
@@ -87,7 +87,7 @@ function ProgressRing({ progress, size = 56, stroke = 4, color = '#3b82f6' }) {
   );
 }
 
-// ─── AVATAR (with photo support) ───
+// â”€â”€â”€ AVATAR (with photo support) â”€â”€â”€
 function Avatar({ user, size = 28, className = '' }) {
   const s = { width: size, height: size, minWidth: size };
   if (user?.photoURL) return <img src={user.photoURL} className={`rounded-full object-cover ${className}`} style={s} referrerPolicy="no-referrer" />;
@@ -95,20 +95,20 @@ function Avatar({ user, size = 28, className = '' }) {
   return <div className={`rounded-full flex items-center justify-center font-black ${className}`} style={{ ...s, fontSize: size * 0.4 }}>{letter}</div>;
 }
 
-// ─── PUNISHMENT WHEEL ───
+// â”€â”€â”€ PUNISHMENT WHEEL â”€â”€â”€
 const PUNISHMENTS = [
-  '☕ Buy winner coffee',
-  '📸 Embarrassing post',
-  '💪 50 pushups on camera',
-  '🧺 Do winner\'s laundry',
-  '🎤 Sing in public',
-  '🍳 Cook winner a meal',
-  '📱 No phone for 2hrs',
-  '🏃 Run a mile on camera',
-  '🤡 Wear a silly outfit to class',
-  '📝 Write winner a compliment essay',
-  '🧹 Clean winner\'s room',
-  '🎬 Embarrassing TikTok',
+  'â˜• Buy winner coffee',
+  'ðŸ“¸ Embarrassing post',
+  'ðŸ’ª 50 pushups on camera',
+  'ðŸ§º Do winner\'s laundry',
+  'ðŸŽ¤ Sing in public',
+  'ðŸ³ Cook winner a meal',
+  'ðŸ“± No phone for 2hrs',
+  'ðŸƒ Run a mile on camera',
+  'ðŸ¤¡ Wear a silly outfit to class',
+  'ðŸ“ Write winner a compliment essay',
+  'ðŸ§¹ Clean winner\'s room',
+  'ðŸŽ¬ Embarrassing TikTok',
 ];
 function Modal({ show, onClose, children, wide, dark }) {
   if (!show) return null;
@@ -151,12 +151,12 @@ class ErrorBoundary extends React.Component {
 }
 
 function VersaAppMain() {
-  // ─── DATE HELPERS (must be before state that uses them) ───
+  // â”€â”€â”€ DATE HELPERS (must be before state that uses them) â”€â”€â”€
   const formatDateStr = (d) => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
   const getToday = () => { const d = new Date(); return formatDateStr(d); };
   const getYesterday = () => { const d = new Date(); d.setDate(d.getDate() - 1); return formatDateStr(d); };
 
-  // ─── STATE ───
+  // â”€â”€â”€ STATE â”€â”€â”€
   const [currentUser, setCurrentUser] = useState(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [view, setView] = useState('login'); // login | signup | forgot | onboarding | dashboard
@@ -212,6 +212,7 @@ function VersaAppMain() {
   const [newHabit, setNewHabit] = useState({ name: '', category: 'Study', points: 10, isRepeatable: false, unit: '', description: '', isNegative: false });
   const [historyDate, setHistoryDate] = useState(null);
   const [editHabitData, setEditHabitData] = useState({});
+  const [activeTab, setActiveTab] = useState('overview');
   const [weeklyWinner, setWeeklyWinner] = useState(null);
   const [yesterdayPoints, setYesterdayPoints] = useState(0);
   const [dateKey, setDateKey] = useState(getToday());
@@ -226,7 +227,7 @@ function VersaAppMain() {
   const [showAddCategory, setShowAddCategory] = useState(false);
   const [newCatName, setNewCatName] = useState('');
   const [newCatColor, setNewCatColor] = useState(0);
-  const [newCatIcon, setNewCatIcon] = useState('⭐');
+  const [newCatIcon, setNewCatIcon] = useState('â­');
   const [maxedHabit, setMaxedHabit] = useState(null);
   const [activityFeed, setActivityFeed] = useState([]);
   const [showHeatMap, setShowHeatMap] = useState(false);
@@ -292,7 +293,7 @@ function VersaAppMain() {
     }
   }, [celebrateComplete]);
 
-  // ─── HELPERS ───
+  // â”€â”€â”€ HELPERS â”€â”€â”€
   const genCode = () => { const c = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; let r = ''; for (let i = 0; i < 6; i++) r += c[Math.floor(Math.random() * c.length)]; return r; };
   const getWeekStart = () => { const n = new Date(), d = n.getDay(); const m = new Date(n); m.setDate(m.getDate() - d); m.setHours(0, 0, 0, 0); return formatDateStr(m); };
   const getWeekEnd = () => { const ws = getWeekStart(); const d = new Date(ws + 'T12:00:00'); d.setDate(d.getDate() + 6); return formatDateStr(d); };
@@ -322,21 +323,21 @@ function VersaAppMain() {
     return msgs[new Date().getDate() % msgs.length];
   };
 
-  // ─── DEFAULT HABITS ───
+  // â”€â”€â”€ DEFAULT HABITS â”€â”€â”€
   const loadDefaultHabits = async () => {
     const defaultHabits = [
-      // STUDY — time-based
+      // STUDY â€” time-based
       { name: 'Deep work', category: 'Study', points: 15, is_repeatable: true, unit: 'per 30 min' },
       { name: 'Read', category: 'Study', points: 15, is_repeatable: true, unit: 'per 30 min' },
-      // STUDY — completion-based
+      // STUDY â€” completion-based
       { name: 'Small task', category: 'Study', points: 10, is_repeatable: true },
       { name: 'Big task', category: 'Study', points: 30, is_repeatable: true },
-      // HEALTH — gym, sleep, nutrition
+      // HEALTH â€” gym, sleep, nutrition
       { name: 'Hit the gym', category: 'Health', points: 20, is_repeatable: true, unit: 'per 30 min' },
       { name: 'Slept 7+ hours', category: 'Health', points: 30, is_repeatable: false },
       { name: 'Woke up before 7', category: 'Health', points: 30, is_repeatable: false },
       { name: 'Junk food', category: 'Health', points: -15, is_repeatable: true, unit: 'per meal/snack' },
-      // FOCUS — screen time, substances, mindset
+      // FOCUS â€” screen time, substances, mindset
       { name: '30 mins screen time', category: 'Focus', points: -10, is_repeatable: true, unit: 'per 30 min' },
       { name: 'Hitting the yart', category: 'Focus', points: -30, is_repeatable: true, unit: 'per instance' },
       { name: 'Work done before 9pm', category: 'Focus', points: 30, is_repeatable: false },
@@ -355,7 +356,7 @@ function VersaAppMain() {
     } catch (err) { console.error(err); setError('Failed to load defaults: ' + err.message); } finally { setLoading(false); }
   };
 
-  // ─── AUTH LISTENER ───
+  // â”€â”€â”€ AUTH LISTENER â”€â”€â”€
   useEffect(() => {
     // Deep link: check URL for ?join=CODE
     const params = new URLSearchParams(window.location.search);
@@ -404,7 +405,7 @@ function VersaAppMain() {
     return () => { mounted = false; subscription?.unsubscribe(); };
   }, []);
 
-  // ─── REALTIME DATA ───
+  // â”€â”€â”€ REALTIME DATA â”€â”€â”€
   useEffect(() => {
     if (!currentUser || !currentRoom) return;
     const subs = [];
@@ -513,7 +514,7 @@ function VersaAppMain() {
     return () => { subs.forEach(s => supabase.removeChannel(s)); };
   }, [currentUser, currentRoom, dateKey]);
 
-  // ─── LOAD ROOM KICKED LIST ───
+  // â”€â”€â”€ LOAD ROOM KICKED LIST â”€â”€â”€
   useEffect(() => {
     if (!currentRoom) { setRoomKicked([]); setRoomCreatedBy(null); return; }
     const load = async () => {
@@ -530,7 +531,7 @@ function VersaAppMain() {
     return () => supabase.removeChannel(sub);
   }, [currentRoom?.id]);
 
-  // ─── LAST WEEK DATA (for recap) ───
+  // â”€â”€â”€ LAST WEEK DATA (for recap) â”€â”€â”€
   useEffect(() => {
     if (!currentUser || !currentRoom || activeMembers.length < 1) return;
     const loadLastWeek = async () => {
@@ -547,13 +548,13 @@ function VersaAppMain() {
           const activeDays = [...new Set(mc.map(c => c.date))].length;
           return { member: m, pts, catPts, activeDays, completions: mc.length };
         }).sort((a, b) => b.pts - a.pts);
-        setLastWeekData({ scores, dateRange: formatDate(lws) + ' — ' + formatDate(lwe) });
+        setLastWeekData({ scores, dateRange: formatDate(lws) + ' â€” ' + formatDate(lwe) });
       } catch { setLastWeekData(null); }
     };
     loadLastWeek();
   }, [currentUser, currentRoom, roomMembers, roomKicked, habits]);
 
-  // ─── STREAK + YESTERDAY ───
+  // â”€â”€â”€ STREAK + YESTERDAY â”€â”€â”€
   useEffect(() => {
     if (!currentUser || !currentRoom) return;
     const calc = async () => {
@@ -603,7 +604,7 @@ function VersaAppMain() {
           if (freezeUsed && savedFreeze > 0) {
             await supabase.from('users').update({ streak_freeze: 0 }).eq('id', currentUser.id);
             setStreakFreeze(0);
-            setFreezeMsg('🛡️ Streak freeze saved your streak!');
+            setFreezeMsg('ðŸ›¡ï¸ Streak freeze saved your streak!');
             setTimeout(() => setFreezeMsg(null), 4000);
           }
         }
@@ -622,7 +623,7 @@ function VersaAppMain() {
         if (streak > prevStreak) {
           const crossed = milestones.find(m => streak >= m && prevStreak < m);
           if (crossed) {
-            const tierNames = { 3: 'Building 1.5×', 7: 'Consistent 2×', 14: 'Dedicated 2.5×', 30: 'Legend 3×' };
+            const tierNames = { 3: 'Building 1.5Ã—', 7: 'Consistent 2Ã—', 14: 'Dedicated 2.5Ã—', 30: 'Legend 3Ã—' };
             setStreakMilestone({ days: crossed, tier: tierNames[crossed] });
             setConfettiTrigger(v => v + 1);
             setTimeout(() => setStreakMilestone(null), 4000);
@@ -634,7 +635,7 @@ function VersaAppMain() {
     calc();
   }, [currentUser, currentRoom, completions, habits, streakTarget]);
 
-  // ─── MUTUAL STREAKS (Snapchat-style between pairs) ───
+  // â”€â”€â”€ MUTUAL STREAKS (Snapchat-style between pairs) â”€â”€â”€
   useEffect(() => {
     if (!currentUser || !currentRoom || activeMembers.length < 2) { setMutualStreaks({}); return; }
     const calc = async () => {
@@ -689,7 +690,7 @@ function VersaAppMain() {
     calc();
   }, [currentUser, currentRoom, completions, roomMembers, roomKicked, streakTarget]);
 
-  // ─── WEEKLY WINNER ───
+  // â”€â”€â”€ WEEKLY WINNER â”€â”€â”€
   useEffect(() => {
     if (!currentRoom || activeMembers.length < 2 || allCompletions.length === 0) { setWeeklyWinner(null); return; }
     // Check if we're past Sunday (i.e. it's a new week and last week had data)
@@ -710,7 +711,7 @@ function VersaAppMain() {
     } else setWeeklyWinner(null);
   }, [roomMembers, roomKicked, allCompletions, habits, currentRoom]);
 
-  // ─── RIVAL STATUS (what your competition is doing today) ───
+  // â”€â”€â”€ RIVAL STATUS (what your competition is doing today) â”€â”€â”€
   useEffect(() => {
     if (!currentUser || !currentRoom || activeMembers.length < 1) { setRivalStatus([]); return; }
     const today = getToday();
@@ -724,7 +725,7 @@ function VersaAppMain() {
     setRivalStatus(rivals);
   }, [currentUser, currentRoom, roomMembers, roomKicked, completions, allCompletions, habits]);
 
-  // ─── HEAT MAP (load on demand) ───
+  // â”€â”€â”€ HEAT MAP (load on demand) â”€â”€â”€
   const loadHeatMap = async () => {
     if (!currentUser) return;
     try {
@@ -746,24 +747,24 @@ function VersaAppMain() {
     } catch (err) { console.error('Heat map error:', err); setShowHeatMap(true); }
   };
 
-  // ─── ROOM ROLES (computed from performance) ───
+  // â”€â”€â”€ ROOM ROLES (computed from performance) â”€â”€â”€
   const getRoomRole = (uid) => {
     if (!currentRoom) return null;
     if ((roomCreatedBy || currentRoom.createdBy) === uid) {
-      if (weeklyWinner?.member?.id === uid) return { role: 'Champion', icon: '👑', color: 'text-[#e8864a]' };
-      return { role: 'Creator', icon: '⚡', color: 'text-blue-400' };
+      if (weeklyWinner?.member?.id === uid) return { role: 'Champion', icon: 'ðŸ‘‘', color: 'text-[#e8864a]' };
+      return { role: 'Creator', icon: 'âš¡', color: 'text-blue-400' };
     }
-    if (weeklyWinner?.member?.id === uid) return { role: 'Defender', icon: '🛡️', color: 'text-[#e8864a]' };
+    if (weeklyWinner?.member?.id === uid) return { role: 'Defender', icon: 'ðŸ›¡ï¸', color: 'text-[#e8864a]' };
     if (lastWeekData?.scores) {
       const lastIdx = lastWeekData.scores.findIndex(s => s.member.id === uid);
-      if (lastIdx === lastWeekData.scores.length - 1 && lastWeekData.scores.length > 1) return { role: 'Underdog', icon: '🔥', color: 'text-red-400' };
+      if (lastIdx === lastWeekData.scores.length - 1 && lastWeekData.scores.length > 1) return { role: 'Underdog', icon: 'ðŸ”¥', color: 'text-red-400' };
     }
     const myWeekPts = allCompletions.filter(c => c.userId === uid && c.date >= getWeekStart() && c.date <= getWeekEnd()).reduce((s, c) => { const h = habits.find(x => x.id === c.habitId); return s + ((c.habitPoints || h?.points || 0) * (c.count || 1)) + (c.bonusPoints || 0); }, 0);
-    if (weeklyWinner && myWeekPts > 0 && myWeekPts >= (weeklyWinner.pts * 0.8)) return { role: 'Challenger', icon: '⚔️', color: 'text-purple-400' };
+    if (weeklyWinner && myWeekPts > 0 && myWeekPts >= (weeklyWinner.pts * 0.8)) return { role: 'Challenger', icon: 'âš”ï¸', color: 'text-purple-400' };
     return null;
   };
 
-  // ─── PERSONAL INSIGHTS (load on demand) ───
+  // â”€â”€â”€ PERSONAL INSIGHTS (load on demand) â”€â”€â”€
   const loadInsights = async () => {
     if (!currentUser || !currentRoom) return;
     try {
@@ -805,8 +806,8 @@ function VersaAppMain() {
     } catch (err) { console.error(err); setShowInsights(true); }
   };
 
-  // ─── CUSTOM BOARDS ───
-  // ─── PERSONAL BOARD ───
+  // â”€â”€â”€ CUSTOM BOARDS â”€â”€â”€
+  // â”€â”€â”€ PERSONAL BOARD â”€â”€â”€
   const toggleHabitOnBoard = async (habitId) => {
     if (!currentUser || !currentRoom) return;
     const boardDocId = currentUser.id + '_' + currentRoom.id;
@@ -863,13 +864,13 @@ function VersaAppMain() {
     } catch { }
   };
 
-  // ─── TIMER + MIDNIGHT RESET ───
+  // â”€â”€â”€ TIMER + MIDNIGHT RESET â”€â”€â”€
   useEffect(() => {
     const update = () => {
       const n = new Date(), m = new Date(n); m.setHours(24, 0, 0, 0);
       const d = m - n;
       setTimeDisplay(Math.floor(d / 3600000) + 'h ' + Math.floor((d % 3600000) / 60000) + 'm');
-      // Check if date changed (midnight crossed) — triggers re-subscribe
+      // Check if date changed (midnight crossed) â€” triggers re-subscribe
       const today = getToday();
       setDateKey(prev => { if (prev !== today) return today; return prev; });
     };
@@ -890,13 +891,13 @@ function VersaAppMain() {
         try {
           await supabase.from('users').update({ streak_freeze: 1 }).eq('id', currentUser.id);
           setStreakFreeze(1);
-          setFreezeMsg('🛡️ Streak freeze earned! Complete 90% tomorrow to earn another.');
+          setFreezeMsg('ðŸ›¡ï¸ Streak freeze earned! Complete 90% tomorrow to earn another.');
           setTimeout(() => setFreezeMsg(null), 4000);
         } catch { }
       };
       award();
     } else if (prog < 0.9 && freezeEarnedRef.current && streakFreeze > 0) {
-      // Progress dropped below 90% — revoke the freeze earned today
+      // Progress dropped below 90% â€” revoke the freeze earned today
       freezeEarnedRef.current = false;
       const revoke = async () => {
         try {
@@ -909,7 +910,7 @@ function VersaAppMain() {
   }, [currentUser, currentRoom, completions, habits, streakFreeze, dailyTarget]);
   useEffect(() => { freezeEarnedRef.current = false; }, [dateKey]);
 
-  // ─── AUTH HANDLERS ───
+  // â”€â”€â”€ AUTH HANDLERS â”€â”€â”€
   const handleSignup = async (e) => {
     e.preventDefault(); setError(''); setLoading(true);
     if (!username.trim()) { setError('Username required'); setLoading(false); return; }
@@ -950,7 +951,7 @@ function VersaAppMain() {
     } finally { setLoading(false); }
   };
 
-  // ─── ROOM ───
+  // â”€â”€â”€ ROOM â”€â”€â”€
   const createRoom = async () => {
     setError(''); setLoading(true);
     try {
@@ -989,7 +990,7 @@ function VersaAppMain() {
   };
   const copyCode = () => { navigator.clipboard.writeText(currentRoom.code); setCopied(true); setTimeout(() => setCopied(false), 2000); };
 
-  // ─── ROOM CREATOR PERMISSIONS ───
+  // â”€â”€â”€ ROOM CREATOR PERMISSIONS â”€â”€â”€
   const isRoomCreator = (roomCreatedBy || currentRoom?.createdBy) === currentUser?.id;
   const kickedIds = roomKicked;
   const activeMembers = roomMembers.filter(m => !kickedIds.includes(m.id));
@@ -1022,7 +1023,7 @@ function VersaAppMain() {
     } catch { setError('Failed to transfer'); }
   };
 
-  // ─── STAKES ───
+  // â”€â”€â”€ STAKES â”€â”€â”€
   const saveStake = async () => {
     if (!newStake.description.trim()) return;
     if (!currentRoom?.id || !currentUser?.id) { setError('No room selected'); return; }
@@ -1063,7 +1064,7 @@ function VersaAppMain() {
     }
   };
 
-  // ─── HABITS (CREATE, EDIT, DELETE) ───
+  // â”€â”€â”€ HABITS (CREATE, EDIT, DELETE) â”€â”€â”€
   const addHabit = async () => {
     if (!newHabit.name.trim()) return;
     const hid = currentRoom.id + '_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8);
@@ -1109,28 +1110,28 @@ function VersaAppMain() {
   };
   const openEditHabit = (habit) => { setEditHabitData({ name: habit.name, category: habit.category, points: Math.abs(habit.points || 10), isNegative: (habit.points || 0) < 0, isRepeatable: habit.isRepeatable, unit: habit.unit || '', description: habit.description || '' }); setShowEditHabit(habit.id); };
 
-  // ─── COMPLETIONS (with embedded habit data for orphan-proofing) ───
+  // â”€â”€â”€ COMPLETIONS (with embedded habit data for orphan-proofing) â”€â”€â”€
   const getExisting = (hid) => { const t = getToday(); return completions.find(c => c.userId === currentUser.id && c.habitId === hid && c.date === t); };
 
   // Mystery bonus: flat point bonuses with different probabilities
   // ~10% total chance of getting a bonus on any completion
   const rollBonus = () => {
     const roll = Math.random();
-    if (roll < 0.002) return { flat: 50, label: '🎰 JACKPOT! +50', type: 'jackpot' };
-    if (roll < 0.007) return { flat: 20, label: '🔥 +20 BONUS!', type: 'epic' };
-    if (roll < 0.02) return { flat: 15, label: '⚡ +15 BONUS!', type: 'rare' };
-    if (roll < 0.05) return { flat: 10, label: '✨ +10 BONUS!', type: 'bonus' };
-    if (roll < 0.10) return { flat: 5, label: '🌟 +5 BONUS!', type: 'common' };
+    if (roll < 0.002) return { flat: 50, label: 'ðŸŽ° JACKPOT! +50', type: 'jackpot' };
+    if (roll < 0.007) return { flat: 20, label: 'ðŸ”¥ +20 BONUS!', type: 'epic' };
+    if (roll < 0.02) return { flat: 15, label: 'âš¡ +15 BONUS!', type: 'rare' };
+    if (roll < 0.05) return { flat: 10, label: 'âœ¨ +10 BONUS!', type: 'bonus' };
+    if (roll < 0.10) return { flat: 5, label: 'ðŸŒŸ +5 BONUS!', type: 'common' };
     return null;
   };
 
-  // ─── STREAK MULTIPLIER (clean numbers) ───
+  // â”€â”€â”€ STREAK MULTIPLIER (clean numbers) â”€â”€â”€
   const getStreakMultiplier = (streak) => {
-    if (streak >= 30) return { multi: 3, label: '3×', tier: 'Legend', color: 'text-red-400', bg: 'bg-red-500/20' };
-    if (streak >= 14) return { multi: 2.5, label: '2.5×', tier: 'Dedicated', color: 'text-[#e8864a]', bg: 'bg-[#e8864a]/20' };
-    if (streak >= 7) return { multi: 2, label: '2×', tier: 'Consistent', color: 'text-purple-400', bg: 'bg-purple-500/20' };
-    if (streak >= 3) return { multi: 1.5, label: '1.5×', tier: 'Building', color: 'text-blue-400', bg: 'bg-blue-500/20' };
-    return { multi: 1, label: '1×', tier: null, color: 'text-gray-500', bg: '' };
+    if (streak >= 30) return { multi: 3, label: '3Ã—', tier: 'Legend', color: 'text-red-400', bg: 'bg-red-500/20' };
+    if (streak >= 14) return { multi: 2.5, label: '2.5Ã—', tier: 'Dedicated', color: 'text-[#e8864a]', bg: 'bg-[#e8864a]/20' };
+    if (streak >= 7) return { multi: 2, label: '2Ã—', tier: 'Consistent', color: 'text-purple-400', bg: 'bg-purple-500/20' };
+    if (streak >= 3) return { multi: 1.5, label: '1.5Ã—', tier: 'Building', color: 'text-blue-400', bg: 'bg-blue-500/20' };
+    return { multi: 1, label: '1Ã—', tier: null, color: 'text-gray-500', bg: '' };
   };
   const streakMulti = getStreakMultiplier(streakData.streak || 0);
 
@@ -1144,7 +1145,7 @@ function VersaAppMain() {
     } catch { }
   };
 
-  const REACTION_EMOJIS = ['🔥', '💀', '👏', '😤'];
+  const REACTION_EMOJIS = ['ðŸ”¥', 'ðŸ’€', 'ðŸ‘', 'ðŸ˜¤'];
   const reactToActivity = async (activityId, emoji) => {
     if (!currentUser) return;
     try {
@@ -1172,7 +1173,7 @@ function VersaAppMain() {
     const bonusAmt = bonus ? bonus.flat : 0;
     const finalPts = baseWithStreak + bonusAmt;
 
-    // Optimistic update — immediately update local state
+    // Optimistic update â€” immediately update local state
     if (ex) {
       if (!h.isRepeatable && ex.count >= 1) return;
       setCompletions(prev => prev.map(c => c.id === ex.id ? { ...c, count: c.count + 1, habitPoints: baseWithStreak, bonusPoints: (c.bonusPoints || 0) + bonusAmt } : c));
@@ -1210,12 +1211,12 @@ function VersaAppMain() {
       }
       // Post to activity feed
       const newCount = ex ? ex.count + 1 : 1;
-      const streakTag = streakMulti.multi > 1 ? ` 🔥${streakMulti.label}` : '';
+      const streakTag = streakMulti.multi > 1 ? ` ðŸ”¥${streakMulti.label}` : '';
       const feedText = bonus
         ? `${h.name} (${baseWithStreak > 0 ? '+' : ''}${baseWithStreak} ${bonus.label})${streakTag}`
         : `${h.name} (${baseWithStreak > 0 ? '+' : ''}${baseWithStreak})${streakTag}`;
       if (newCount >= max) {
-        postActivity(`Maxed out ${h.name}! 💎${streakTag}`, bonus);
+        postActivity(`Maxed out ${h.name}! ðŸ’Ž${streakTag}`, bonus);
       } else if (newCount === 1 || Math.random() < 0.3) {
         postActivity(feedText, bonus);
       }
@@ -1247,7 +1248,7 @@ function VersaAppMain() {
     } catch (err) { console.error(err); }
   };
 
-  // ─── HISTORY ───
+  // â”€â”€â”€ HISTORY â”€â”€â”€
   const loadHistoryDate = async (dateStr) => {
     setHistoryDate(dateStr);
     try {
@@ -1264,7 +1265,7 @@ function VersaAppMain() {
     loadHistoryDate(ds);
   };
 
-  // ─── SCORING ───
+  // â”€â”€â”€ SCORING â”€â”€â”€
   const getCatPts = (uid, cat) => completions.filter(c => c.userId === uid && c.date === getToday()).reduce((s, c) => { const h = habits.find(x => x.id === c.habitId); if ((h?.category || c.habitCategory) === cat) return s + ((c.habitPoints || h?.points || 0) * (c.count || 1)) + (c.bonusPoints || 0); return s; }, 0);
   const getTodayCrystals = (uid) => {
     const cr = {}; allCatNames.forEach(c => cr[c] = false);
@@ -1299,9 +1300,9 @@ function VersaAppMain() {
   const getLeaderboard = () => activeMembers.map(m => ({ member: m, todayPts: getTodayPts(m.id), weeklyPts: getWeeklyPts(m.id), crystals: getTodayCrystals(m.id), weeklyCrystals: getWeeklyCrystals(m.id) })).sort((a, b) => leaderboardTab === 'today' ? b.todayPts - a.todayPts : b.weeklyPts - a.weeklyPts);
 
   const DEFAULT_CATEGORIES = [
-    { name: 'Study', colorIdx: 0, icon: '📚' },
-    { name: 'Health', colorIdx: 1, icon: '💪' },
-    { name: 'Focus', colorIdx: 2, icon: '🎯' },
+    { name: 'Study', colorIdx: 0, icon: 'ðŸ“š' },
+    { name: 'Health', colorIdx: 1, icon: 'ðŸ’ª' },
+    { name: 'Focus', colorIdx: 2, icon: 'ðŸŽ¯' },
   ];
   const activeCategories = roomCategories.length > 0 ? roomCategories : DEFAULT_CATEGORIES;
   const allCatNames = activeCategories.map(c => c.name);
@@ -1315,7 +1316,7 @@ function VersaAppMain() {
     { name: 'Mauve', neon: '#9b6bc8', bg: 'bg-[#9b6bc8]', bgS: 'bg-[#9b6bc8]/10', bgM: 'bg-[#9b6bc8]/20', bdr: 'border-[#9b6bc8]/30', txt: 'text-[#9b6bc8]', txtB: 'text-[#b58be0]', pill: 'bg-[#9b6bc8]/20 text-[#9b6bc8]', glow: 'shadow-[#9b6bc8]/20' },
     { name: 'Ochre', neon: '#d4a04a', bg: 'bg-[#d4a04a]', bgS: 'bg-[#d4a04a]/10', bgM: 'bg-[#d4a04a]/20', bdr: 'border-[#d4a04a]/30', txt: 'text-[#d4a04a]', txtB: 'text-[#e0b86a]', pill: 'bg-[#d4a04a]/20 text-[#d4a04a]', glow: 'shadow-[#d4a04a]/20' },
   ];
-  const ICON_OPTIONS = ['🧠', '💪', '✨', '⭐', '📚', '🎨', '💼', '🏃', '🧘', '💰', '🎯', '❤️', '🌱', '🔬', '🎮', '🍎'];
+  const ICON_OPTIONS = ['ðŸ§ ', 'ðŸ’ª', 'âœ¨', 'â­', 'ðŸ“š', 'ðŸŽ¨', 'ðŸ’¼', 'ðŸƒ', 'ðŸ§˜', 'ðŸ’°', 'ðŸŽ¯', 'â¤ï¸', 'ðŸŒ±', 'ðŸ”¬', 'ðŸŽ®', 'ðŸŽ'];
   const getCT = (catName) => {
     const cat = activeCategories.find(c => c.name === catName);
     const idx = cat?.colorIdx ?? 0;
@@ -1335,7 +1336,7 @@ function VersaAppMain() {
     const updated = [...activeCategories, { name: newCatName.trim(), colorIdx: newCatColor, icon: newCatIcon }];
     try {
       await supabase.from('room_categories').upsert({ room_id: currentRoom.id, categories: updated });
-      setNewCatName(''); setNewCatColor(0); setNewCatIcon('⭐'); setShowAddCategory(false);
+      setNewCatName(''); setNewCatColor(0); setNewCatIcon('â­'); setShowAddCategory(false);
     } catch { setError('Failed to add category'); }
   };
   const deleteCategory = async (catName) => {
@@ -1352,7 +1353,7 @@ function VersaAppMain() {
     { type: 'service', label: 'Service', desc: 'Loser does a favor', ph: "e.g. Loser's chores" },
   ];
 
-  // ─── THEME CLASSES ───
+  // â”€â”€â”€ THEME CLASSES â”€â”€â”€
   const T = darkMode ? {
     bg: 'bg-[#0f1b2d]', bgCard: 'bg-[#182544]', bgCardHover: 'hover:bg-[#1e2e50]', bgInput: 'bg-[#182544]',
     border: 'border-[#223858]', borderInput: 'border-[#264060]', text: 'text-white', textMuted: 'text-[#7a8ba8]',
@@ -1367,7 +1368,7 @@ function VersaAppMain() {
   const inputCls = `w-full px-4 py-3 ${T.bgInput} border ${T.borderInput} rounded-xl focus:outline-none focus:border-[#4a90e8]/50 ${T.text} placeholder-[#4a6080] text-sm transition-all`;
   const btnPrimary = "w-full py-3.5 rounded-xl text-sm font-bold tracking-wide transition-all disabled:opacity-50 active:scale-[0.98]";
 
-  // ─── NOTIFICATIONS STATE ───
+  // â”€â”€â”€ NOTIFICATIONS STATE â”€â”€â”€
   const [notifPermission, setNotifPermission] = useState(() => ('Notification' in window) ? Notification.permission : 'default');
   const prevCompletionsRef = useRef([]);
   const prevActivityRef = useRef([]);
@@ -1418,9 +1419,9 @@ function VersaAppMain() {
         const prevRivalPts = prev.filter(c => c.userId === latest.userId).reduce((s, c) => s + ((c.habitPoints || 0) * (c.count || 1)) + (c.bonusPoints || 0), 0);
         const rivalCount = completions.filter(c => c.userId === latest.userId).reduce((s, c) => s + (c.count || 1), 0);
         if (rivalPts > myPts && prevRivalPts <= myPts && myPts > 0) {
-          throttledNotify('🔥 ' + member.username + ' passed you!', rivalPts + ' pts vs your ' + myPts + '. Time to grind.', 'rival-pass-' + latest.userId);
+          throttledNotify('ðŸ”¥ ' + member.username + ' passed you!', rivalPts + ' pts vs your ' + myPts + '. Time to grind.', 'rival-pass-' + latest.userId);
         } else if (rivalCount >= 5 && rivalCount % 5 === 0) {
-          throttledNotify(member.username + ' is on a tear 💪', rivalCount + ' habits logged today.', 'rival-tear-' + latest.userId);
+          throttledNotify(member.username + ' is on a tear ðŸ’ª', rivalCount + ' habits logged today.', 'rival-tear-' + latest.userId);
         } else if (document.hidden && habit) {
           throttledNotify(member.username + ' is grinding', habit.name + ' (+' + (habit.points || 10) + ')', 'rival-log');
         }
@@ -1455,22 +1456,22 @@ function VersaAppMain() {
       const today = getToday();
       if (hour === 18 && myPts === 0) {
         const k = 'versa-nudge-' + today;
-        if (!sessionStorage.getItem(k)) { sendLocalNotification('📋 Don\'t forget to log today', 'Your rivals might already be ahead.', 'daily-nudge'); sessionStorage.setItem(k, '1'); }
+        if (!sessionStorage.getItem(k)) { sendLocalNotification('ðŸ“‹ Don\'t forget to log today', 'Your rivals might already be ahead.', 'daily-nudge'); sessionStorage.setItem(k, '1'); }
       }
       const currentDynamicTarget = getDynamicStreakTarget(streakTarget, streakMulti.multi);
       if (hour === 20 && myPts < currentDynamicTarget && streakData.streak > 0) {
         const k = 'versa-s8-' + today;
-        if (!sessionStorage.getItem(k)) { sendLocalNotification('⚠️ Your ' + streakData.streak + '-day streak is at risk', 'Log ' + currentDynamicTarget + 'pts before midnight.', 'streak-8pm'); sessionStorage.setItem(k, '1'); }
+        if (!sessionStorage.getItem(k)) { sendLocalNotification('âš ï¸ Your ' + streakData.streak + '-day streak is at risk', 'Log ' + currentDynamicTarget + 'pts before midnight.', 'streak-8pm'); sessionStorage.setItem(k, '1'); }
       }
       if (hour === 22 && myPts < currentDynamicTarget && streakData.streak > 0) {
         const k = 'versa-s10-' + today;
-        if (!sessionStorage.getItem(k)) { sendLocalNotification('🚨 2 hours left!', (streakFreeze > 0 ? 'Freeze will save you.' : 'No freeze — this is it.'), 'streak-10pm'); sessionStorage.setItem(k, '1'); }
+        if (!sessionStorage.getItem(k)) { sendLocalNotification('ðŸš¨ 2 hours left!', (streakFreeze > 0 ? 'Freeze will save you.' : 'No freeze â€” this is it.'), 'streak-10pm'); sessionStorage.setItem(k, '1'); }
       }
       if (new Date().getDay() === 0 && hour === 18 && activeMembers.length > 1) {
         const k = 'versa-lp-' + today;
         if (!sessionStorage.getItem(k)) {
           const lb = activeMembers.map(m => ({ id: m.id, pts: allCompletions.filter(c => c.userId === m.id).reduce((s, c) => s + ((c.habitPoints || 0) * (c.count || 1)) + (c.bonusPoints || 0), 0) })).sort((a, b) => b.pts - a.pts);
-          if (lb.length > 0 && lb[lb.length - 1].id === currentUser.id) { sendLocalNotification('😬 You\'re in last place', 'The week resets tonight.', 'last-place'); sessionStorage.setItem(k, '1'); }
+          if (lb.length > 0 && lb[lb.length - 1].id === currentUser.id) { sendLocalNotification('ðŸ˜¬ You\'re in last place', 'The week resets tonight.', 'last-place'); sessionStorage.setItem(k, '1'); }
         }
       }
     };
@@ -1479,7 +1480,7 @@ function VersaAppMain() {
     return () => clearInterval(iv);
   }, [notifPermission, myPts, streakData.streak, streakMulti.multi, streakTarget]);
 
-  // Celebration: won the week — only on Monday (day after reset)
+  // Celebration: won the week â€” only on Monday (day after reset)
   useEffect(() => {
     if (!currentUser || !lastWeekData || notifPermission !== 'granted') return;
     const day = new Date().getDay(); // 0=Sun, 1=Mon
@@ -1487,7 +1488,7 @@ function VersaAppMain() {
     const key = 'versa-weekwin-' + getWeekStart();
     try { if (localStorage.getItem(key)) return; } catch { }
     if (lastWeekData.scores.length > 0 && lastWeekData.scores[0].member.id === currentUser.id) {
-      throttledNotify('🏆 You won the week!', lastWeekData.scores[0].pts + ' pts — you dominated.', 'week-win');
+      throttledNotify('ðŸ† You won the week!', lastWeekData.scores[0].pts + ' pts â€” you dominated.', 'week-win');
       try { localStorage.setItem(key, '1'); } catch { }
     }
   }, [lastWeekData, notifPermission]);
@@ -1500,12 +1501,12 @@ function VersaAppMain() {
       const crossed = [3, 7, 14, 30].find(m => days >= m && last < m);
       if (crossed) {
         const rival = activeMembers.find(m => m.id === uid);
-        if (rival) { duoMilestoneRef.current[uid] = crossed; throttledNotify('🔗 ' + crossed + '-day duo streak!', 'You and ' + rival.username + ' — ' + crossed + ' days.', 'duo-' + uid); }
+        if (rival) { duoMilestoneRef.current[uid] = crossed; throttledNotify('ðŸ”— ' + crossed + '-day duo streak!', 'You and ' + rival.username + ' â€” ' + crossed + ' days.', 'duo-' + uid); }
       }
     });
   }, [mutualStreaks, notifPermission]);
 
-  // Personal: progress milestones (independent — no rival needed)
+  // Personal: progress milestones (independent â€” no rival needed)
   const prevProgressRef = useRef(0);
   useEffect(() => {
     if (!currentUser || notifPermission !== 'granted' || !habits.length) return;
@@ -1514,15 +1515,15 @@ function VersaAppMain() {
     const today = getToday();
     if (prev < 0.5 && prog >= 0.5 && prog < 1) {
       const k = 'versa-50-' + today;
-      if (!sessionStorage.getItem(k)) { throttledNotify('💪 Halfway there!', myPts + ' pts — keep pushing to 100%.', 'progress-50'); sessionStorage.setItem(k, '1'); }
+      if (!sessionStorage.getItem(k)) { throttledNotify('ðŸ’ª Halfway there!', myPts + ' pts â€” keep pushing to 100%.', 'progress-50'); sessionStorage.setItem(k, '1'); }
     }
     if (prev < 0.75 && prog >= 0.75 && prog < 1) {
       const k = 'versa-75-' + today;
-      if (!sessionStorage.getItem(k)) { throttledNotify('🔥 75% done!', myPts + ' pts — almost there.', 'progress-75'); sessionStorage.setItem(k, '1'); }
+      if (!sessionStorage.getItem(k)) { throttledNotify('ðŸ”¥ 75% done!', myPts + ' pts â€” almost there.', 'progress-75'); sessionStorage.setItem(k, '1'); }
     }
     if (prev < 1 && prog >= 1) {
       const k = 'versa-100-' + today;
-      if (!sessionStorage.getItem(k)) { throttledNotify('🎯 100% — Daily target crushed!', myPts + ' pts today. Legend.', 'progress-100'); sessionStorage.setItem(k, '1'); }
+      if (!sessionStorage.getItem(k)) { throttledNotify('ðŸŽ¯ 100% â€” Daily target crushed!', myPts + ' pts today. Legend.', 'progress-100'); sessionStorage.setItem(k, '1'); }
     }
     prevProgressRef.current = prog;
   }, [dailyProg, notifPermission]);
@@ -1539,7 +1540,7 @@ function VersaAppMain() {
       const k = 'versa-streak-' + crossed;
       try {
         if (!localStorage.getItem(k)) {
-          throttledNotify('🔥 ' + crossed + '-day streak!', 'You\'ve been consistent for ' + crossed + ' days straight.', 'streak-milestone-' + crossed);
+          throttledNotify('ðŸ”¥ ' + crossed + '-day streak!', 'You\'ve been consistent for ' + crossed + ' days straight.', 'streak-milestone-' + crossed);
           localStorage.setItem(k, '1');
         }
       } catch { }
@@ -1547,7 +1548,7 @@ function VersaAppMain() {
     prevStreakNotifRef.current = streak;
   }, [streakData.streak, notifPermission]);
 
-  // ─── LOADING ───
+  // â”€â”€â”€ LOADING â”€â”€â”€
   if (authLoading) return (
     <div className="min-h-screen bg-[#0f1b2d] flex items-center justify-center relative overflow-hidden">
       <div className="text-center">
@@ -1565,9 +1566,9 @@ function VersaAppMain() {
   prevProgRef.current = dailyProg;
   const soloMode = activeMembers.length < 2;
 
-  // ═══════════════════════════════════════
+  // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
   // ONBOARDING
-  // ═══════════════════════════════════════
+  // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
   if (!currentUser && view === 'onboarding') {
     return (
       <div className="min-h-screen bg-[#0f1b2d] flex flex-col items-center justify-center p-6 relative overflow-hidden">
@@ -1586,10 +1587,10 @@ function VersaAppMain() {
           {/* Feature cards */}
           <div className="space-y-3 mb-8">
             {[
-              { icon: '📚', title: 'Track What Matters', desc: 'Studying, gym, screen time, sleep. Earn points for everything.', color: 'from-[#5b7cf5]/10 to-[#5b7cf5]/5' },
-              { icon: '🔥', title: 'Streak Multipliers', desc: 'Don\'t break the chain → earn up to 2× points.', color: 'from-[#e8864a]/10 to-[#e8864a]/5' },
-              { icon: '🏆', title: 'Compete with Friends', desc: 'Real-time leaderboards. Set stakes. Loser pays.', color: 'from-[#d4a04a]/10 to-[#d4a04a]/5' },
-              { icon: '💎', title: 'Win Crystals', desc: 'Top scorer in Study, Health, or Focus earns the crystal.', color: 'from-[#9b6bc8]/10 to-[#9b6bc8]/5' },
+              { icon: 'ðŸ“š', title: 'Track What Matters', desc: 'Studying, gym, screen time, sleep. Earn points for everything.', color: 'from-[#5b7cf5]/10 to-[#5b7cf5]/5' },
+              { icon: 'ðŸ”¥', title: 'Streak Multipliers', desc: 'Don\'t break the chain â†’ earn up to 2Ã— points.', color: 'from-[#e8864a]/10 to-[#e8864a]/5' },
+              { icon: 'ðŸ†', title: 'Compete with Friends', desc: 'Real-time leaderboards. Set stakes. Loser pays.', color: 'from-[#d4a04a]/10 to-[#d4a04a]/5' },
+              { icon: 'ðŸ’Ž', title: 'Win Crystals', desc: 'Top scorer in Study, Health, or Focus earns the crystal.', color: 'from-[#9b6bc8]/10 to-[#9b6bc8]/5' },
             ].map((item, i) => (
               <div key={i} className={`bg-gradient-to-r ${item.color} backdrop-blur-sm border border-[#223858] rounded-2xl p-4 flex items-center gap-4`}>
                 <span className="text-2xl">{item.icon}</span>
@@ -1613,9 +1614,9 @@ function VersaAppMain() {
     );
   }
 
-  // ═══════════════════════════════════════
+  // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
   // AUTH SCREENS
-  // ═══════════════════════════════════════
+  // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
   if (!currentUser) {
     return (
       <div className="min-h-screen bg-[#0f1b2d] flex items-center justify-center p-4 relative overflow-hidden">
@@ -1634,7 +1635,7 @@ function VersaAppMain() {
                 {error && <p className="text-red-400 text-xs text-center">{error}</p>}
                 {successMsg && <p className="text-emerald-400 text-xs text-center">{successMsg}</p>}
                 <button type="submit" disabled={loading} className={btnPrimary + ' bg-gradient-to-r from-blue-600 to-blue-500 text-white shadow-lg shadow-[#5b7cf5]/15 !rounded-xl'}>{loading ? 'Sending...' : 'Send Reset Link'}</button>
-                <button type="button" onClick={() => { setView('login'); setError(''); setSuccessMsg(''); }} className="w-full text-gray-500 py-2 hover:text-white text-sm transition-colors">← Back to Sign In</button>
+                <button type="button" onClick={() => { setView('login'); setError(''); setSuccessMsg(''); }} className="w-full text-gray-500 py-2 hover:text-white text-sm transition-colors">â† Back to Sign In</button>
               </form>
             ) : view === 'login' ? (
               <div className="space-y-4">
@@ -1652,7 +1653,7 @@ function VersaAppMain() {
                   <button type="submit" disabled={loading} className={btnPrimary + ' bg-[#5b7cf5] text-white shadow-lg shadow-[#5b7cf5]/15 !rounded-xl'}>{loading ? 'Signing in...' : 'Sign In'}</button>
                 </form>
                 <div className="flex justify-between pt-1">
-                  <button type="button" onClick={() => { setView('onboarding'); setError(''); }} className="text-gray-500 text-xs hover:text-white transition-colors">← Create Account</button>
+                  <button type="button" onClick={() => { setView('onboarding'); setError(''); }} className="text-gray-500 text-xs hover:text-white transition-colors">â† Create Account</button>
                   <button type="button" onClick={() => { setView('forgot'); setError(''); }} className="text-gray-500 text-xs hover:text-blue-400 transition-colors">Forgot password?</button>
                 </div>
               </div>
@@ -1681,13 +1682,13 @@ function VersaAppMain() {
     );
   }
 
-  // ═══ KICKED CHECK ═══
+  // â•â•â• KICKED CHECK â•â•â•
   const isKicked = currentRoom && roomKicked.includes(currentUser?.id);
 
   if (isKicked) return (
     <div className="min-h-screen bg-[#0f1b2d] flex items-center justify-center p-4">
       <div className="text-center max-w-sm">
-        <div className="text-4xl mb-4">🚫</div>
+        <div className="text-4xl mb-4">ðŸš«</div>
         <h2 className="text-lg font-bold text-white mb-2">You've been removed from this room</h2>
         <p className="text-gray-500 text-sm mb-6">The room creator has removed you from <span className="font-mono text-gray-400">{currentRoom.code}</span>.</p>
         <div className="space-y-3">
@@ -1701,7 +1702,7 @@ function VersaAppMain() {
     </div>
   );
 
-  // ═══ ROOM SELECT ═══
+  // â•â•â• ROOM SELECT â•â•â•
   if (showRoomModal) return (
     <div className="min-h-screen bg-[#0f1b2d] flex items-center justify-center p-4 relative overflow-hidden">
       <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[600px] h-[600px] bg-gradient-to-b from-blue-600/8 via-purple-600/5 to-transparent rounded-full blur-[120px] -translate-y-1/3" />
@@ -1712,14 +1713,14 @@ function VersaAppMain() {
         {onboardingStep === 0 && (
           <div className="text-center space-y-6">
             <div>
-              <div className="text-5xl mb-4">👋</div>
+              <div className="text-5xl mb-4">ðŸ‘‹</div>
               <h1 className="text-2xl font-bold text-white mb-2">Welcome, <span className="text-[#5b7cf5]">{currentUser.username}</span></h1>
               <p className="text-gray-500 text-sm leading-relaxed">Compete with friends on real habits.<br />Let's get you set up in 30 seconds.</p>
             </div>
             <div className="space-y-3">
               {[
-                { icon: '🏠', title: 'Create a room', desc: 'Start fresh and invite friends', action: () => setOnboardingStep(1) },
-                { icon: '🔗', title: 'Join a room', desc: 'Got a code from a friend?', action: () => setOnboardingStep(2) },
+                { icon: 'ðŸ ', title: 'Create a room', desc: 'Start fresh and invite friends', action: () => setOnboardingStep(1) },
+                { icon: 'ðŸ”—', title: 'Join a room', desc: 'Got a code from a friend?', action: () => setOnboardingStep(2) },
               ].map((opt, i) => (
                 <button key={i} onClick={opt.action} className="w-full flex items-center gap-4 p-4 bg-[#151d30] border border-[#223858] rounded-2xl text-left hover:bg-[#1e3050] transition-all active:scale-[0.98]">
                   <span className="text-2xl">{opt.icon}</span>
@@ -1736,7 +1737,7 @@ function VersaAppMain() {
         {onboardingStep === 1 && (
           <div className="space-y-6">
             <div className="text-center">
-              <div className="text-4xl mb-3">🏠</div>
+              <div className="text-4xl mb-3">ðŸ </div>
               <h2 className="text-xl font-bold text-white mb-1">Create your room</h2>
               <p className="text-gray-500 text-sm">A room is where you and your friends track habits and compete. You'll get a code to share.</p>
             </div>
@@ -1755,7 +1756,7 @@ function VersaAppMain() {
               </div>
             </div>
             <button onClick={async () => { await createRoom(); setShowInviteModal(false); setOnboardingStep(0); setShowOnboardingTour(true); }} disabled={loading} className={btnPrimary + ' bg-[#5b7cf5] text-white shadow-lg shadow-[#5b7cf5]/15 rounded-2xl'}>{loading ? 'Creating...' : 'Create Room'}</button>
-            <button onClick={() => setOnboardingStep(0)} className="w-full text-gray-600 text-xs hover:text-gray-400 transition-colors text-center">← Back</button>
+            <button onClick={() => setOnboardingStep(0)} className="w-full text-gray-600 text-xs hover:text-gray-400 transition-colors text-center">â† Back</button>
             {error && <p className="text-red-400 text-xs text-center">{error}</p>}
           </div>
         )}
@@ -1764,7 +1765,7 @@ function VersaAppMain() {
         {onboardingStep === 2 && (
           <div className="space-y-6">
             <div className="text-center">
-              <div className="text-4xl mb-3">🔗</div>
+              <div className="text-4xl mb-3">ðŸ”—</div>
               <h2 className="text-xl font-bold text-white mb-1">Join a room</h2>
               <p className="text-gray-500 text-sm">Enter the 6-letter code your friend shared with you.</p>
             </div>
@@ -1772,7 +1773,7 @@ function VersaAppMain() {
               <input type="text" placeholder="ABCDEF" value={roomCode} onChange={e => setRoomCode(e.target.value.toUpperCase())} className="w-full px-4 py-4 bg-[#1e2e50] border border-[#2a4060] rounded-xl focus:outline-none focus:border-blue-500/50 text-white placeholder-gray-600 text-lg font-mono tracking-[0.4em] text-center" maxLength={6} autoFocus />
             </div>
             <button onClick={async () => { await joinRoom(); setOnboardingStep(0); setShowOnboardingTour(true); }} disabled={loading || roomCode.length < 4} className={btnPrimary + ' bg-gradient-to-r from-orange-500 to-red-500 text-white shadow-lg shadow-orange-500/20 rounded-2xl disabled:opacity-40'}>{loading ? 'Joining...' : 'Join Room'}</button>
-            <button onClick={() => setOnboardingStep(0)} className="w-full text-gray-600 text-xs hover:text-gray-400 transition-colors text-center">← Back</button>
+            <button onClick={() => setOnboardingStep(0)} className="w-full text-gray-600 text-xs hover:text-gray-400 transition-colors text-center">â† Back</button>
             {error && <p className="text-red-400 text-xs text-center">{error}</p>}
           </div>
         )}
@@ -1781,15 +1782,15 @@ function VersaAppMain() {
     </div>
   );
 
-  // ═══════════════════════════════════════
+  // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
   // MAIN DASHBOARD
-  // ═══════════════════════════════════════
+  // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
   const tourSteps = [
-    { icon: '🎯', title: 'Track your habits', desc: 'Tap the + button on any habit to log it. Each completion earns you points. Try it now!' },
-    { icon: '🔥', title: 'Build your streak', desc: 'Complete at least one habit every day. The longer your streak, the higher your point multiplier — up to 3× at 30 days.' },
-    { icon: '💎', title: 'Win crystals', desc: 'Score the most points in any category (Grind, Health, Discipline) to earn a crystal for the day.' },
-    { icon: '🏆', title: 'Dominate the leaderboard', desc: 'Your weekly points determine the leaderboard rank. Set stakes to make losing hurt.' },
-    { icon: '👥', title: 'Invite your friends', desc: 'Share your room code and start competing. The more rivals, the better.' },
+    { icon: 'ðŸŽ¯', title: 'Track your habits', desc: 'Tap the + button on any habit to log it. Each completion earns you points. Try it now!' },
+    { icon: 'ðŸ”¥', title: 'Build your streak', desc: 'Complete at least one habit every day. The longer your streak, the higher your point multiplier â€” up to 3Ã— at 30 days.' },
+    { icon: 'ðŸ’Ž', title: 'Win crystals', desc: 'Score the most points in any category (Grind, Health, Discipline) to earn a crystal for the day.' },
+    { icon: 'ðŸ†', title: 'Dominate the leaderboard', desc: 'Your weekly points determine the leaderboard rank. Set stakes to make losing hurt.' },
+    { icon: 'ðŸ‘¥', title: 'Invite your friends', desc: 'Share your room code and start competing. The more rivals, the better.' },
   ];
 
   return (
@@ -1848,7 +1849,7 @@ function VersaAppMain() {
       {streakMilestone && (
         <div className="fixed top-20 left-1/2 -translate-x-1/2 z-[101] animate-bounce">
           <div className="px-6 py-3 rounded-2xl shadow-2xl text-center bg-gradient-to-r from-orange-500 to-red-500 text-white">
-            <div className="text-lg font-black">🔥 {streakMilestone.days}-Day Streak!</div>
+            <div className="text-lg font-black">ðŸ”¥ {streakMilestone.days}-Day Streak!</div>
             <div className="text-xs font-bold opacity-90">Unlocked: {streakMilestone.tier}</div>
           </div>
         </div>
@@ -1861,233 +1862,351 @@ function VersaAppMain() {
           </div>
         </div>
       )}
-      {/* ═══ HEADER ═══ */}
-      <div className={`${T.headerBg} ${T.blurBg} border-b ${T.border} sticky top-0 z-40`}>
-        <div className="max-w-2xl mx-auto px-4 py-3">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <h1 onClick={() => { logoTapRef.current.count++; clearTimeout(logoTapRef.current.timer); if (logoTapRef.current.count >= 3) { logoTapRef.current.count = 0; toggleDevMode(); } else { logoTapRef.current.timer = setTimeout(() => { logoTapRef.current.count = 0; }, 600); } }} className="text-lg font-black tracking-[0.15em] cursor-default select-none">VERSA</h1>
-              {streakData.streak > 0 && <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full ${darkMode ? 'bg-[#e8864a]/15' : 'bg-[#e8864a]/10'}`}><Flame size={13} className="text-[#e8864a]" /><span className="text-[#e8864a] text-sm font-bold">{streakData.streak}</span>{streakMulti.multi > 1 && <span className={`text-[9px] font-bold ${streakMulti.color}`}>{streakMulti.label}</span>}{streakFreeze > 0 && <span className="text-xs">🛡️</span>}</div>}
-            </div>
-            <div className="flex items-center gap-1.5">
-              <button onClick={() => setShowInviteModal(true)} className={`flex items-center gap-1.5 px-3 py-1.5 mr-1 rounded-full text-[11px] font-bold transition-all active:scale-[0.97] ${darkMode ? 'bg-blue-500/10 text-blue-400 border border-blue-500/20' : 'bg-blue-50 text-blue-600 border border-blue-200'}`}><UserPlus size={13} />Rooms</button>
-              <button onClick={() => setShowLeaderboard(true)} className={`p-2 rounded-xl ${darkMode ? 'hover:bg-[#1e3050]' : 'hover:bg-gray-100'} transition-colors`}><Trophy size={16} className="text-[#e8864a]" /></button>
-              <button onClick={toggleTheme} className={`p-2 rounded-xl ${darkMode ? 'hover:bg-[#1e3050]' : 'hover:bg-gray-100'} transition-colors`}>{darkMode ? <Sun size={16} className="text-gray-500" /> : <Moon size={16} className="text-gray-400" />}</button>
-              <div className="relative">
-                <button onClick={() => setShowSettingsMenu(!showSettingsMenu)} className={`p-2 rounded-xl transition-colors ${showSettingsMenu ? (darkMode ? 'bg-[#1e3050] text-white' : 'bg-gray-200 text-gray-900') : (darkMode ? 'hover:bg-[#1e3050]' : 'hover:bg-gray-100')}`}><Settings size={16} className={showSettingsMenu ? (darkMode ? 'text-white' : 'text-gray-900') : 'text-gray-500'} /></button>
-                {showSettingsMenu && <>
-                  <div className="fixed inset-0 z-40" onClick={() => setShowSettingsMenu(false)} />
+      {/* â•â•â• HEADER â•â•â• */}
+      <div className={`${T.headerBg} border-b ${T.border} sticky top-0 z-40 shadow-sm`}>
+        <div className="max-w-xl mx-auto px-5 py-4 flex items-center justify-between">
+          {activeTab === 'overview' && (
+            <>
+              <div className="flex items-center gap-3">
+                <h1 className="text-xl font-black tracking-widest text-[#5b7cf5]">VERSA <span className="text-xl">âœ¨</span></h1>
+                <div className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wide ${darkMode ? 'bg-gray-800 text-gray-300' : 'bg-gray-100 text-gray-500'}`}>Study Group Code: <span className={darkMode ? 'text-white' : 'text-gray-900'}>{currentRoom?.id}</span></div>
+              </div>
+              <div className="flex items-center cursor-pointer" onClick={() => setActiveTab('profile')}>
+                <div className="relative">
+                  {currentUser.photoURL ? <img src={currentUser.photoURL} className="w-9 h-9 rounded-full object-cover shadow-sm bg-gray-200" referrerPolicy="no-referrer" /> : <div className="w-9 h-9 rounded-full bg-gray-200 flex items-center justify-center"><User size={16} className="text-gray-500" /></div>}
+                  {streakData.streak > 0 && <div className="absolute -bottom-1 -right-2 flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-[#e8864a] border-2 border-white shadow-sm text-white text-[9px] font-black"><Flame size={10} />{streakData.streak}</div>}
+                </div>
+              </div>
+            </>
+          )}
+          {activeTab === 'habits' && (
+            <>
+              <div>
+                <h1 className={`text-2xl font-black ${darkMode ? 'text-white' : 'text-[#1e2532]'}`}>Log Progress</h1>
+                <div className="text-[11px] font-semibold text-gray-400 mt-1">Consistency builds momentum.</div>
+              </div>
+              {streakMulti.multi > 1 && <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full border ${darkMode ? 'bg-blue-500/10 border-blue-500/20 text-blue-300' : 'bg-blue-50 border-blue-200 text-blue-600'} text-xs font-bold shadow-sm`}><TrendingUp size={14} />{streakMulti.label}</div>}
+            </>
+          )}
+          {activeTab === 'cohort' && (
+            <>
+              <div>
+                <h1 className={`text-2xl font-black flex items-center gap-2 ${darkMode ? 'text-white' : 'text-[#1e2532]'}`}>Cohort <Users size={20} className="text-[#5b7cf5]"/ ></h1>
+                <div className="text-[11px] font-semibold text-gray-400 mt-1">Stay accountable with your group.</div>
+              </div>
+              <button onClick={() => { setHistoryDate(getYesterday()); loadHistoryDate(getYesterday()); setShowHistory(true); }} className={`p-2.5 rounded-2xl border ${darkMode ? 'border-[#223858] text-gray-400 bg-[#182544]' : 'border-gray-200 text-gray-500 bg-white'} shadow-sm`}>
+                <Calendar size={18} />
+              </button>
+            </>
+          )}
+          {activeTab === 'stakes' && (
+            <>
+              <div>
+                <h1 className={`text-2xl font-black flex items-center gap-2 ${darkMode ? 'text-white' : 'text-[#1e2532]'}`}>Weekly Stakes <Target size={20} className="text-red-500" /></h1>
+                <div className="text-[11px] font-semibold text-gray-400 mt-1">Set a consequence for the lowest performer.</div>
+              </div>
+            </>
+          )}
+          {activeTab === 'profile' && (
+            <>
+              <div className="flex items-center gap-3">
+                 {currentUser.photoURL ? <img src={currentUser.photoURL} className="w-12 h-12 rounded-full object-cover shadow-sm bg-gray-200" referrerPolicy="no-referrer" /> : <div className="w-12 h-12 rounded-full bg-gray-200 flex items-center justify-center"><User size={24} className="text-gray-500" /></div>}
+                 <div>
+                   <h1 className={`text-xl font-black ${darkMode ? 'text-white' : 'text-[#1e2532]'}`}>{currentUser.username} {isRoomCreator && <span className="text-[10px] text-gray-500 font-medium">(You)</span>}</h1>
+                   <div className="text-xs font-semibold text-gray-500">Total Score: {myPts}</div>
+                 </div>
+              </div>
+              <button onClick={() => setShowSettingsMenu(!showSettingsMenu)} className={`p-2.5 rounded-2xl border ${darkMode ? 'border-[#223858] text-gray-400 bg-[#182544]' : 'border-gray-200 text-gray-500 bg-white'} shadow-sm relative`}>
+                <Settings size={18} />
+                 {showSettingsMenu && <>
+                  <div className="fixed inset-0 z-40" onClick={(e) => { e.stopPropagation(); setShowSettingsMenu(false); }} />
                   <div className={`absolute right-0 top-full mt-2 w-56 rounded-2xl border shadow-xl z-50 overflow-hidden ${darkMode ? 'bg-[#182544] border-[#223858]' : 'bg-white border-gray-200'}`}>
                     <div className="py-1">
-                      <button onClick={() => { setShowAddHabit(true); setShowSettingsMenu(false); }} className={`w-full flex items-center gap-3 px-4 py-3 text-sm transition-all ${darkMode ? 'text-[#9aaec0] hover:bg-[#1e3050]' : 'text-gray-700 hover:bg-gray-50'}`}><Plus size={15} className="text-blue-400" />Add Habit</button>
-                      <button onClick={() => { setShowAddCategory(true); setShowSettingsMenu(false); }} className={`w-full flex items-center gap-3 px-4 py-3 text-sm transition-all ${darkMode ? 'text-[#9aaec0] hover:bg-[#1e3050]' : 'text-gray-700 hover:bg-gray-50'}`}><Plus size={15} className="text-purple-400" />Add Category</button>
-                      {habits.length > 0 && <button onClick={() => { setEditMode(!editMode); setShowSettingsMenu(false); }} className={`w-full flex items-center gap-3 px-4 py-3 text-sm transition-all ${editMode ? 'text-blue-400' : (darkMode ? 'text-[#9aaec0] hover:bg-[#1e3050]' : 'text-gray-700 hover:bg-gray-50')}`}><Edit3 size={15} className={editMode ? 'text-blue-400' : 'text-gray-500'} />{editMode ? 'Done Editing' : 'Edit Habits'}</button>}
-                      <button onClick={() => { setCustomBoardHabits(myBoardIds || habits.map(h => h.id)); setShowCustomBoard(true); setShowSettingsMenu(false); }} className={`w-full flex items-center gap-3 px-4 py-3 text-sm transition-all ${darkMode ? 'text-[#9aaec0] hover:bg-[#1e3050]' : 'text-gray-700 hover:bg-gray-50'}`}><Target size={15} className="text-indigo-400" />My Board</button>
-                      {isRoomCreator && <button onClick={() => { setShowRoomSettings(true); setShowSettingsMenu(false); }} className={`w-full flex items-center gap-3 px-4 py-3 text-sm transition-all ${darkMode ? 'text-[#9aaec0] hover:bg-[#1e3050]' : 'text-gray-700 hover:bg-gray-50'}`}><Crown size={15} className="text-[#e8864a]" />Room Settings</button>}
-                      <div className={`mx-3 my-1 border-t ${darkMode ? 'border-[#223858]' : 'border-gray-100'}`} />
-                      <button onClick={() => { loadHeatMap(); setShowSettingsMenu(false); }} className={`w-full flex items-center gap-3 px-4 py-3 text-sm transition-all ${darkMode ? 'text-[#9aaec0] hover:bg-[#1e3050]' : 'text-gray-700 hover:bg-gray-50'}`}><BarChart3 size={15} className="text-[#4aba7a]" />Heat Map</button>
-                      <button onClick={() => { loadInsights(); setShowSettingsMenu(false); }} className={`w-full flex items-center gap-3 px-4 py-3 text-sm transition-all ${darkMode ? 'text-[#9aaec0] hover:bg-[#1e3050]' : 'text-gray-700 hover:bg-gray-50'}`}><TrendingUp size={15} className="text-blue-400" />Insights</button>
-                      <button onClick={() => { setHistoryDate(getYesterday()); loadHistoryDate(getYesterday()); setShowHistory(true); setShowSettingsMenu(false); }} className={`w-full flex items-center gap-3 px-4 py-3 text-sm transition-all ${darkMode ? 'text-[#9aaec0] hover:bg-[#1e3050]' : 'text-gray-700 hover:bg-gray-50'}`}><Calendar size={15} className="text-gray-500" />History</button>
-                      {lastWeekData && <button onClick={() => { setShowWeeklyRecap(true); setShowSettingsMenu(false); }} className={`w-full flex items-center gap-3 px-4 py-3 text-sm transition-all ${darkMode ? 'text-[#9aaec0] hover:bg-[#1e3050]' : 'text-gray-700 hover:bg-gray-50'}`}><BarChart3 size={15} className="text-purple-400" />Weekly Recap</button>}
+                      <button onClick={(e) => { e.stopPropagation(); setShowAddHabit(true); setShowSettingsMenu(false); }} className={`w-full flex items-center gap-3 px-4 py-3 text-sm transition-all ${darkMode ? 'text-[#9aaec0] hover:bg-[#1e3050]' : 'text-gray-700 hover:bg-gray-50'}`}><Plus size={15} className="text-blue-400" />Add Habit</button>
+                      <button onClick={(e) => { e.stopPropagation(); setShowAddCategory(true); setShowSettingsMenu(false); }} className={`w-full flex items-center gap-3 px-4 py-3 text-sm transition-all ${darkMode ? 'text-[#9aaec0] hover:bg-[#1e3050]' : 'text-gray-700 hover:bg-gray-50'}`}><Plus size={15} className="text-purple-400" />Add Category</button>
+                      {habits.length > 0 && <button onClick={(e) => { e.stopPropagation(); setEditMode(!editMode); setShowSettingsMenu(false); }} className={`w-full flex items-center gap-3 px-4 py-3 text-sm transition-all ${editMode ? 'text-blue-400' : (darkMode ? 'text-[#9aaec0] hover:bg-[#1e3050]' : 'text-gray-700 hover:bg-gray-50')}`}><Edit3 size={15} className={editMode ? 'text-blue-400' : 'text-gray-500'} />{editMode ? 'Done Editing' : 'Edit Habits'}</button>}
+                      <button onClick={(e) => { e.stopPropagation(); setCustomBoardHabits(myBoardIds || habits.map(h => h.id)); setShowCustomBoard(true); setShowSettingsMenu(false); }} className={`w-full flex items-center gap-3 px-4 py-3 text-sm transition-all ${darkMode ? 'text-[#9aaec0] hover:bg-[#1e3050]' : 'text-gray-700 hover:bg-gray-50'}`}><Target size={15} className="text-indigo-400" />My Board</button>
+                      {isRoomCreator && <button onClick={(e) => { e.stopPropagation(); setShowRoomSettings(true); setShowSettingsMenu(false); }} className={`w-full flex items-center gap-3 px-4 py-3 text-sm transition-all ${darkMode ? 'text-[#9aaec0] hover:bg-[#1e3050]' : 'text-gray-700 hover:bg-gray-50'}`}><Crown size={15} className="text-[#e8864a]" />Room Settings</button>}
+                      <button onClick={(e) => { e.stopPropagation(); toggleTheme(); setShowSettingsMenu(false); }} className={`w-full flex items-center gap-3 px-4 py-3 text-sm transition-all ${darkMode ? 'text-[#9aaec0] hover:bg-[#1e3050]' : 'text-gray-700 hover:bg-gray-50'}`}>{darkMode ? <Sun size={15} className="text-gray-500" /> : <Moon size={15} className="text-gray-400" />}{darkMode ? 'Light Mode' : 'Dark Mode'}</button>
                     </div>
                   </div>
                 </>}
-              </div>
-              <button onClick={() => setShowProfile(true)} className={`p-2 rounded-xl ${darkMode ? 'hover:bg-[#1e3050]' : 'hover:bg-gray-100'} transition-colors`}>{currentUser.photoURL ? <img src={currentUser.photoURL} className="w-7 h-7 rounded-full object-cover" referrerPolicy="no-referrer" /> : <User size={16} className={T.textMuted} />}</button>
-            </div>
-          </div>
+              </button>
+            </>
+          )}
         </div>
       </div>
 
-      <div className="max-w-2xl mx-auto px-4 pt-6 pb-20">
-
-        {/* ═══ SCORE RING ═══ */}
-        <div className="text-center mb-6">
-          <div className="relative inline-block">
-            <svg width="140" height="140" className="transform -rotate-90">
-              <circle cx="70" cy="70" r="60" stroke={darkMode ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.08)"} strokeWidth="8" fill="none" />
-              <circle cx="70" cy="70" r="60" stroke="url(#scoreGrad)" strokeWidth="8" fill="none" strokeLinecap="round" strokeDasharray={`${dailyProg * 377} 377`} className="transition-all duration-700" />
-              <defs><linearGradient id="scoreGrad" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stopColor="#5b7cf5" /><stop offset="50%" stopColor="#9b6bc8" /><stop offset="100%" stopColor="#4aba7a" /></linearGradient></defs>
-            </svg>
-            <div className="absolute inset-0 flex flex-col items-center justify-center">
-              <span className={`text-3xl font-black ${T.text}`}>{myPts}</span>
-              <span className={`text-[10px] font-bold ${dailyProg >= 1 ? 'text-[#4aba7a]' : 'text-[#5b7cf5]'}`}>{Math.round(dailyProg * 100)}%</span>
-            </div>
-          </div>
-          <div className="mt-2 flex justify-center gap-3 items-center">
-            {roomStakes ? (
-              <div className="flex items-center gap-3">
-                <button onClick={() => setShowStakes(true)} className={`inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full text-xs font-semibold transition-all active:scale-[0.97] ${darkMode ? 'bg-red-500/10 text-red-400 border border-red-500/20' : 'bg-red-50 text-red-500 border border-red-200'}`}><Zap size={12} />{roomStakes.description}</button>
-                <span className={`text-[10px] ${T.textDim}`}>{getDaysUntilReset() > 0 ? getDaysUntilReset() + 'd left' : timeDisplay}</span>
+      <div className="max-w-xl mx-auto px-5 pt-6 pb-32">
+        {/* ======================================= */}
+        {/* TAB 1: OVERVIEW */}
+        {/* ======================================= */}
+        {activeTab === 'overview' && (
+          <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+            {/* HERO CARD */}
+            <div className="relative overflow-hidden w-full rounded-[2rem] bg-gradient-to-br from-[#5b7cf5] leading-none to-indigo-700 text-white p-7 shadow-xl mb-8">
+              <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2 pointer-events-none" />
+              <div className="font-bold tracking-widest uppercase text-[10px] text-blue-100 mb-2">WEEKLY POINTS</div>
+              <div className="text-6xl font-black mb-1">{getWeeklyPts(currentUser.id)}</div>
+              
+              <div className="absolute right-6 top-1/2 -translate-y-1/2 flex flex-col items-end gap-2">
+                <div className="flex items-center gap-2 px-4 py-2 bg-white/20 backdrop-blur-md rounded-full border border-white/20 text-xs font-bold shadow-sm">
+                  <TrendingUp size={14} /> {streakMulti.multi}x Multiplier
+                </div>
+                <div className="text-[10px] font-semibold text-blue-200">Consistency mode active</div>
               </div>
-            ) : dailyProg >= 1 ? (
-              <p className="text-sm font-medium text-emerald-400">🎉 All done — nice work.</p>
-            ) : (
-              <p className={`text-sm ${T.textDim} italic`}>{getMotivation()}</p>
-            )}
-          </div>
-        </div>
+            </div>
 
-
-
-        {/* ═══ RIVAL PILLS ═══ */}
-        {rivalStatus.length > 0 && (
-          <div className="flex items-center gap-2 mb-5 overflow-x-auto pb-1 pt-3 -mt-3 -mx-1 px-1">
-            {rivalStatus.slice(0, 5).map((r, idx) => {
-              const isMe = r.member.id === currentUser.id;
-              const ahead = isMe ? false : r.pts > myPts;
-              const ms = isMe ? 0 : (mutualStreaks[r.member.id] || 0);
-              const isWinning = idx === 0 && r.pts > 0;
-              return (
-                <div key={r.member.id} onClick={() => setShowCompetitor(r.member)} className={`relative flex items-center gap-2 px-3 py-2 rounded-xl border shrink-0 cursor-pointer active:scale-[0.97] transition-all ${isWinning ? (darkMode ? 'border-yellow-500/50 bg-yellow-500/10 shadow-[0_0_15px_rgba(234,179,8,0.2)]' : 'border-yellow-400 bg-yellow-50 shadow-[0_0_15px_rgba(250,204,21,0.4)]') : ahead ? (darkMode ? 'border-red-500/20 bg-red-500/5' : 'border-red-200 bg-red-50') : (darkMode ? 'border-emerald-500/20 bg-emerald-500/5' : 'border-emerald-200 bg-emerald-50')}`}>
-                  {isWinning && <div className="absolute -top-3 -right-1 text-lg drop-shadow-md z-10">👑</div>}
-                  <div className="relative">
-                    <Avatar user={r.member} size={22} className={isWinning ? 'bg-yellow-500/20 text-yellow-500' : ahead ? 'bg-red-500/20 text-red-400' : 'bg-emerald-500/20 text-emerald-400'} />
-                    {ms > 0 && <div className={`absolute -bottom-1 -right-1 w-4 h-4 rounded-full flex items-center justify-center text-[7px] font-black text-white ${ms >= 7 ? 'bg-gradient-to-r from-orange-500 to-red-500' : ms >= 3 ? 'bg-orange-500' : 'bg-[#e8864a]'}`}>{ms}</div>}
-                  </div>
-                  <div className="flex flex-col">
-                    <span className={`text-[11px] ${isWinning ? 'font-bold text-yellow-600 dark:text-yellow-400' : 'font-medium ' + (darkMode ? 'text-[#9aaec0]' : 'text-[#4a6080]')}`}>
-                      {r.member.username}{isMe && <span className="opacity-70 font-normal"> (You)</span>}
-                    </span>
-                    <div className="flex items-center gap-1.5">
-                      <span className={`text-[10px] font-bold ${isWinning ? 'text-yellow-600 dark:text-yellow-400' : ahead ? 'text-red-400' : 'text-emerald-400'}`}>{r.pts} pts</span>
-                      {ms > 0 && <span className={`text-[9px] font-bold ${ms >= 7 ? 'text-[#e8864a]' : ms >= 3 ? 'text-[#e8864a]' : 'text-[#e8864a]/70'}`}>🔗{ms}d</span>}
+            {/* LIVE COHORT LEADERBOARD */}
+            <div className="flex items-center justify-between mb-4">
+              <h2 className={`text-lg font-black ${darkMode ? 'text-white' : 'text-[#1e2532]'}`}>Live Cohort Leaderboard</h2>
+              <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full border ${darkMode ? 'border-gray-700 bg-gray-800' : 'border-gray-200 bg-white'} shadow-sm text-[10px] text-gray-500 font-semibold`}><Clock size={12}/> Resets Sunday</div>
+            </div>
+            
+            <div className="space-y-3">
+              {[...activeMembers].map(m => { m.weeklyPts = getWeeklyPts(m.id); return m; }).sort((a,b) => b.weeklyPts - a.weeklyPts).map((member, i) => {
+                const isMe = member.id === currentUser.id;
+                return (
+                  <div key={member.id} className={`relative flex items-center p-4 rounded-2xl border ${isMe ? (darkMode ? 'border-[#5b7cf5]/50 bg-[#5b7cf5]/10' : 'border-[#5b7cf5]/30 bg-white shadow-md shadow-blue-500/5') : (darkMode ? 'border-[#223858] bg-[#182544]' : 'border-gray-100 bg-white shadow-sm')} transition-all`}>
+                    {isMe && <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-10 bg-[#5b7cf5] rounded-r-full" />}
+                    
+                    <div className="w-8 flex justify-center text-sm font-black mr-2">
+                       {i === 0 ? <Crown size={18} className="text-amber-500" /> : <span className={darkMode ? 'text-[#4a6080]' : 'text-gray-400'}>{i + 1}</span>}
+                    </div>
+                    
+                    {member.photoURL ? <img src={member.photoURL} className="w-10 h-10 rounded-full object-cover mr-4" /> : <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center mr-4"><User size={16} className="text-gray-400"/></div>}
+                    
+                    <div className="flex-1">
+                      <div className={`font-black text-sm ${darkMode ? 'text-white' : 'text-gray-900'}`}>{member.username} {isMe && <span className="text-gray-500 font-medium">(You)</span>}</div>
+                      <div className="flex items-center gap-2 mt-1">
+                        {member.streak > 0 && <span className="flex items-center gap-1 text-[10px] font-bold text-gray-400"><Flame size={10} className="text-amber-500"/>{member.streak}</span>}
+                      </div>
+                    </div>
+                    
+                    <div className="text-right">
+                      <div className={`text-xl font-black ${isMe ? 'text-[#5b7cf5]' : (darkMode ? 'text-white' : 'text-gray-900')}`}>{member.weeklyPts}</div>
+                      <div className="text-[9px] font-bold tracking-widest text-gray-400 uppercase">PTS</div>
                     </div>
                   </div>
-                </div>
-              );
-            })}
-            {myPts === 0 && rivalStatus.some(r => r.pts > 0 && r.member.id !== currentUser.id) && <span className="text-[10px] text-red-400/70 shrink-0 font-medium">⚠️ They started</span>}
+                );
+              })}
+            </div>
           </div>
         )}
 
-        {soloMode && !rivalStatus.length && yesterdayPoints > 0 && (
-          <div className={`flex items-center justify-between mb-4 px-4 py-2.5 rounded-xl ${darkMode ? 'bg-[#151d30] border border-[#223858]' : 'bg-gray-50 border border-gray-200'}`}>
-            <span className={`text-xs ${T.textDim}`}>Yesterday: {yesterdayPoints} pts</span>
-            {myPts > yesterdayPoints && myPts > 0 && <span className="text-[11px] text-emerald-400 font-bold">↑ Ahead</span>}
-          </div>
-        )}
+        {/* ======================================= */}
+        {/* TAB 2: HABITS */}
+        {/* ======================================= */}
+        {activeTab === 'habits' && (
+          <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+             {/* Daily Target Progress */}
+             <div className={`p-5 rounded-3xl border ${darkMode ? 'border-[#223858] bg-[#182544]' : 'border-gray-100 bg-white shadow-sm'} mb-8`}>
+               <div className="flex justify-between items-center mb-3">
+                 <span className={`text-sm font-bold ${darkMode ? 'text-white' : 'text-gray-900'}`}>Daily Target</span>
+                 <span className="text-sm font-black text-[#5b7cf5]">{Math.min(100, Math.round(dailyProg * 100))}%</span>
+               </div>
+               <div className={`h-3 w-full ${darkMode ? 'bg-[#0f1b2d]' : 'bg-gray-100'} rounded-full overflow-hidden mb-3`}>
+                 <div className="h-full bg-[#5b7cf5] rounded-full transition-all duration-1000 ease-out" style={{width: `${Math.min(100, dailyProg * 100)}%`}} />
+               </div>
+               <div className="text-[9px] font-bold tracking-widest text-gray-400 uppercase text-right">HIT 90% TO BANK A STREAK FREEZE</div>
+             </div>
+             
+             {/* Core Habits Header */}
+             <div className="flex items-center gap-2 mb-3 px-1">
+               <Target size={14} className="text-gray-400"/>
+               <span className="text-[10px] font-bold tracking-widest text-gray-400 uppercase">CORE HABITS</span>
+             </div>
 
-        {!roomStakes && <div className="flex items-center justify-center gap-3 mb-4">
-          <button onClick={() => setShowStakes(true)} className={`flex items-center gap-2 px-5 py-2 rounded-full text-xs font-bold transition-all active:scale-[0.97] ${darkMode ? 'bg-[#1e2e50] text-gray-500 border border-[#223858] hover:text-gray-300' : 'bg-gray-100 text-gray-400 border border-gray-200 hover:text-gray-600'}`}><Zap size={13} />Set Stakes</button>
-          <span className={`text-[10px] ${T.textDim}`}>Reset in {getDaysUntilReset() > 0 ? getDaysUntilReset() + 'd' : timeDisplay}</span>
-        </div>}
-
-        {devMode && boardRequests.length > 0 && boardRequests.map(br => (
-          <div key={br.id} className={`mb-2 p-2.5 rounded-xl border ${darkMode ? 'bg-purple-500/5 border-purple-500/15' : 'bg-purple-50 border-purple-200'}`}>
-            <div className="flex items-center justify-between"><span className={`text-xs ${T.textMuted}`}>{br.username} proposed a board</span><div className="flex gap-1"><button onClick={() => voteBoardRequest(br, true)} className="text-[10px] text-emerald-400 font-bold px-2 py-1 bg-emerald-500/10 rounded-lg">✓</button><button onClick={() => voteBoardRequest(br, false)} className="text-[10px] text-red-400 font-bold px-2 py-1 bg-red-500/10 rounded-lg">✗</button></div></div>
-          </div>
-        ))}
-        {myBoardIds && <div className={`mb-3 px-3 py-1.5 rounded-xl text-center text-[10px] font-medium ${darkMode ? 'bg-indigo-500/10 text-indigo-300 border border-indigo-500/15' : 'bg-indigo-50 text-indigo-600 border border-indigo-200'}`}>Custom board active · <button onClick={() => { setMyBoardIds(null); try { supabase.from('my_board').delete().eq('id', currentUser.id + '_' + currentRoom.id); } catch { } }} className="underline">Show All</button></div>}
-
-        {/* ═══ HABITS ═══ */}
-        <div className="space-y-2 mb-6">
-          {allCatNames.map(catName => {
-            const catHabits = displayHabits.filter(h => h.category === catName);
-            if (!catHabits.length) return null;
-            const t = getCT(catName);
-            const catIcon = activeCategories.find(cat => cat.name === catName)?.icon || '📋';
-            return (
-              <div key={catName}>
-                <div className="flex items-center gap-2 mb-2 mt-4 first:mt-0"><span className="text-base">{catIcon}</span><span className={`text-xs font-bold tracking-wider uppercase ${t.txt}`}>{catName}</span></div>
-                {catHabits.map(h => {
+             <div className="space-y-3 mb-8">
+                {habits.filter(h => h.points > 0).map(h => {
                   const cnt = getCount(h.id);
                   const done = cnt > 0;
-                  const isVice = h.points < 0;
                   const maxed = !h.isRepeatable && cnt >= 1;
                   return (
-                    <div key={h.id} className={`flex items-center gap-3 mb-1.5 rounded-2xl p-3 pl-0 overflow-hidden transition-all ${maxed ? (darkMode ? 'bg-gradient-to-r from-' + (isVice ? 'red-500/' : t.bg.replace('bg-', '') + '') + '10 to-transparent' : (isVice ? 'bg-red-50' : 'bg-' + t.bg.replace('bg-', '').replace('500', '50'))) : (darkMode ? 'bg-[#182544]' : 'bg-white')} ${darkMode ? 'border border-[#223858]' : 'border border-gray-100 shadow-sm'}`}>
-                      <div className={`w-1 self-stretch rounded-r-full ${done ? (isVice ? 'bg-red-500' : t.bg) : 'bg-transparent'} transition-all`} />
-                      <div className="min-w-0 flex-1">
-                        <div className={`text-[13px] font-semibold ${done ? (darkMode ? 'text-white' : 'text-gray-900') : (darkMode ? 'text-[#7a8ba8]' : 'text-[#6b7e96]')}`}>{h.name}</div>
-                        {h.description && <div className={`text-[10px] ${T.textDim} mt-0.5`}>{h.description}</div>}
-                        <div className={`text-[10px] ${T.textDim} flex items-center gap-1.5 mt-0.5`}>
-                          <span className={isVice ? 'text-red-400 font-bold' : ''}>{h.points > 0 ? '+' : ''}{h.points}pts</span>
-                          {h.unit && <><span>·</span><span>{h.unit}</span></>}
-                          {h.isRepeatable && cnt > 0 && <><span>·</span><span className={'font-bold ' + (isVice ? 'text-red-400' : t.txt)}>×{cnt}</span></>}
+                    <div key={h.id} className={`flex items-center p-4 rounded-2xl border ${done ? (darkMode ? 'border-[#5b7cf5]/30 bg-[#5b7cf5]/10' : 'border-[#5b7cf5]/30 bg-blue-50/50') : (darkMode ? 'border-[#223858] bg-[#182544]' : 'border-gray-100 bg-white shadow-sm')} transition-all`}>
+                      <button onClick={() => !maxed ? handleIncrement(h.id) : handleDecrement(h.id)} className={`w-6 h-6 rounded-full border-2 flex items-center justify-center mr-4 transition-all ${done ? 'bg-[#5b7cf5] border-[#5b7cf5] text-white' : (darkMode ? 'border-gray-600' : 'border-gray-300')}`}>
+                        {done && <Check size={14} strokeWidth={4} />}
+                      </button>
+                      <div className="flex-1">
+                        <div className={`text-sm font-bold ${done ? (darkMode ? 'text-[#7a8ba8]' : 'text-gray-600') : (darkMode ? 'text-white' : 'text-gray-900')}`}>{h.name} {h.isRepeatable && cnt > 0 && <span className="text-[#5b7cf5] ml-1">x{cnt}</span>}</div>
+                        <div className="flex items-center gap-2 mt-1.5">
+                           <span className={`px-2 py-0.5 rounded-full ${darkMode ? 'bg-[#0f1b2d] text-gray-400' : 'bg-gray-100 text-gray-500'} text-[9px] font-bold tracking-widest uppercase`}>{h.category}</span>
+                           <span className={`px-2 py-0.5 rounded-full ${darkMode ? 'bg-[#5b7cf5]/20 text-[#5b7cf5]' : 'bg-blue-50 text-blue-600'} text-[9px] font-bold tracking-widest uppercase`}>+{h.points} pts</span>
                         </div>
                       </div>
-                      <div className="flex items-center gap-1.5 shrink-0">
-                        {cnt > 0 && !editMode && <button onClick={() => handleDecrement(h.id)} className={`w-6 h-6 rounded-full flex items-center justify-center transition-all active:scale-90 opacity-30 hover:opacity-70 ${darkMode ? 'text-[#4a6080] hover:bg-[#1e3050]' : 'text-gray-300 hover:bg-gray-100'}`}><MinusIcon size={11} /></button>}
-                        {!maxed && !editMode && <button onClick={() => handleIncrement(h.id)} className={`w-10 h-10 rounded-full flex items-center justify-center transition-all active:scale-90 shadow-lg text-white font-bold ${isVice ? 'bg-red-500/90' : t.bg} hover:opacity-90`} style={{ boxShadow: isVice ? '0 4px 14px rgba(239, 68, 68, 0.4)' : `0 4px 14px ${t.neon}40` }}>{isVice ? <MinusIcon size={18} strokeWidth={3} /> : <Plus size={18} strokeWidth={3} />}</button>}
-                        {maxed && !editMode && <div className={`w-10 h-10 rounded-full flex items-center justify-center ${isVice ? 'bg-red-500/90' : t.bg} text-white`}><Check size={18} /></div>}
-                        {editMode && <><button onClick={() => openEditHabit(h)} className="text-blue-400 p-1.5"><Edit3 size={14} /></button><button onClick={() => deleteHabit(h.id)} className="text-red-400 p-1.5"><Trash2 size={14} /></button></>}
-                      </div>
+                      <ChevronRight size={16} className={darkMode ? 'text-gray-600' : 'text-gray-300'} />
                     </div>
                   );
                 })}
-              </div>
-            );
-          })}
-          {habits.length === 0 ? (
-            <div className="text-center py-16"><div className="text-5xl mb-4">🎯</div><p className={`${T.textMuted} text-sm mb-5`}>No habits yet</p><button onClick={() => setShowAddHabit(true)} className="inline-flex items-center gap-2 px-6 py-3 bg-[#5b7cf5] text-white rounded-2xl shadow-lg shadow-[#5b7cf5]/15 text-sm font-bold active:scale-[0.98]"><Plus size={18} />Add Habits</button></div>
-          ) : devMode ? (
-            <div className="flex gap-2 mt-2">
-              <button onClick={() => setShowAddHabit(true)} className={`flex-1 border border-dashed rounded-2xl p-4 hover:text-blue-400 hover:border-blue-500/30 hover:bg-blue-500/5 flex items-center justify-center gap-2 transition-all ${darkMode ? 'border-[#2a4060] text-gray-600' : 'border-gray-300 text-gray-400'}`}><Plus size={15} /><span className="text-xs font-medium">Add Habit</span></button>
-              <button onClick={() => setShowAddCategory(true)} className={`border border-dashed rounded-2xl p-4 hover:text-purple-400 hover:border-purple-500/30 hover:bg-purple-500/5 flex items-center justify-center gap-2 transition-all ${darkMode ? 'border-[#2a4060] text-gray-600' : 'border-gray-300 text-gray-400'}`}><span className="text-xs font-medium">+ Category</span></button>
-            </div>
-          ) : null}
-        </div>
+                {habits.filter(h => h.points > 0).length === 0 && <div className="text-center py-6 text-sm text-gray-500">No habits added.</div>}
+             </div>
 
+             {/* Distractions (Negative) */}
+             <div className="flex items-center gap-2 mb-3 px-1">
+               <X size={14} className="text-gray-400"/>
+               <span className="text-[10px] font-bold tracking-widest text-gray-400 uppercase">DISTRACTIONS</span>
+             </div>
 
-
-        {/* ═══ ACTIVITY FEED (collapsible) ═══ */}
-        {activityFeed.length > 0 && (
-          <div className={`mb-4 rounded-2xl border overflow-hidden ${darkMode ? 'border-[#223858] bg-[#182544]' : 'border-gray-200 bg-white shadow-sm'}`}>
-            <button onClick={() => setShowActivityExpanded(!showActivityExpanded)} className={`w-full px-4 py-2.5 flex items-center justify-between ${darkMode ? 'hover:bg-[#182544]' : 'hover:bg-gray-50'} transition-colors`}>
-              <span className={`text-[10px] font-bold tracking-wider uppercase ${T.textMuted}`}>Activity</span>
-              <ChevronDown size={14} className={`${T.textDim} transition-transform ${showActivityExpanded ? 'rotate-180' : ''}`} />
-            </button>
-            {showActivityExpanded && <div className={`max-h-48 overflow-y-auto border-t ${T.border}`}>{activityFeed.slice(0, 10).map(a => {
-              const isMe = a.userId === currentUser.id;
-              const ts = a.ts ? new Date(a.ts) : null;
-              const timeAgo = ts ? (Math.floor((Date.now() - ts.getTime()) / 60000) < 60 ? Math.floor((Date.now() - ts.getTime()) / 60000) + 'm' : Math.floor((Date.now() - ts.getTime()) / 3600000) + 'h') : '';
-              const reactions = a.reactions || {};
-              const reactionCounts = {};
-              Object.values(reactions).forEach(e => { reactionCounts[e] = (reactionCounts[e] || 0) + 1; });
-              const myReaction = reactions[currentUser?.id];
-              return (
-                <div key={a.id} className={`px-4 py-2.5 border-b last:border-b-0 ${T.border}`}>
-                  <div className="flex items-center gap-2">
-                    <Avatar user={activeMembers.find(m => m.id === a.userId) || { username: a.username }} size={20} className={isMe ? 'bg-blue-500/20 text-blue-400' : (darkMode ? 'bg-[#1e3050] text-gray-500' : 'bg-gray-100 text-gray-500')} />
-                    <div className="flex-1 min-w-0 truncate"><span className={`text-[11px] ${isMe ? 'text-blue-400' : (darkMode ? 'text-[#7a8ba8]' : 'text-[#6b7e96]')} font-medium`}>{isMe ? 'You' : a.username}</span><span className={`text-[11px] ${T.textDim} ml-1`}>{a.text}</span>{a.bonus === 'jackpot' && <span className="ml-1 text-[9px] text-[#e8864a] font-bold">+50</span>}{a.bonus === 'epic' && <span className="ml-1 text-[9px] text-red-400 font-bold">+20</span>}{a.bonus === 'rare' && <span className="ml-1 text-[9px] text-purple-400 font-bold">+15</span>}{a.bonus === 'bonus' && <span className="ml-1 text-[9px] text-cyan-400 font-bold">+10</span>}{a.bonus === 'common' && <span className="ml-1 text-[9px] text-emerald-400 font-bold">+5</span>}</div>
-                    <span className={`text-[9px] ${T.textFaint} shrink-0`}>{timeAgo}</span>
-                  </div>
-                  <div className="flex items-center gap-1 mt-1 ml-7">
-                    {Object.keys(reactionCounts).length > 0 && Object.entries(reactionCounts).map(([emoji, count]) => (
-                      <span key={emoji} className={`text-[9px] px-1.5 py-0.5 rounded-full ${myReaction === emoji ? 'bg-blue-500/20 border border-blue-500/30' : (darkMode ? 'bg-[#1e2e50]' : 'bg-gray-100')}`}>{emoji} {count}</span>
-                    ))}
-                    {!isMe && <div className="flex gap-0.5 ml-1">{REACTION_EMOJIS.map(e => (
-                      <button key={e} onClick={() => reactToActivity(a.id, e)} className={`text-[11px] w-7 h-7 rounded-full flex items-center justify-center transition-all hover:scale-110 ${myReaction === e ? 'bg-blue-500/20' : (darkMode ? 'hover:bg-[#1e3050]' : 'hover:bg-gray-100')}`}>{e}</button>
-                    ))}</div>}
-                  </div>
-                </div>
-              );
-            })}</div>}
+             <div className="space-y-3">
+                {habits.filter(h => h.points < 0).map(h => {
+                  const cnt = getCount(h.id);
+                  const done = cnt > 0;
+                  return (
+                    <div key={h.id} className={`flex items-center p-4 rounded-2xl border ${done ? (darkMode ? 'border-rose-500/30 bg-rose-500/10' : 'border-rose-200 bg-rose-50/50') : (darkMode ? 'border-[#223858] bg-[#182544]' : 'border-gray-100 bg-white shadow-sm')} transition-all`}>
+                      <div className="flex-1">
+                        <div className={`text-sm font-bold ${darkMode ? 'text-white' : 'text-gray-900'}`}>{h.name}</div>
+                        <div className="flex items-center gap-2 mt-1.5">
+                           <span className={`px-2 py-0.5 rounded-full ${darkMode ? 'bg-[#0f1b2d] text-gray-400' : 'bg-gray-100 text-gray-500'} text-[9px] font-bold tracking-widest uppercase`}>{h.category}</span>
+                           <span className={`px-2 py-0.5 rounded-full ${darkMode ? 'bg-rose-500/20 text-rose-400' : 'bg-rose-50 text-rose-600'} text-[9px] font-bold tracking-widest uppercase`}>-{Math.abs(h.points)} pts</span>
+                        </div>
+                      </div>
+                      <button onClick={() => handleIncrement(h.id)} className={`w-8 h-8 rounded-full border-2 flex items-center justify-center transition-all ${darkMode ? 'border-gray-600 text-gray-400' : 'border-gray-200 text-gray-400'} hover:text-rose-500 hover:bg-rose-50 hover:border-rose-200`}>
+                        <X size={16} />
+                      </button>
+                    </div>
+                  );
+                })}
+                {habits.filter(h => h.points < 0).length === 0 && <div className="text-center py-6 text-[10px] uppercase tracking-wider text-gray-500">No vices configured</div>}
+             </div>
           </div>
         )}
 
+        {/* ======================================= */}
+        {/* TAB 3: COHORT (FEED) */}
+        {/* ======================================= */}
+        {activeTab === 'cohort' && (
+          <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 space-y-4 relative">
+             {activityFeed.length === 0 ? <p className="text-center text-gray-400 py-10 text-sm">No activity yet</p> : activityFeed.map(a => {
+               const ts = a.ts ? new Date(a.ts) : null;
+               const timeAgo = ts ? (Math.floor((Date.now() - ts.getTime()) / 60000) < 60 ? Math.floor((Date.now() - ts.getTime()) / 60000) + 'M' : Math.floor((Date.now() - ts.getTime()) / 3600000) + 'H') + ' AGO' : '';
+               const reactions = a.reactions || {};
+               return (
+                 <div key={a.id} className={`p-4 rounded-3xl border ${darkMode ? 'border-[#223858] bg-[#182544]' : 'border-gray-100 bg-white shadow-sm'}`}>
+                    <div className="flex gap-3 mb-4">
+                       <div className={`w-10 h-10 rounded-full border ${darkMode ? 'border-[#223858] bg-[#0f1b2d]' : 'border-gray-100 bg-gray-50'} flex items-center justify-center text-lg shrink-0`}>
+                          {a.text.includes('streak') ? 'ðŸ”¥' : a.bonus === 'jackpot' ? 'ðŸŽ°' : a.text.includes('caved') ? 'ðŸ’€' : 'âš¡'}
+                       </div>
+                       <div className="flex-1 mt-0.5">
+                         <div className={`text-sm ${darkMode ? 'text-[#9aaec0]' : 'text-gray-600'}`}><span className={`font-black ${darkMode ? 'text-white' : 'text-gray-900'}`}>{a.username}</span> {a.text}</div>
+                         <div className="text-[9px] font-bold tracking-widest text-gray-400 mt-1">{timeAgo}</div>
+                       </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                       <button onClick={() => reactToActivity(a.id, 'ðŸ”¥')} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full border ${darkMode ? 'border-[#223858] bg-[#0f1b2d] text-gray-400' : 'border-gray-200 bg-gray-50 text-gray-600'} hover:opacity-80 text-[10px] font-bold`}><Flame size={12} className="text-[#e8864a]"/> React</button>
+                       <button onClick={() => reactToActivity(a.id, 'ðŸ’€')} className={`px-3 py-1.5 rounded-full border ${darkMode ? 'border-[#223858] bg-[#0f1b2d]' : 'border-gray-200 bg-gray-50'} hover:opacity-80 text-xs`}>ðŸ’€</button>
+                       <button onClick={() => reactToActivity(a.id, 'ðŸ‘')} className={`px-3 py-1.5 rounded-full border ${darkMode ? 'border-[#223858] bg-[#0f1b2d]' : 'border-gray-200 bg-gray-50'} hover:opacity-80 text-xs`}>ðŸ‘</button>
+                    </div>
+                 </div>
+               );
+             })}
+          </div>
+        )}
 
+        {/* ======================================= */}
+        {/* TAB 4: STAKES */}
+        {/* ======================================= */}
+        {activeTab === 'stakes' && (
+          <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+             {roomMembers.length > 0 && (() => {
+               const sorted = [...activeMembers].map(m => { m.weeklyPts = getWeeklyPts(m.id); return m; }).sort((a,b) => a.weeklyPts - b.weeklyPts);
+               const lowest = sorted[0];
+               if (!lowest) return null;
+               return (
+                 <div className={`flex items-center gap-4 p-5 mb-16 rounded-2xl border ${darkMode ? 'border-red-900/50 bg-red-900/20' : 'border-red-200 bg-red-50'}`}>
+                    <div className={`w-12 h-12 rounded-full ${darkMode ? 'bg-[#182544] border-red-900/50' : 'bg-white border-red-200'} flex items-center justify-center text-red-500`}>
+                      <Target size={24} />
+                    </div>
+                    <div>
+                      <div className="text-sm font-black text-red-500 mb-0.5">At Risk: {lowest.username}</div>
+                      <div className={`text-xs font-semibold ${darkMode ? 'text-red-400' : 'text-red-500/80'}`}>Currently in last place with {lowest.weeklyPts} pts.</div>
+                    </div>
+                 </div>
+               );
+             })()}
 
-        {/* Debug (triple-tap VERSA logo to toggle) */}
-        {devMode && (
-          <div className={`mb-4 p-3 rounded-2xl border ${darkMode ? 'border-[#223858] bg-[#5b7cf5]/5' : 'border-[#dce4ee] bg-[#5b7cf5]/5'}`}>
-            <div className={`text-[9px] font-mono ${T.textDim} space-y-1`}>
-              <div>Room: {currentRoom?.id} | Members: {roomMembers.length} | Active: {activeMembers.length} | Kicked: {roomKicked.length}</div>
-              <div>Habits: {habits.length} | Today comps: {completions.length} | Week comps: {allCompletions.length}</div>
-              <div>My pts: {myPts} | Rivals: {rivalStatus.length} | Winner: {weeklyWinner?.member?.username || 'none'} ({weeklyWinner?.pts || 0})</div>
-              <div>Members: {activeMembers.map(m => m.username + '(' + getTodayPts(m.id) + ')').join(', ')}</div>
-            </div>
+             <div className="flex flex-col items-center justify-center pb-12">
+               <Target size={200} className={`${darkMode ? 'text-[#223858]' : 'text-gray-100'} mb-8`} strokeWidth={1} />
+               <button onClick={() => setShowPunishmentWheel(true)} className="px-8 py-4 bg-[#5b7cf5] hover:bg-blue-600 text-white rounded-full font-black tracking-widest uppercase text-xs shadow-lg shadow-blue-500/30 transition-all flex items-center gap-2 active:scale-95">
+                 Draw Consequence <ChevronRight size={16} />
+               </button>
+             </div>
+          </div>
+        )}
+
+        {/* ======================================= */}
+        {/* TAB 5: PROFILE */}
+        {/* ======================================= */}
+        {activeTab === 'profile' && (
+          <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 space-y-4">
+             <div className="grid grid-cols-2 gap-4 mb-4">
+               <div className={`p-4 rounded-3xl border ${darkMode ? 'border-[#223858] bg-[#182544]' : 'border-gray-100 bg-white shadow-sm'}`}>
+                 <div className="text-[10px] font-bold tracking-widest text-[#9aaec0] uppercase mb-2">Trophies</div>
+                 <div className="flex items-end justify-between">
+                   <div className={`text-4xl font-black ${darkMode ? 'text-white' : 'text-gray-900'}`}>{archivedStakes.filter(st => st.winner_id === currentUser.id).length}</div>
+                   <Trophy size={28} className="text-amber-400 opacity-50" strokeWidth={1.5}/>
+                 </div>
+               </div>
+               <div className={`p-4 rounded-3xl border ${darkMode ? 'border-[#223858] bg-[#182544]' : 'border-gray-100 bg-white shadow-sm'}`}>
+                 <div className="text-[10px] font-bold tracking-widest text-[#9aaec0] uppercase mb-2">Penalties</div>
+                 <div className="flex items-end justify-between">
+                   <div className={`text-4xl font-black ${darkMode ? 'text-white' : 'text-gray-900'}`}>{archivedStakes.filter(st => st.loser_id === currentUser.id).length}</div>
+                   <div className="w-7 h-7 rounded-full border border-red-400 text-red-400 flex items-center justify-center opacity-50 font-bold">!</div>
+                 </div>
+               </div>
+               <div className={`p-4 rounded-3xl border ${darkMode ? 'border-[#5b7cf5]/30 bg-[#5b7cf5]/10' : 'border-blue-100 bg-blue-50/50 shadow-sm'}`}>
+                 <div className="text-[10px] font-bold tracking-widest text-[#5b7cf5] uppercase mb-2">Top Streak</div>
+                 <div className="flex items-end justify-between">
+                   <div className={`text-4xl font-black ${darkMode ? 'text-blue-300' : 'text-blue-900'}`}>{streakData.streak}</div>
+                   <TrendingUp size={28} className="text-[#5b7cf5] opacity-50" strokeWidth={1.5}/>
+                 </div>
+               </div>
+               <div className={`p-4 rounded-3xl border ${darkMode ? 'border-cyan-900/50 bg-cyan-900/20' : 'border-cyan-100 bg-cyan-50/50 shadow-sm'}`}>
+                 <div className="text-[10px] font-bold tracking-widest text-cyan-500 uppercase mb-2">Freezes</div>
+                 <div className="flex items-end justify-between">
+                   <div className={`text-4xl font-black ${darkMode ? 'text-cyan-300' : 'text-cyan-900'}`}>{streakFreeze}</div>
+                   <TrendingUp size={28} className="text-cyan-400 opacity-50" strokeWidth={1.5}/>
+                 </div>
+               </div>
+             </div>
+             
+             <div className={`p-5 rounded-3xl border ${darkMode ? 'border-[#223858] bg-[#182544]' : 'border-gray-100 bg-white shadow-sm'}`}>
+               <div className="flex justify-between items-center mb-4">
+                 <div className="text-[10px] font-bold tracking-widest text-[#9aaec0] uppercase">Consistency</div>
+                 <div className={`px-2 py-1 rounded ${darkMode ? 'bg-[#0f1b2d]' : 'bg-gray-100'} text-[10px] font-bold ${darkMode ? 'text-gray-400' : 'text-gray-400'}`}>Last 90 Days</div>
+               </div>
+               <button onClick={() => setShowHeatMap(true)} className={`w-full flex items-center justify-center gap-2 py-6 border-2 border-dashed ${darkMode ? 'border-[#223858] text-gray-500 hover:text-[#5b7cf5] hover:bg-[#5b7cf5]/5' : 'border-gray-200 text-gray-400 hover:text-blue-600 hover:bg-gray-50'} rounded-xl transition-all font-bold`}>
+                 <BarChart3 size={20} /> View Heatmap
+               </button>
+             </div>
           </div>
         )}
       </div>
 
-      {/* ═══ MODALS ═══ */}
+      {/* â•â•â• BOTTOM NAVIGATION TABS â•â•â• */}
+      <div className={`fixed bottom-0 w-full z-50 border-t ${darkMode ? 'bg-[#182544] border-[#223858]' : 'bg-white border-gray-200'} pb-safe`}>
+         <div className="max-w-xl mx-auto flex items-center justify-between px-6 py-3">
+           {[ 
+             { id: 'overview', icon: <Home size={22} className="mb-1" strokeWidth={2.5}/>, label: 'OVERVIEW' },
+             { id: 'habits', icon: <CheckSquare size={22} className="mb-1" strokeWidth={2.5}/>, label: 'HABITS' },
+             { id: 'cohort', icon: <Users size={22} className="mb-1" strokeWidth={2.5}/>, label: 'COHORT' },
+             { id: 'stakes', icon: <Target size={22} className="mb-1" strokeWidth={2.5}/>, label: 'STAKES' },
+             { id: 'profile', icon: <User size={22} className="mb-1" strokeWidth={2.5}/>, label: 'PROFILE' }
+           ].map(tab => (
+             <button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`flex flex-col items-center justify-center w-16 transition-all ${activeTab === tab.id ? 'text-[#5b7cf5] scale-110' : (darkMode ? 'text-[#7a8ba8] hover:text-white' : 'text-gray-400 hover:text-gray-600')}`}>
+               {tab.icon}
+               <span className="text-[8px] font-black tracking-widest">{tab.label}</span>
+             </button>
+           ))}
+         </div>
+      </div>
+      <div className="h-20" /> {/* Spacer */}
+      
+      {/* â•â•â• MODALS â•â•â• */}{/* â•â•â• MODALS â•â•â• */}
 
       {/* Add Habit */}
       <Modal show={showAddHabit} onClose={() => setShowAddHabit(false)} dark={darkMode}>
         <ModalHeader title="Add Habit" onClose={() => setShowAddHabit(false)} dark={darkMode} />
-        <button onClick={loadDefaultHabits} disabled={loading} className="w-full mb-5 px-4 py-3 bg-[#7c82a8] text-white rounded-xl shadow-lg shadow-violet-500/20 text-sm font-bold active:scale-[0.98] disabled:opacity-50">{loading ? 'Loading...' : '⚡ Load Preset (12 habits)'}</button>
+        <button onClick={loadDefaultHabits} disabled={loading} className="w-full mb-5 px-4 py-3 bg-[#7c82a8] text-white rounded-xl shadow-lg shadow-violet-500/20 text-sm font-bold active:scale-[0.98] disabled:opacity-50">{loading ? 'Loading...' : 'âš¡ Load Preset (12 habits)'}</button>
         <div className="space-y-3">
           <input type="text" placeholder="Habit name" value={newHabit.name} onChange={e => setNewHabit({ ...newHabit, name: e.target.value })} className={inputCls} maxLength={30} />
           <div className="grid grid-cols-2 gap-3">
@@ -2200,7 +2319,7 @@ function VersaAppMain() {
             ))}</div>
             <input type="text" placeholder={stakePresets.find(s => s.type === newStake.type)?.ph || 'Describe the stake...'} value={newStake.description} onChange={e => setNewStake({ ...newStake, description: e.target.value })} className={inputCls + ' mb-3'} maxLength={60} />
             <div className="flex gap-2 mb-4">{['weekly', 'monthly'].map(d => <button key={d} onClick={() => setNewStake({ ...newStake, duration: d })} className={'flex-1 py-2.5 text-xs font-bold rounded-xl transition-all uppercase tracking-wider ' + (newStake.duration === d ? (darkMode ? 'bg-[#223858] text-white' : 'bg-gray-200 text-gray-900') : (darkMode ? 'bg-[#182544] text-gray-600' : 'bg-gray-100 text-gray-400'))}>{d}</button>)}</div>
-            <button onClick={saveStake} disabled={!newStake.description.trim() || loading} className="w-full px-4 py-4 bg-[#d06b4a] text-white rounded-xl text-base font-bold shadow-lg shadow-red-500/20 active:scale-[0.98] disabled:opacity-30 transition-all">{loading ? 'Saving...' : !newStake.description.trim() ? 'Type a stake above' : '⚡ Set Stakes'}</button>
+            <button onClick={saveStake} disabled={!newStake.description.trim() || loading} className="w-full px-4 py-4 bg-[#d06b4a] text-white rounded-xl text-base font-bold shadow-lg shadow-red-500/20 active:scale-[0.98] disabled:opacity-30 transition-all">{loading ? 'Saving...' : !newStake.description.trim() ? 'Type a stake above' : 'âš¡ Set Stakes'}</button>
             {error && <p className="text-red-400 text-xs text-center mt-2">{error}</p>}
           </div>
         )}
@@ -2217,7 +2336,7 @@ function VersaAppMain() {
           const ms = !isMe ? (mutualStreaks[item.member.id] || 0) : 0;
           return (
             <div key={item.member.id} className={'rounded-xl p-4 border transition-all ' + (isMe ? 'bg-gradient-to-r from-blue-600/20 to-indigo-600/20 border-blue-500/30 shadow-lg shadow-[#5b7cf5]/10' : i === 0 ? 'bg-[#e8864a]/5 border-[#e8864a]/20' : (darkMode ? 'bg-[#182544] border-[#1e3050] hover:bg-[#1e2e50]' : 'bg-gray-50 border-gray-200 hover:bg-gray-100'))}>
-              <div className="flex items-center justify-between"><div className="flex items-center gap-3"><div className="text-lg w-8 text-center">{i < 3 ? medals[i] : <span className="text-sm text-gray-600">{i + 1}</span>}</div><Avatar user={item.member} size={28} className={isMe ? 'bg-blue-500/20 text-blue-400' : (darkMode ? 'bg-[#1e3050] text-gray-400' : 'bg-gray-100 text-gray-500')} /><div><div className={'text-sm font-semibold flex items-center gap-1.5 ' + (isMe ? 'text-blue-300' : (darkMode ? 'text-[#9aaec0]' : 'text-[#4a6080]'))}>{item.member.username}{isMe && <span className="text-[10px] text-gray-600">(you)</span>}{getRoomRole(item.member.id) && <span className={`text-[9px] font-bold ${getRoomRole(item.member.id).color}`}>{getRoomRole(item.member.id).icon}</span>}{ms > 0 && <span className={`text-[9px] font-bold ${ms >= 7 ? 'text-[#e8864a]' : 'text-[#e8864a]'}`}>🔗{ms}</span>}</div><div className="text-xs text-gray-600">{pts} pts{leaderboardTab === 'week' ? ' \u00b7 ' + item.weeklyCrystals + ' crystals' : ''}</div></div></div>
+              <div className="flex items-center justify-between"><div className="flex items-center gap-3"><div className="text-lg w-8 text-center">{i < 3 ? medals[i] : <span className="text-sm text-gray-600">{i + 1}</span>}</div><Avatar user={item.member} size={28} className={isMe ? 'bg-blue-500/20 text-blue-400' : (darkMode ? 'bg-[#1e3050] text-gray-400' : 'bg-gray-100 text-gray-500')} /><div><div className={'text-sm font-semibold flex items-center gap-1.5 ' + (isMe ? 'text-blue-300' : (darkMode ? 'text-[#9aaec0]' : 'text-[#4a6080]'))}>{item.member.username}{isMe && <span className="text-[10px] text-gray-600">(you)</span>}{getRoomRole(item.member.id) && <span className={`text-[9px] font-bold ${getRoomRole(item.member.id).color}`}>{getRoomRole(item.member.id).icon}</span>}{ms > 0 && <span className={`text-[9px] font-bold ${ms >= 7 ? 'text-[#e8864a]' : 'text-[#e8864a]'}`}>ðŸ”—{ms}</span>}</div><div className="text-xs text-gray-600">{pts} pts{leaderboardTab === 'week' ? ' \u00b7 ' + item.weeklyCrystals + ' crystals' : ''}</div></div></div>
                 <div className="flex items-center gap-3">{leaderboardTab === 'today' && <div className="flex items-center gap-1.5">{allCatNames.map(c => <div key={c} className={'w-2.5 h-2.5 rounded-full ' + (item.crystals[c] ? getCT(c).bg + ' shadow-sm' : (isMe ? 'bg-[#1e3050]' : (darkMode ? 'bg-[#1e3050]' : 'bg-gray-200')))} />)}</div>}{!isMe && <button onClick={() => { setShowLeaderboard(false); setShowCompetitor(item.member); }} className={`text-[10px] uppercase tracking-wider font-medium ${darkMode ? 'text-gray-600 hover:text-white' : 'text-gray-400 hover:text-gray-700'}`}>View</button>}</div>
               </div>
             </div>
@@ -2230,11 +2349,11 @@ function VersaAppMain() {
       <Modal show={showProfile} onClose={() => setShowProfile(false)} dark={darkMode}>
         <ModalHeader title="Profile" onClose={() => setShowProfile(false)} dark={darkMode} />
         <div className="text-center mb-6"><div className="relative inline-block">{currentUser.photoURL ? <img src={currentUser.photoURL} className="w-20 h-20 rounded-full object-cover border-2 border-blue-500/30" referrerPolicy="no-referrer" /> : <><ProgressRing progress={dailyProg} size={80} stroke={4} color={dailyProg >= 1 ? '#10b981' : '#3b82f6'} /><div className="absolute inset-0 flex items-center justify-center"><span className="text-xl font-black">{Math.round(dailyProg * 100)}%</span></div></>}</div><h3 className="text-xl font-bold mt-3">{currentUser.username}</h3><p className="text-gray-600 text-xs">{currentUser.email}</p></div>
-        <div className="grid grid-cols-4 gap-2 mb-4">{[{ v: streakData.streak || 0, l: 'Streak', c: 'text-[#e8864a]', i: <Flame size={16} className="text-[#e8864a] mx-auto mb-1" /> }, { v: streakFreeze > 0 ? '🛡️' : '—', l: 'Freeze', c: streakFreeze > 0 ? 'text-cyan-400' : 'text-gray-600', i: null }, { v: myPts, l: 'Today', c: 'text-blue-400', i: <Star size={16} className="text-blue-400 mx-auto mb-1" /> }, { v: getWeeklyPts(currentUser.id), l: 'Week', c: 'text-emerald-400', i: <TrendingUp size={16} className="text-emerald-400 mx-auto mb-1" /> }].map((s, i) => <div key={i} className={`text-center p-3 ${T.bgCard} rounded-xl border ${T.border}`}>{s.i}<div className={'text-xl font-black ' + s.c}>{s.v}</div><div className="text-[9px] text-gray-600 tracking-wider uppercase mt-0.5">{s.l}</div></div>)}</div>
+        <div className="grid grid-cols-4 gap-2 mb-4">{[{ v: streakData.streak || 0, l: 'Streak', c: 'text-[#e8864a]', i: <Flame size={16} className="text-[#e8864a] mx-auto mb-1" /> }, { v: streakFreeze > 0 ? 'ðŸ›¡ï¸' : 'â€”', l: 'Freeze', c: streakFreeze > 0 ? 'text-cyan-400' : 'text-gray-600', i: null }, { v: myPts, l: 'Today', c: 'text-blue-400', i: <Star size={16} className="text-blue-400 mx-auto mb-1" /> }, { v: getWeeklyPts(currentUser.id), l: 'Week', c: 'text-emerald-400', i: <TrendingUp size={16} className="text-emerald-400 mx-auto mb-1" /> }].map((s, i) => <div key={i} className={`text-center p-3 ${T.bgCard} rounded-xl border ${T.border}`}>{s.i}<div className={'text-xl font-black ' + s.c}>{s.v}</div><div className="text-[9px] text-gray-600 tracking-wider uppercase mt-0.5">{s.l}</div></div>)}</div>
         <div className="grid grid-cols-2 gap-3 mb-4"><div className={`text-center p-3 ${T.bgCard} rounded-xl border ${T.border}`}><div className="text-lg font-black text-purple-400">{streakData.activeDays || 0}</div><div className="text-[9px] text-gray-600 tracking-wider uppercase mt-0.5">Active Days</div></div><div className={`text-center p-3 ${T.bgCard} rounded-xl border ${T.border}`}><div className="text-lg font-black text-cyan-400">{streakData.totalCompletions || 0}</div><div className="text-[9px] text-gray-600 tracking-wider uppercase mt-0.5">Completions</div></div></div>
         <div className={`p-3 ${T.bgCard} rounded-xl border ${T.border}`}><div className="text-[9px] text-gray-600 tracking-wider uppercase mb-2">Crystals</div><div className="flex justify-center gap-4">{allCatNames.map(c => <div key={c} className="text-center"><div className={'w-6 h-6 rounded-full mx-auto mb-1 transition-all ' + (myCr[c] ? getCT(c).bg + ' shadow-md ' + getCT(c).glow : 'bg-[#1e3050]')} /><span className="text-[9px] text-gray-600">{c}</span></div>)}</div></div>
         <div className={`mt-4 p-3 ${T.bgCard} rounded-xl border ${T.border} flex items-center justify-between`}><div><div className={`text-sm font-medium ${T.text}`}>Email Reminders</div><div className="text-[10px] text-gray-500">Daily nudges at 12pm & 6pm</div></div><button onClick={async () => { const current = currentUser.emailReminders !== false; const next = !current; try { await supabase.from('users').update({ email_reminders: next }).eq('id', currentUser.id); setCurrentUser(p => ({ ...p, emailReminders: next })); } catch (e) { console.error(e); } }} className={'relative w-11 h-6 rounded-full transition-all ' + (currentUser.emailReminders !== false ? 'bg-[#5b7cf5]' : (darkMode ? 'bg-[#223858]' : 'bg-gray-200'))}><div className={'absolute top-1 w-4 h-4 rounded-full bg-white transition-all shadow-sm ' + (currentUser.emailReminders !== false ? 'left-6' : 'left-1')} /></button></div>
-        <div className={`mt-2 p-3 ${T.bgCard} rounded-xl border ${T.border} flex items-center justify-between`}><div><div className={`text-sm font-medium ${T.text}`}>Push Notifications</div><div className="text-[10px] text-gray-500">{notifPermission === 'granted' ? 'Rivals, streaks, reminders' : notifPermission === 'denied' ? 'Blocked in browser settings' : 'Get notified when rivals log habits'}</div></div>{notifPermission === 'granted' ? <div className="text-[#4aba7a] text-sm font-bold">✓ On</div> : notifPermission === 'denied' ? <div className="text-red-400 text-xs">Check browser settings</div> : <button onClick={async () => { try { const p = await Notification.requestPermission(); setNotifPermission(p); if (p === 'granted') { const r = await registerServiceWorker(); if (r) { const sub = await subscribeToPush(r); if (sub && currentUser) { await supabase.from('push_subscriptions').upsert({ id: currentUser.id + '_' + Date.now(), user_id: currentUser.id, subscription: sub.toJSON() }); } } } } catch (e) { console.error('Push setup error:', e); } }} className="px-3 py-1.5 bg-[#5b7cf5] text-white text-xs font-bold rounded-lg active:scale-[0.97]">Enable</button>}</div>
+        <div className={`mt-2 p-3 ${T.bgCard} rounded-xl border ${T.border} flex items-center justify-between`}><div><div className={`text-sm font-medium ${T.text}`}>Push Notifications</div><div className="text-[10px] text-gray-500">{notifPermission === 'granted' ? 'Rivals, streaks, reminders' : notifPermission === 'denied' ? 'Blocked in browser settings' : 'Get notified when rivals log habits'}</div></div>{notifPermission === 'granted' ? <div className="text-[#4aba7a] text-sm font-bold">âœ“ On</div> : notifPermission === 'denied' ? <div className="text-red-400 text-xs">Check browser settings</div> : <button onClick={async () => { try { const p = await Notification.requestPermission(); setNotifPermission(p); if (p === 'granted') { const r = await registerServiceWorker(); if (r) { const sub = await subscribeToPush(r); if (sub && currentUser) { await supabase.from('push_subscriptions').upsert({ id: currentUser.id + '_' + Date.now(), user_id: currentUser.id, subscription: sub.toJSON() }); } } } } catch (e) { console.error('Push setup error:', e); } }} className="px-3 py-1.5 bg-[#5b7cf5] text-white text-xs font-bold rounded-lg active:scale-[0.97]">Enable</button>}</div>
         <div className={`mt-2 p-3 ${T.bgCard} rounded-xl border ${T.border}`}>
           <div className={`text-sm font-medium ${T.text} mb-3`}>Custom Thresholds</div>
           <div className="flex items-center justify-between mb-3">
@@ -2262,7 +2381,7 @@ function VersaAppMain() {
                 return (
                   <div key={st.id} className={`p-2.5 rounded-xl border flex justify-between items-center ${isWinner ? (darkMode ? 'border-[#d4a04a]/30 bg-[#d4a04a]/10 text-white' : 'border-[#d4a04a]/30 bg-[#d4a04a]/5 text-gray-900') : (darkMode ? 'border-red-500/20 bg-red-500/10 text-gray-300' : 'border-red-500/20 bg-red-500/5 text-gray-700')}`}>
                     <div>
-                      <div className="font-bold uppercase tracking-wider text-[10px] mb-0.5 flex items-center gap-1.5">{isWinner ? <span className="text-[#d4a04a]">🏆 Trophy Winner</span> : <span className="text-red-400">💀 Hall of Shame</span>}</div>
+                      <div className="font-bold uppercase tracking-wider text-[10px] mb-0.5 flex items-center gap-1.5">{isWinner ? <span className="text-[#d4a04a]">ðŸ† Trophy Winner</span> : <span className="text-red-400">ðŸ’€ Hall of Shame</span>}</div>
                       <div className="text-xs font-medium max-w-[200px] truncate" title={st.description}>"{st.description}"</div>
                     </div>
                     <div className="text-right">
@@ -2291,15 +2410,15 @@ function VersaAppMain() {
         <ModalHeader title="How Versa Works" onClose={() => setShowHelp(false)} dark={darkMode} />
         <div className="space-y-3 text-sm text-gray-400">
           {[
-            { i: '🎯', t: 'Track & Earn', d: 'Tap + to log habits. Each completion earns points. Hit ' + dailyTarget + 'pts for a perfect day.' },
-            { i: '🔥', t: 'Streaks', d: 'Log at least ' + streakTarget + 'pts daily to maintain your streak (this threshold scales exponentially harder at higher tiers!). Tiers: 3d→1.5× · 7d→2× · 14d→2.5× · 30d→3×.' },
-            { i: '🛡️', t: 'Streak Freeze', d: 'Hit 90% (' + Math.round(dailyTarget * 0.9) + 'pts) in a day to bank a freeze. If you miss tomorrow, the freeze saves your streak. Max 1 at a time — unlog habits and you lose it.' },
-            { i: '🎰', t: 'Mystery Bonus', d: '~10% chance on every tap: +5 (common), +10, +15 (rare), +20 (epic), +50 (jackpot). Bonus points stack on top of streak multipliers.' },
-            { i: '💎', t: 'Crystals', d: 'Score the most points in a category (Study, Health, Focus) to earn a crystal for the day. Ties = no crystal.' },
-            { i: '🏆', t: 'Compete', d: 'Weekly leaderboard resets Sunday. Invite friends, set stakes, and see who actually follows through.' },
-            { i: '⚡', t: 'Stakes', d: 'Set what the weekly loser has to do. Spin the punishment wheel for random consequences.' },
-            { i: '🔥', t: 'Reactions', d: 'React to your rivals\' completions with 🔥 💀 👏 😤 in the activity feed.' },
-            { i: '👤', t: 'Solo Mode', d: 'No friends yet? Compete against your own yesterday score.' },
+            { i: 'ðŸŽ¯', t: 'Track & Earn', d: 'Tap + to log habits. Each completion earns points. Hit ' + dailyTarget + 'pts for a perfect day.' },
+            { i: 'ðŸ”¥', t: 'Streaks', d: 'Log at least ' + streakTarget + 'pts daily to maintain your streak (this threshold scales exponentially harder at higher tiers!). Tiers: 3dâ†’1.5Ã— Â· 7dâ†’2Ã— Â· 14dâ†’2.5Ã— Â· 30dâ†’3Ã—.' },
+            { i: 'ðŸ›¡ï¸', t: 'Streak Freeze', d: 'Hit 90% (' + Math.round(dailyTarget * 0.9) + 'pts) in a day to bank a freeze. If you miss tomorrow, the freeze saves your streak. Max 1 at a time â€” unlog habits and you lose it.' },
+            { i: 'ðŸŽ°', t: 'Mystery Bonus', d: '~10% chance on every tap: +5 (common), +10, +15 (rare), +20 (epic), +50 (jackpot). Bonus points stack on top of streak multipliers.' },
+            { i: 'ðŸ’Ž', t: 'Crystals', d: 'Score the most points in a category (Study, Health, Focus) to earn a crystal for the day. Ties = no crystal.' },
+            { i: 'ðŸ†', t: 'Compete', d: 'Weekly leaderboard resets Sunday. Invite friends, set stakes, and see who actually follows through.' },
+            { i: 'âš¡', t: 'Stakes', d: 'Set what the weekly loser has to do. Spin the punishment wheel for random consequences.' },
+            { i: 'ðŸ”¥', t: 'Reactions', d: 'React to your rivals\' completions with ðŸ”¥ ðŸ’€ ðŸ‘ ðŸ˜¤ in the activity feed.' },
+            { i: 'ðŸ‘¤', t: 'Solo Mode', d: 'No friends yet? Compete against your own yesterday score.' },
           ].map((s, i) => (
             <div key={i} className={`${T.bgCard} rounded-xl p-4 border ${T.border}`}><p className={`font-bold ${T.text} mb-1`}>{s.i} {s.t}</p><p>{s.d}</p></div>
           ))}
@@ -2395,7 +2514,7 @@ function VersaAppMain() {
                     <div className="flex items-center gap-2">
                       <div className={`w-1.5 h-1.5 rounded-full ${ct.bg}`} />
                       <span className={`text-sm ${darkMode ? 'text-[#9aaec0]' : 'text-[#4a6080]'}`}>{h?.name || c.habitName || 'Unknown'}</span>
-                      {c.count > 1 && <span className={`text-[10px] font-bold ${ct.txt}`}>×{c.count}</span>}
+                      {c.count > 1 && <span className={`text-[10px] font-bold ${ct.txt}`}>Ã—{c.count}</span>}
                     </div>
                     <span className={`text-sm font-bold ${ct.txt}`}>{pts}</span>
                   </div>;
@@ -2412,7 +2531,7 @@ function VersaAppMain() {
                 <div className="text-[9px] text-gray-600 tracking-wider uppercase">This week</div>
               </div>
               {ms > 0 && <div className={`flex-1 text-center p-3 rounded-xl border ${darkMode ? 'border-[#e8864a]/20 bg-[#e8864a]/5' : 'border-orange-200 bg-orange-50'}`}>
-                <div className="text-lg font-black text-[#e8864a]">🔗 {ms}d</div>
+                <div className="text-lg font-black text-[#e8864a]">ðŸ”— {ms}d</div>
                 <div className="text-[9px] text-gray-600 tracking-wider uppercase">Duo streak</div>
               </div>}
             </div>
@@ -2428,13 +2547,13 @@ function VersaAppMain() {
             <p className={`text-xs ${T.textDim} mb-4`}>{lastWeekData.dateRange}</p>
             {lastWeekData.scores.length > 0 && (
               <div className="text-center p-5 bg-gradient-to-r from-[#e8864a]/10 to-[#d4a04a]/10 border border-[#e8864a]/15 rounded-xl mb-4">
-                <span className="text-3xl">🏆</span>
+                <span className="text-3xl">ðŸ†</span>
                 <h3 className="text-xl font-black text-[#e8864a] mt-2">{lastWeekData.scores[0].member.username}</h3>
                 <p className={`text-sm ${T.textMuted} mt-1`}>{lastWeekData.scores[0].pts} points &middot; {lastWeekData.scores[0].activeDays} active days</p>
               </div>
             )}
             <div className="space-y-2 mb-4">{lastWeekData.scores.map((s, i) => {
-              const medals = ['🥇', '🥈', '🥉']; const isMe = s.member.id === currentUser.id;
+              const medals = ['ðŸ¥‡', 'ðŸ¥ˆ', 'ðŸ¥‰']; const isMe = s.member.id === currentUser.id;
               return (
                 <div key={s.member.id} className={'rounded-xl p-3 border transition-all ' + (isMe ? 'bg-blue-600/10 border-blue-500/20' : darkMode ? 'bg-[#182544] border-[#1e3050]' : 'bg-gray-50 border-gray-200')}>
                   <div className="flex items-center justify-between mb-2">
@@ -2454,11 +2573,11 @@ function VersaAppMain() {
             {/* Share + Punishment */}
             <div className="flex gap-2">
               <button onClick={async () => {
-                const text = `🏆 Versa Weekly Recap\n${lastWeekData.dateRange}\n\n${lastWeekData.scores.map((s, i) => ((['🥇', '🥈', '🥉'][i] || `${i + 1}.`) + ' ' + s.member.username + ' — ' + s.pts + 'pts')).join('\n')}\n\nJoin us: ${window.location.origin}?join=${currentRoom?.code}`;
+                const text = `ðŸ† Versa Weekly Recap\n${lastWeekData.dateRange}\n\n${lastWeekData.scores.map((s, i) => ((['ðŸ¥‡', 'ðŸ¥ˆ', 'ðŸ¥‰'][i] || `${i + 1}.`) + ' ' + s.member.username + ' â€” ' + s.pts + 'pts')).join('\n')}\n\nJoin us: ${window.location.origin}?join=${currentRoom?.code}`;
                 if (navigator.share) { try { await navigator.share({ title: 'Vers Weekly Recap', text }); } catch { } } else { navigator.clipboard.writeText(text); setCopied(true); setTimeout(() => setCopied(false), 2000); }
               }} className="flex-1 px-4 py-3 bg-[#5b7cf5] text-white rounded-xl text-sm font-bold flex items-center justify-center gap-2 active:scale-[0.98]"><Copy size={14} />{copied ? 'Copied!' : 'Share Recap'}</button>
-              <button onClick={() => { setShowWeeklyRecap(false); setStoryCardIdx(0); setShowStoryCards(true); }} className="flex-1 px-4 py-3 bg-[#9b6bc8] text-white rounded-xl text-sm font-bold flex items-center justify-center gap-2 active:scale-[0.98]">📸 Story</button>
-              {lastWeekData.scores.length > 1 && <button onClick={() => { setShowWeeklyRecap(false); setShowPunishmentWheel(true); setWheelResult(null); }} className="flex-1 px-4 py-3 bg-[#d06b4a] text-white rounded-xl text-sm font-bold flex items-center justify-center gap-2 active:scale-[0.98]">🎰 Wheel</button>}
+              <button onClick={() => { setShowWeeklyRecap(false); setStoryCardIdx(0); setShowStoryCards(true); }} className="flex-1 px-4 py-3 bg-[#9b6bc8] text-white rounded-xl text-sm font-bold flex items-center justify-center gap-2 active:scale-[0.98]">ðŸ“¸ Story</button>
+              {lastWeekData.scores.length > 1 && <button onClick={() => { setShowWeeklyRecap(false); setShowPunishmentWheel(true); setWheelResult(null); }} className="flex-1 px-4 py-3 bg-[#d06b4a] text-white rounded-xl text-sm font-bold flex items-center justify-center gap-2 active:scale-[0.98]">ðŸŽ° Wheel</button>}
             </div>
           </div>
         ) : (
@@ -2468,7 +2587,7 @@ function VersaAppMain() {
 
       {/* Punishment Wheel */}
       <Modal show={showPunishmentWheel} onClose={() => { setShowPunishmentWheel(false); setWheelResult(null); setWheelSpinning(false); }} wide dark={darkMode}>
-        <ModalHeader title="🎰 Punishment Wheel" onClose={() => { setShowPunishmentWheel(false); setWheelResult(null); setWheelSpinning(false); }} dark={darkMode} />
+        <ModalHeader title="ðŸŽ° Punishment Wheel" onClose={() => { setShowPunishmentWheel(false); setWheelResult(null); setWheelSpinning(false); }} dark={darkMode} />
         {lastWeekData && lastWeekData.scores.length > 1 && (
           <div className="text-center">
             <div className="mb-4">
@@ -2525,7 +2644,7 @@ function VersaAppMain() {
               <div className="flex gap-2">
                 <button onClick={() => { setWheelResult(null); }} className="flex-1 px-4 py-3 border border-[#2a4060] text-gray-400 rounded-xl text-sm font-medium hover:bg-[#1e2e50]">Spin Again</button>
                 <button onClick={async () => {
-                  const text = `🎰 Versa Punishment Wheel\n\n${lastWeekData.scores[lastWeekData.scores.length - 1].member.username} lost and has to:\n${wheelResult}\n\nJoin us: ${window.location.origin}?join=${currentRoom?.code}`;
+                  const text = `ðŸŽ° Versa Punishment Wheel\n\n${lastWeekData.scores[lastWeekData.scores.length - 1].member.username} lost and has to:\n${wheelResult}\n\nJoin us: ${window.location.origin}?join=${currentRoom?.code}`;
                   if (navigator.share) { try { await navigator.share({ title: 'Vers Punishment', text }); } catch { } } else { navigator.clipboard.writeText(text); setCopied(true); setTimeout(() => setCopied(false), 2000); }
                 }} className="flex-1 px-4 py-3 bg-[#5b7cf5] text-white rounded-xl text-sm font-bold active:scale-[0.98]">{copied ? 'Copied!' : 'Share'}</button>
               </div>
@@ -2552,11 +2671,11 @@ function VersaAppMain() {
                 {storyCardIdx === 0 && (
                   <div className="flex-1 flex flex-col items-center justify-center text-center">
                     <div className={`text-[10px] font-bold tracking-[0.3em] uppercase mb-6 ${storyTheme === 'light' ? 'text-gray-400' : 'text-gray-500'}`}>VERSA WEEKLY RECAP</div>
-                    <div className="text-5xl mb-4">🏆</div>
+                    <div className="text-5xl mb-4">ðŸ†</div>
                     <div className={`text-2xl font-black mb-1 ${storyTheme === 'neon' ? 'text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-pink-400' : ''}`}>{lastWeekData.scores[0].member.username}</div>
                     <div className={`text-sm ${storyTheme === 'light' ? 'text-gray-500' : 'text-gray-400'}`}>won the week</div>
                     <div className={`text-4xl font-black mt-4 ${storyTheme === 'neon' ? 'text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-blue-400' : 'text-blue-400'}`}>{lastWeekData.scores[0].pts}</div>
-                    <div className={`text-xs ${storyTheme === 'light' ? 'text-gray-400' : 'text-gray-600'}`}>points · {lastWeekData.scores[0].activeDays} active days</div>
+                    <div className={`text-xs ${storyTheme === 'light' ? 'text-gray-400' : 'text-gray-600'}`}>points Â· {lastWeekData.scores[0].activeDays} active days</div>
                     <div className={`text-[10px] mt-6 ${storyTheme === 'light' ? 'text-gray-300' : 'text-gray-700'}`}>{lastWeekData.dateRange}</div>
                   </div>
                 )}
@@ -2567,7 +2686,7 @@ function VersaAppMain() {
                     <div className={`text-[10px] font-bold tracking-[0.3em] uppercase mb-5 text-center ${storyTheme === 'light' ? 'text-gray-400' : 'text-gray-500'}`}>FINAL STANDINGS</div>
                     <div className="space-y-3">
                       {lastWeekData.scores.map((s, i) => {
-                        const medals = ['🥇', '🥈', '🥉'];
+                        const medals = ['ðŸ¥‡', 'ðŸ¥ˆ', 'ðŸ¥‰'];
                         return (
                           <div key={s.member.id} className={`flex items-center justify-between p-3 rounded-xl ${i === 0 ? (storyTheme === 'neon' ? 'bg-purple-500/20 border border-purple-500/30' : 'bg-blue-500/10 border border-blue-500/20') : (storyTheme === 'light' ? 'bg-gray-50' : 'bg-[#151d30]')} ${i > 0 ? 'border ' + (storyTheme === 'light' ? 'border-gray-100' : 'border-[#1e3050]') : ''}`}>
                             <div className="flex items-center gap-3">
@@ -2601,7 +2720,7 @@ function VersaAppMain() {
                       </div>
                       <div>
                         <div className={`text-[10px] uppercase tracking-wider ${storyTheme === 'light' ? 'text-gray-400' : 'text-gray-600'}`}>Top Category</div>
-                        <div className="text-lg font-black">{(() => { let best = '', bestPts = 0; allCatNames.forEach(c => { const p = lastWeekData.scores[0].catPts[c] || 0; if (p > bestPts) { bestPts = p; best = c; } }); return best || '—'; })()}</div>
+                        <div className="text-lg font-black">{(() => { let best = '', bestPts = 0; allCatNames.forEach(c => { const p = lastWeekData.scores[0].catPts[c] || 0; if (p > bestPts) { bestPts = p; best = c; } }); return best || 'â€”'; })()}</div>
                         <div className={`text-xs ${storyTheme === 'neon' ? 'text-purple-400' : 'text-emerald-400'}`}>for {lastWeekData.scores[0].member.username}</div>
                       </div>
                       {lastWeekData.scores.length > 1 && <div>
@@ -2609,7 +2728,7 @@ function VersaAppMain() {
                         <div className="text-lg font-black">{lastWeekData.scores[0].pts - lastWeekData.scores[1].pts} pts</div>
                         <div className={`text-xs ${storyTheme === 'light' ? 'text-gray-400' : 'text-gray-600'}`}>between 1st and 2nd</div>
                       </div>}
-                      {(() => { const topMs = Object.entries(mutualStreaks).filter(([_, v]) => v > 0).sort((a, b) => b[1] - a[1])[0]; if (!topMs) return null; const rival = activeMembers.find(m => m.id === topMs[0]); if (!rival) return null; return (<div><div className={`text-[10px] uppercase tracking-wider ${storyTheme === 'light' ? 'text-gray-400' : 'text-gray-600'}`}>Longest Duo Streak</div><div className="text-lg font-black">🔗 {topMs[1]} days</div><div className={`text-xs ${storyTheme === 'neon' ? 'text-[#e8864a]' : 'text-[#e8864a]'}`}>{currentUser.username} & {rival.username}</div></div>); })()}
+                      {(() => { const topMs = Object.entries(mutualStreaks).filter(([_, v]) => v > 0).sort((a, b) => b[1] - a[1])[0]; if (!topMs) return null; const rival = activeMembers.find(m => m.id === topMs[0]); if (!rival) return null; return (<div><div className={`text-[10px] uppercase tracking-wider ${storyTheme === 'light' ? 'text-gray-400' : 'text-gray-600'}`}>Longest Duo Streak</div><div className="text-lg font-black">ðŸ”— {topMs[1]} days</div><div className={`text-xs ${storyTheme === 'neon' ? 'text-[#e8864a]' : 'text-[#e8864a]'}`}>{currentUser.username} & {rival.username}</div></div>); })()}
                     </div>
                     <div className={`text-[10px] mt-6 ${storyTheme === 'light' ? 'text-gray-300' : 'text-gray-700'}`}>VERSA</div>
                   </div>
@@ -2626,8 +2745,8 @@ function VersaAppMain() {
 
             {/* Nav + Save */}
             <div className="flex gap-2 mt-4">
-              <button onClick={() => setStoryCardIdx(p => Math.max(0, p - 1))} disabled={storyCardIdx === 0} className={`flex-1 py-2.5 rounded-xl text-sm font-medium transition-all disabled:opacity-20 ${darkMode ? 'text-gray-400 border border-[#223858]' : 'text-gray-500 border border-gray-200'}`}>← Prev</button>
-              <button onClick={() => setStoryCardIdx(p => Math.min(2, p + 1))} disabled={storyCardIdx === 2} className={`flex-1 py-2.5 rounded-xl text-sm font-medium transition-all disabled:opacity-20 ${darkMode ? 'text-gray-400 border border-[#223858]' : 'text-gray-500 border border-gray-200'}`}>Next →</button>
+              <button onClick={() => setStoryCardIdx(p => Math.max(0, p - 1))} disabled={storyCardIdx === 0} className={`flex-1 py-2.5 rounded-xl text-sm font-medium transition-all disabled:opacity-20 ${darkMode ? 'text-gray-400 border border-[#223858]' : 'text-gray-500 border border-gray-200'}`}>â† Prev</button>
+              <button onClick={() => setStoryCardIdx(p => Math.min(2, p + 1))} disabled={storyCardIdx === 2} className={`flex-1 py-2.5 rounded-xl text-sm font-medium transition-all disabled:opacity-20 ${darkMode ? 'text-gray-400 border border-[#223858]' : 'text-gray-500 border border-gray-200'}`}>Next â†’</button>
             </div>
             <button onClick={async () => {
               try {
@@ -2637,10 +2756,10 @@ function VersaAppMain() {
                 const link = document.createElement('a'); link.download = 'versa-recap.png'; link.href = canvas.toDataURL(); link.click();
               } catch {
                 // Fallback: share as text
-                const text = `🏆 Versa Weekly Recap\n${lastWeekData.dateRange}\n\nWinner: ${lastWeekData.scores[0].member.username} — ${lastWeekData.scores[0].pts}pts`;
+                const text = `ðŸ† Versa Weekly Recap\n${lastWeekData.dateRange}\n\nWinner: ${lastWeekData.scores[0].member.username} â€” ${lastWeekData.scores[0].pts}pts`;
                 if (navigator.share) { try { await navigator.share({ title: 'Vers Recap', text }); } catch { } } else { navigator.clipboard.writeText(text); }
               }
-            }} className="w-full mt-2 py-3 bg-[#9b6bc8] text-white rounded-xl text-sm font-bold active:scale-[0.98]">📸 Save as Image</button>
+            }} className="w-full mt-2 py-3 bg-[#9b6bc8] text-white rounded-xl text-sm font-bold active:scale-[0.98]">ðŸ“¸ Save as Image</button>
           </div>
         )}
       </Modal>
@@ -2711,10 +2830,10 @@ function VersaAppMain() {
             {/* Key metrics */}
             <div className="grid grid-cols-2 gap-3 mb-4">
               {[
-                { v: insightsData.avgPerDay, l: 'Avg habits/day', c: 'text-blue-400', icon: '📊' },
-                { v: insightsData.bestDay, l: 'Best day', c: 'text-emerald-400', icon: '🔥' },
-                { v: insightsData.avgPtsPerDay, l: 'Avg pts/day', c: 'text-purple-400', icon: '⚡' },
-                { v: insightsData.bestStreak + 'd', l: 'Best streak', c: 'text-[#e8864a]', icon: '🏆' },
+                { v: insightsData.avgPerDay, l: 'Avg habits/day', c: 'text-blue-400', icon: 'ðŸ“Š' },
+                { v: insightsData.bestDay, l: 'Best day', c: 'text-emerald-400', icon: 'ðŸ”¥' },
+                { v: insightsData.avgPtsPerDay, l: 'Avg pts/day', c: 'text-purple-400', icon: 'âš¡' },
+                { v: insightsData.bestStreak + 'd', l: 'Best streak', c: 'text-[#e8864a]', icon: 'ðŸ†' },
               ].map((s, i) => (
                 <div key={i} className={`p-3 rounded-xl ${darkMode ? 'bg-[#151d30] border border-[#1e3050]' : 'bg-gray-50 border border-gray-200'}`}>
                   <div className="text-sm mb-0.5">{s.icon}</div>
@@ -2763,7 +2882,7 @@ function VersaAppMain() {
               ))}
             </div>
 
-            <p className={`text-[10px] ${T.textDim} text-center mt-4 italic`}>Based on last 60 days · only you can see this</p>
+            <p className={`text-[10px] ${T.textDim} text-center mt-4 italic`}>Based on last 60 days Â· only you can see this</p>
           </div>
         ) : <p className={`text-sm ${T.textDim} text-center py-8`}>Loading...</p>}
       </Modal>
@@ -2774,12 +2893,12 @@ function VersaAppMain() {
         <p className={`text-xs ${T.textDim} mb-4`}>Pick which habits go on your personal board, or add new ones. Needs approval from your room.</p>
         {pendingBoards.find(b => b.userId === currentUser?.id && b.status === 'approved') && (
           <div className="mb-3 p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-xl">
-            <span className="text-xs text-emerald-400 font-medium">✓ You have an active custom board</span>
+            <span className="text-xs text-emerald-400 font-medium">âœ“ You have an active custom board</span>
           </div>
         )}
         {pendingBoards.find(b => b.userId === currentUser?.id && b.status === 'pending') && (
           <div className="mb-3 p-3 bg-[#e8864a]/10 border border-[#e8864a]/20 rounded-xl">
-            <span className="text-xs text-[#e8864a] font-medium">⏳ Your board is pending approval</span>
+            <span className="text-xs text-[#e8864a] font-medium">â³ Your board is pending approval</span>
           </div>
         )}
         <div className="space-y-2 mb-3 max-h-52 overflow-y-auto">
@@ -2792,10 +2911,10 @@ function VersaAppMain() {
               }} className={`w-full text-left p-3 rounded-xl border transition-all flex items-center gap-3 ${selected ? ct.bdr + ' ' + ct.bgS : darkMode ? 'border-[#1e3050] bg-[#182544] hover:bg-[#151d30]' : 'border-gray-200 bg-white hover:bg-gray-50'
                 }`}>
                 <div className={`w-5 h-5 rounded-md border-2 flex items-center justify-center text-xs ${selected ? ct.bg + ' border-transparent text-white' : 'border-gray-600'
-                  }`}>{selected && '✓'}</div>
+                  }`}>{selected && 'âœ“'}</div>
                 <div className="flex-1 min-w-0">
                   <div className={`text-sm font-medium truncate ${selected ? (darkMode ? 'text-white' : 'text-gray-900') : T.textDim}`}>{h.name}</div>
-                  <div className={`text-[10px] ${T.textDim}`}>{h.category} · {h.points} pts</div>
+                  <div className={`text-[10px] ${T.textDim}`}>{h.category} Â· {h.points} pts</div>
                 </div>
               </button>
             );
@@ -2846,7 +2965,7 @@ function VersaAppMain() {
         <ModalHeader title="Room Settings" onClose={() => setShowRoomSettings(false)} icon={<Crown size={16} className="text-[#e8864a]" />} dark={darkMode} />
         <div className={`text-[10px] ${T.textDim} mb-4 flex items-center gap-2`}>
           <span className="font-mono tracking-wider bg-[#1e3050] px-2 py-1 rounded">{currentRoom?.code}</span>
-          <span>·</span>
+          <span>Â·</span>
           <span>You are the room creator</span>
         </div>
 
@@ -2924,7 +3043,7 @@ function VersaAppMain() {
             
             <div className="space-y-4">
               <div>
-                <label className={`block text-[10px] uppercase tracking-wider font-bold mb-2 ${T.textDim}`}>🏆 Who Won the Stake?</label>
+                <label className={`block text-[10px] uppercase tracking-wider font-bold mb-2 ${T.textDim}`}>ðŸ† Who Won the Stake?</label>
                 <select value={settleStakeData.winnerId} onChange={e => setSettleStakeData(prev => ({...prev, winnerId: e.target.value}))} className={`w-full p-3 rounded-xl border appearance-none outline-none text-sm ${darkMode ? 'bg-[#182544] border-[#223858] text-white' : 'bg-gray-50 border-gray-200 text-gray-900'}`}>
                   <option value="" disabled>Select Winner...</option>
                   {roomMembers.map(m => <option key={m.id} value={m.id}>{m.username}</option>)}
@@ -2932,7 +3051,7 @@ function VersaAppMain() {
               </div>
               
               <div>
-                <label className={`block text-[10px] uppercase tracking-wider font-bold mb-2 ${T.textDim}`}>💀 Who Lost & Mentions the Hall of Shame?</label>
+                <label className={`block text-[10px] uppercase tracking-wider font-bold mb-2 ${T.textDim}`}>ðŸ’€ Who Lost & Mentions the Hall of Shame?</label>
                 <select value={settleStakeData.loserId} onChange={e => setSettleStakeData(prev => ({...prev, loserId: e.target.value}))} className={`w-full p-3 rounded-xl border appearance-none outline-none text-sm ${darkMode ? 'bg-[#182544] border-[#223858] text-white' : 'bg-gray-50 border-gray-200 text-gray-900'}`}>
                   <option value="" disabled>Select Loser...</option>
                   {roomMembers.map(m => <option key={m.id} value={m.id}>{m.username}</option>)}
@@ -2958,3 +3077,4 @@ function VersaAppMain() {
 
 
 export default function VersaApp() { return <ErrorBoundary><VersaAppMain /></ErrorBoundary>; }
+
