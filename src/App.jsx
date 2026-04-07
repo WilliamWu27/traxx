@@ -2015,83 +2015,60 @@ function VersaAppMain() {
                <div className="text-[9px] font-bold tracking-widest text-gray-400 uppercase text-right">HIT 90% TO BANK A STREAK FREEZE</div>
              </div>
              
-             {/* Core Habits Header */}
-             <div className="flex items-center gap-2 mb-3 px-1">
-               <Target size={14} className="text-gray-400"/>
-               <span className="text-[10px] font-bold tracking-widest text-gray-400 uppercase">CORE HABITS</span>
-             </div>
-
-             <div className="space-y-3 mb-8">
-                {habits.filter(h => h.points > 0).map(h => {
-                  const cnt = getCount(h.id);
-                  const done = cnt > 0;
-                  const maxed = !h.isRepeatable && cnt >= 1;
-                  return (
-                    <div key={h.id} className={`flex items-center p-4 rounded-2xl border ${done ? (darkMode ? 'border-[#5b7cf5]/30 bg-[#5b7cf5]/10' : 'border-[#5b7cf5]/30 bg-blue-50/50') : (darkMode ? 'border-[#223858] bg-[#182544]' : 'border-gray-100 bg-white shadow-sm')} transition-all`}>
-                      {editMode ? (
-                        <button onClick={() => deleteHabit(h.id)} className="w-6 h-6 rounded-full bg-red-500/20 text-red-400 flex items-center justify-center mr-4"><X size={12} strokeWidth={3}/></button>
-                      ) : (
-                        <button onClick={() => !maxed ? handleIncrement(h.id) : handleDecrement(h.id)} className={`w-6 h-6 rounded-full border-2 flex items-center justify-center mr-4 transition-all ${done ? 'bg-[#5b7cf5] border-[#5b7cf5] text-white' : (darkMode ? 'border-gray-600' : 'border-gray-300')}`}>
-                          {done && <Check size={14} strokeWidth={4} />}
-                        </button>
-                      )}
-                      <div className="flex-1">
-                        <div className={`text-sm font-bold ${done ? (darkMode ? 'text-[#7a8ba8]' : 'text-gray-600') : (darkMode ? 'text-white' : 'text-gray-900')}`}>{h.name} {h.isRepeatable && cnt > 0 && <span className="text-[#5b7cf5] ml-1">x{cnt}</span>}</div>
-                        <div className="flex items-center gap-2 mt-1.5">
-                           <span className={`px-2 py-0.5 rounded-full ${darkMode ? 'bg-[#0f1b2d] text-gray-400' : 'bg-gray-100 text-gray-500'} text-[9px] font-bold tracking-widest uppercase`}>{h.category}</span>
-                           <span className={`px-2 py-0.5 rounded-full ${darkMode ? 'bg-[#5b7cf5]/20 text-[#5b7cf5]' : 'bg-blue-50 text-blue-600'} text-[9px] font-bold tracking-widest uppercase`}>+{h.points} pts</span>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-1.5">
-                        {cnt > 0 && !editMode && <button onClick={() => handleDecrement(h.id)} className="w-6 h-6 rounded-full flex items-center justify-center opacity-30 hover:opacity-70 text-gray-400"><MinusIcon size={12}/></button>}
-                        {editMode ? (
-                          <button onClick={() => openEditHabit(h)} className={`text-[10px] px-2.5 py-1 rounded-lg font-bold ${darkMode ? 'text-blue-400 bg-blue-500/10' : 'text-blue-600 bg-blue-50'}`}>Edit</button>
-                        ) : (
-                          <button onClick={() => openEditHabit(h)} className={darkMode ? 'text-gray-600' : 'text-gray-300'}><ChevronRight size={16} /></button>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
-                {habits.filter(h => h.points > 0).length === 0 && <div className="text-center py-6 text-sm text-gray-500">No habits added.</div>}
-             </div>
-
-             {/* Distractions (Negative) */}
-             <div className="flex items-center gap-2 mb-3 px-1">
-               <X size={14} className="text-gray-400"/>
-               <span className="text-[10px] font-bold tracking-widest text-gray-400 uppercase">DISTRACTIONS</span>
-             </div>
-
-             <div className="space-y-3">
-                {habits.filter(h => h.points < 0).map(h => {
-                  const cnt = getCount(h.id);
-                  const done = cnt > 0;
-                  return (
-                    <div key={h.id} className={`flex items-center p-4 rounded-2xl border ${done ? (darkMode ? 'border-rose-500/30 bg-rose-500/10' : 'border-rose-200 bg-rose-50/50') : (darkMode ? 'border-[#223858] bg-[#182544]' : 'border-gray-100 bg-white shadow-sm')} transition-all`}>
-                      {editMode ? (
-                        <button onClick={() => deleteHabit(h.id)} className="w-6 h-6 rounded-full bg-red-500/20 text-red-400 flex items-center justify-center mr-4"><X size={12} strokeWidth={3}/></button>
-                      ) : null}
-                      <div className="flex-1">
-                        <div className={`text-sm font-bold ${darkMode ? 'text-white' : 'text-gray-900'}`}>{h.name} {cnt > 0 && <span className="text-rose-400 ml-1">x{cnt}</span>}</div>
-                        <div className="flex items-center gap-2 mt-1.5">
-                           <span className={`px-2 py-0.5 rounded-full ${darkMode ? 'bg-[#0f1b2d] text-gray-400' : 'bg-gray-100 text-gray-500'} text-[9px] font-bold tracking-widest uppercase`}>{h.category}</span>
-                           <span className={`px-2 py-0.5 rounded-full ${darkMode ? 'bg-rose-500/20 text-rose-400' : 'bg-rose-50 text-rose-600'} text-[9px] font-bold tracking-widest uppercase`}>-{Math.abs(h.points)} pts</span>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-1.5">
-                        {cnt > 0 && !editMode && <button onClick={() => handleDecrement(h.id)} className="w-6 h-6 rounded-full flex items-center justify-center opacity-40 hover:opacity-80 text-emerald-400"><MinusIcon size={12}/></button>}
-                        {editMode ? (
-                          <button onClick={() => openEditHabit(h)} className={`text-[10px] px-2.5 py-1 rounded-lg font-bold ${darkMode ? 'text-blue-400 bg-blue-500/10' : 'text-blue-600 bg-blue-50'}`}>Edit</button>
-                        ) : (
-                          <button onClick={() => handleIncrement(h.id)} className={`w-8 h-8 rounded-full border-2 flex items-center justify-center transition-all ${darkMode ? 'border-gray-600 text-gray-400' : 'border-gray-200 text-gray-400'} hover:text-rose-500 hover:bg-rose-50 hover:border-rose-200`}>
-                            <X size={16} />
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
-                {habits.filter(h => h.points < 0).length === 0 && <div className="text-center py-6 text-[10px] uppercase tracking-wider text-gray-500">No vices configured</div>}
+             {/* Habits grouped by category */}
+             {allCatNames.map(cat => {
+               const catHabits = habits.filter(h => h.category === cat);
+               if (catHabits.length === 0 && !editMode) return null;
+               const ct = getCT(cat);
+               const catIcon = activeCategories.find(c => c.name === cat)?.icon || '⭐';
+               return (
+                 <div key={cat} className="mb-6">
+                   <div className="flex items-center gap-2 mb-3 px-1">
+                     <span className="text-sm">{catIcon}</span>
+                     <span className={`text-[10px] font-bold tracking-widest uppercase ${ct.txt}`}>{cat}</span>
+                     <span className={`text-[10px] ${darkMode ? 'text-[#4a6080]' : 'text-gray-400'}`}>{catHabits.length}</span>
+                   </div>
+                   <div className="space-y-3">
+                     {catHabits.map(h => {
+                       const cnt = getCount(h.id);
+                       const done = cnt > 0;
+                       const isNeg = h.points < 0;
+                       const maxed = !h.isRepeatable && cnt >= 1;
+                       const doneBorder = isNeg ? (darkMode ? 'border-rose-500/30 bg-rose-500/10' : 'border-rose-200 bg-rose-50/50') : (darkMode ? `${ct.bdr} ${ct.bgS}` : `${ct.bdr} bg-blue-50/30`);
+                       const defaultBorder = darkMode ? 'border-[#223858] bg-[#182544]' : 'border-gray-100 bg-white shadow-sm';
+                       return (
+                         <div key={h.id} className={`flex items-center p-4 rounded-2xl border ${done ? doneBorder : defaultBorder} transition-all`}>
+                           {editMode ? (
+                             <button onClick={() => deleteHabit(h.id)} className="w-6 h-6 rounded-full bg-red-500/20 text-red-400 flex items-center justify-center mr-4"><X size={12} strokeWidth={3}/></button>
+                           ) : isNeg ? (
+                             <button onClick={() => handleIncrement(h.id)} className={`w-6 h-6 rounded-full border-2 flex items-center justify-center mr-4 transition-all ${done ? 'bg-rose-500 border-rose-500 text-white' : (darkMode ? 'border-gray-600' : 'border-gray-300')}`}>
+                               {done ? <X size={12} strokeWidth={4}/> : null}
+                             </button>
+                           ) : (
+                             <button onClick={() => !maxed ? handleIncrement(h.id) : handleDecrement(h.id)} className={`w-6 h-6 rounded-full border-2 flex items-center justify-center mr-4 transition-all ${done ? 'bg-[#5b7cf5] border-[#5b7cf5] text-white' : (darkMode ? 'border-gray-600' : 'border-gray-300')}`}>
+                               {done && <Check size={14} strokeWidth={4} />}
+                             </button>
+                           )}
+                           <div className="flex-1">
+                             <div className={`text-sm font-bold ${done ? (darkMode ? 'text-[#7a8ba8]' : 'text-gray-600') : (darkMode ? 'text-white' : 'text-gray-900')}`}>{h.name} {(h.isRepeatable || isNeg) && cnt > 0 && <span className={isNeg ? 'text-rose-400 ml-1' : `${ct.txt} ml-1`}>x{cnt}</span>}</div>
+                             <div className="flex items-center gap-2 mt-1.5">
+                               <span className={`px-2 py-0.5 rounded-full ${isNeg ? (darkMode ? 'bg-rose-500/20 text-rose-400' : 'bg-rose-50 text-rose-600') : (darkMode ? `${ct.bgS} ${ct.txt}` : `bg-blue-50 text-blue-600`)} text-[9px] font-bold tracking-widest uppercase`}>{isNeg ? '-' : '+'}{Math.abs(h.points)} pts</span>
+                               {h.unit && <span className={`text-[9px] ${darkMode ? 'text-[#4a6080]' : 'text-gray-400'}`}>{h.unit}</span>}
+                             </div>
+                           </div>
+                           <div className="flex items-center gap-1.5">
+                             {cnt > 0 && !editMode && <button onClick={() => handleDecrement(h.id)} className={`w-6 h-6 rounded-full flex items-center justify-center opacity-30 hover:opacity-70 ${isNeg ? 'text-emerald-400' : 'text-gray-400'}`}><MinusIcon size={12}/></button>}
+                             {editMode && <button onClick={() => openEditHabit(h)} className={`text-[10px] px-2.5 py-1 rounded-lg font-bold ${darkMode ? 'text-blue-400 bg-blue-500/10' : 'text-blue-600 bg-blue-50'}`}>Edit</button>}
+                             {!editMode && !isNeg && <button onClick={() => openEditHabit(h)} className={darkMode ? 'text-gray-600' : 'text-gray-300'}><ChevronRight size={16} /></button>}
+                           </div>
+                         </div>
+                       );
+                     })}
+                   </div>
+                 </div>
+               );
+             })}
+             {habits.length === 0 && <div className="text-center py-12 text-sm text-gray-500">No habits added. Tap + to get started.</div>}
              </div>
           </div>
         )}
@@ -2791,82 +2768,123 @@ function VersaAppMain() {
 
       {/* Heat Map Calendar */}
       <Modal show={showHeatMap} onClose={() => setShowHeatMap(false)} wide dark={darkMode}>
-        <ModalHeader title="90-Day Heat Map" onClose={() => setShowHeatMap(false)} icon={<Calendar size={18} className="text-emerald-400" />} dark={darkMode} />
-        <div className="mb-3"><p className={`text-xs ${T.textDim}`}>Based on daily points out of 400</p></div>
-        <div className="overflow-x-auto">
-          <div className="flex gap-[3px]">
-            {/* Day labels */}
-            <div className="flex flex-col gap-[3px] mr-1 shrink-0">
-              {['','M','','W','','F',''].map((d,i)=><div key={i} className={`w-[10px] h-[10px] flex items-center justify-center text-[7px] ${T.textDim}`}>{d}</div>)}
-            </div>
-            {/* Grid columns (weeks) */}
-            {(() => {
-              const today = new Date();
-              const startDate = new Date(today); startDate.setDate(startDate.getDate() - 89);
-              const startDow = startDate.getDay(); // 0=Sun
-              const getColor = (pts) => {
-                if (pts >= 320) return 'rgba(74,186,122,1)';
-                if (pts >= 200) return 'rgba(74,186,122,0.7)';
-                if (pts >= 120) return 'rgba(74,186,122,0.45)';
-                if (pts >= 40) return 'rgba(74,186,122,0.25)';
-                return null;
-              };
-              // Build all cells including padding
-              const allDays = [];
-              // Pad the first week
-              for (let p = 0; p < startDow; p++) allDays.push(null);
-              for (let i = 0; i <= 89; i++) {
-                const d = new Date(startDate); d.setDate(d.getDate() + i);
-                allDays.push(d);
-              }
-              // Split into weeks (columns of 7)
-              const weeks = [];
-              for (let i = 0; i < allDays.length; i += 7) weeks.push(allDays.slice(i, i + 7));
-              // Pad last week
-              const last = weeks[weeks.length - 1];
-              while (last.length < 7) last.push(null);
-              return weeks.map((week, wi) => (
-                <div key={wi} className="flex flex-col gap-[3px]">
-                  {week.map((day, di) => {
-                    if (!day) return <div key={di} className="w-[10px] h-[10px]" />;
-                    const ds = formatDateStr(day);
-                    const pts = heatMapData[ds] || 0;
-                    const color = getColor(pts);
-                    const isToday = ds === getToday();
-                    return <div key={di} className={`w-[10px] h-[10px] rounded-[2px] ${!color ? (darkMode ? 'bg-[#1e2e50]' : 'bg-gray-100') : ''} ${isToday ? 'ring-1 ring-white/30' : ''}`} style={color ? { backgroundColor: color } : {}} title={`${formatDate(ds)}: ${pts} pts`} />;
-                  })}
+        <ModalHeader title="Activity" onClose={() => setShowHeatMap(false)} icon={<Calendar size={18} className="text-emerald-400" />} dark={darkMode} />
+        {(() => {
+          const today = new Date();
+          const getColor = (pts) => {
+            if (pts >= 320) return '#4aba7a';
+            if (pts >= 200) return '#3a9a64';
+            if (pts >= 120) return '#2d7a50';
+            if (pts >= 40) return '#1e5a3a';
+            return darkMode ? '#1a2540' : '#eef2f7';
+          };
+          // Calculate grid: always 13 full weeks (91 days) ending on today's week
+          const endOfWeek = new Date(today);
+          const todayDow = endOfWeek.getDay();
+          endOfWeek.setDate(endOfWeek.getDate() + (6 - todayDow)); // move to Saturday
+          const startOfGrid = new Date(endOfWeek);
+          startOfGrid.setDate(startOfGrid.getDate() - (13 * 7 - 1)); // 13 weeks back
+          
+          // Build 13 columns × 7 rows
+          const weeks = [];
+          for (let w = 0; w < 13; w++) {
+            const week = [];
+            for (let d = 0; d < 7; d++) {
+              const date = new Date(startOfGrid);
+              date.setDate(date.getDate() + w * 7 + d);
+              week.push(date);
+            }
+            weeks.push(week);
+          }
+
+          // Month labels
+          const months = [];
+          let lastMonth = -1;
+          weeks.forEach((week, wi) => {
+            const firstDay = week[0];
+            const m = firstDay.getMonth();
+            if (m !== lastMonth) {
+              months.push({ idx: wi, label: firstDay.toLocaleDateString('en-US', { month: 'short' }) });
+              lastMonth = m;
+            }
+          });
+
+          const cellSize = 18;
+          const gap = 3;
+          const labelW = 24;
+          const gridW = labelW + weeks.length * (cellSize + gap);
+
+          return (
+            <div>
+              {/* Month labels */}
+              <div className="flex mb-1" style={{ paddingLeft: labelW }}>
+                {months.map((m, i) => (
+                  <div key={i} className={`text-[9px] font-bold ${darkMode ? 'text-[#4a6080]' : 'text-gray-400'}`} style={{ position: 'relative', left: m.idx * (cellSize + gap) }}>{m.label}</div>
+                ))}
+              </div>
+
+              {/* Grid */}
+              <div className="flex">
+                {/* Day labels */}
+                <div className="flex flex-col shrink-0" style={{ width: labelW, gap }}>
+                  {['S','M','T','W','T','F','S'].map((d, i) => (
+                    <div key={i} className={`flex items-center justify-end pr-1.5 text-[9px] font-bold ${i % 2 === 1 ? (darkMode ? 'text-[#4a6080]' : 'text-gray-400') : 'text-transparent'}`} style={{ height: cellSize }}>{d}</div>
+                  ))}
                 </div>
-              ));
-            })()}
-          </div>
-        </div>
-        <div className="flex items-center justify-between mt-3">
-          <span className={`text-[10px] ${T.textDim}`}>90 days ago</span>
-          <div className="flex items-center gap-1">
-            <span className={`text-[10px] ${T.textDim} mr-1`}>0</span>
-            <div className="w-[10px] h-[10px] rounded-[2px]" style={{ backgroundColor: darkMode ? 'rgba(255,255,255,0.04)' : '#f3f4f6' }} />
-            <div className="w-[10px] h-[10px] rounded-[2px]" style={{ backgroundColor: 'rgba(74,186,122,0.25)' }} />
-            <div className="w-[10px] h-[10px] rounded-[2px]" style={{ backgroundColor: 'rgba(74,186,122,0.45)' }} />
-            <div className="w-[10px] h-[10px] rounded-[2px]" style={{ backgroundColor: 'rgba(74,186,122,0.7)' }} />
-            <div className="w-[10px] h-[10px] rounded-[2px]" style={{ backgroundColor: 'rgba(74,186,122,1)' }} />
-            <span className={`text-[10px] ${T.textDim} ml-1`}>400</span>
-          </div>
-          <span className={`text-[10px] ${T.textDim}`}>Today</span>
-        </div>
-        <div className={`flex justify-center gap-4 mt-2 text-[9px] ${T.textDim}`}>
-          <span>10%=40</span><span>30%=120</span><span>50%=200</span><span>80%=320</span>
-        </div>
-        {/* Stats summary */}
-        <div className="grid grid-cols-3 gap-3 mt-4">{[
-          { v: Object.keys(heatMapData).length, l: 'Active Days' },
-          { v: Object.values(heatMapData).reduce((a, b) => a + b, 0), l: 'Total Points' },
-          { v: streakData.streak || 0, l: 'Current Streak' }
-        ].map((s, i) => (
-          <div key={i} className={`text-center p-3 rounded-xl ${darkMode ? 'bg-[#151d30] border border-[#1e3050]' : 'bg-gray-50 border border-gray-200'}`}>
-            <div className="text-lg font-black text-[#5b7cf5]">{s.v}</div>
-            <div className={`text-[9px] ${T.textDim} tracking-wider uppercase`}>{s.l}</div>
-          </div>
-        ))}</div>
+
+                {/* Cells */}
+                <div className="flex" style={{ gap }}>
+                  {weeks.map((week, wi) => (
+                    <div key={wi} className="flex flex-col" style={{ gap }}>
+                      {week.map((day, di) => {
+                        const ds = formatDateStr(day);
+                        const pts = heatMapData[ds] || 0;
+                        const isFuture = day > today;
+                        const isToday = ds === getToday();
+                        return (
+                          <div
+                            key={di}
+                            className={`rounded-[3px] transition-colors ${isToday ? 'ring-1.5 ring-white/40' : ''}`}
+                            style={{
+                              width: cellSize,
+                              height: cellSize,
+                              backgroundColor: isFuture ? 'transparent' : getColor(pts),
+                              opacity: isFuture ? 0.15 : 1,
+                            }}
+                            title={isFuture ? '' : `${formatDate(ds)}: ${pts} pts`}
+                          />
+                        );
+                      })}
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Legend */}
+              <div className="flex items-center justify-between mt-4">
+                <span className={`text-[10px] font-medium ${T.textDim}`}>Less</span>
+                <div className="flex items-center gap-1">
+                  {[darkMode ? '#1a2540' : '#eef2f7', '#1e5a3a', '#2d7a50', '#3a9a64', '#4aba7a'].map((color, i) => (
+                    <div key={i} className="rounded-[3px]" style={{ width: cellSize, height: cellSize, backgroundColor: color }} />
+                  ))}
+                </div>
+                <span className={`text-[10px] font-medium ${T.textDim}`}>More</span>
+              </div>
+
+              {/* Stats */}
+              <div className="grid grid-cols-3 gap-3 mt-5">{[
+                { v: Object.keys(heatMapData).length, l: 'Active Days', c: 'text-emerald-400' },
+                { v: Object.values(heatMapData).reduce((a, b) => a + b, 0), l: 'Total Points', c: 'text-[#5b7cf5]' },
+                { v: streakData.streak || 0, l: 'Current Streak', c: 'text-[#e8864a]' }
+              ].map((s, i) => (
+                <div key={i} className={`text-center p-3 rounded-xl ${darkMode ? 'bg-[#0f1b2d] border border-[#1e3050]' : 'bg-gray-50 border border-gray-200'}`}>
+                  <div className={`text-xl font-black ${s.c}`}>{s.v}</div>
+                  <div className={`text-[9px] ${T.textDim} tracking-wider uppercase mt-0.5`}>{s.l}</div>
+                </div>
+              ))}</div>
+            </div>
+          );
+        })()}
       </Modal>
 
       {/* Personal Insights */}
