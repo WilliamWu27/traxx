@@ -205,6 +205,9 @@ function VersaAppMain() {
   const [streakData, setStreakData] = useState({});
   const [userRooms, setUserRooms] = useState([]);
   const [roomStakes, setRoomStakes] = useState(null);
+  const [archivedStakes, setArchivedStakes] = useState([]);
+  const [showSettleStake, setShowSettleStake] = useState(false);
+  const [settleStakeData, setSettleStakeData] = useState({ winnerId: '', loserId: '' });
   const [newStake, setNewStake] = useState({ type: 'custom', description: '', duration: 'weekly' });
   const [newHabit, setNewHabit] = useState({ name: '', category: 'Study', points: 10, isRepeatable: false, unit: '', description: '', isNegative: false });
   const [historyDate, setHistoryDate] = useState(null);
@@ -452,6 +455,14 @@ function VersaAppMain() {
     };
     fetchStakes();
     subs.push(supabase.channel('stakes-' + currentRoom.id).on('postgres_changes', { event: '*', schema: 'public', table: 'stakes' }, () => setTimeout(fetchStakes, 300)).subscribe());
+
+    // Fetch archived stakes
+    const fetchArchived = async () => {
+      const { data } = await supabase.from('archived_stakes').select('*').eq('room_id', currentRoom.id).order('date_archived', { ascending: false });
+      if (data) setArchivedStakes(data);
+    };
+    fetchArchived();
+    subs.push(supabase.channel('archived-stakes-' + currentRoom.id).on('postgres_changes', { event: '*', schema: 'public', table: 'archived_stakes' }, () => setTimeout(fetchArchived, 300)).subscribe());
 
     // Fetch room categories
     const fetchCats = async () => {
@@ -1024,6 +1035,33 @@ function VersaAppMain() {
     finally { setLoading(false); }
   };
   const clearStake = async () => { if (!isRoomCreator && roomStakes?.createdBy !== currentUser?.id) return; if (!confirm('Remove stake?')) return; try { await supabase.from('stakes').delete().eq('id', currentRoom.id); setRoomStakes(null); } catch { } };
+
+  const archiveStake = async () => {
+    if (!settleStakeData.winnerId || !settleStakeData.loserId) { setError('Select both a winner and a loser.'); return; }
+    if (settleStakeData.winnerId === settleStakeData.loserId) { setError('Winner and loser cannot be the same person.'); return; }
+    setLoading(true); setError('');
+    try {
+      await supabase.from('archived_stakes').insert({
+        room_id: currentRoom.id,
+        description: roomStakes.description,
+        type: roomStakes.type,
+        winner_id: settleStakeData.winnerId,
+        loser_id: settleStakeData.loserId,
+        date_archived: getToday()
+      });
+      await supabase.from('stakes').delete().eq('id', currentRoom.id);
+      setRoomStakes(null);
+      setShowSettleStake(false);
+      setSettleStakeData({ winnerId: '', loserId: '' });
+      setConfettiTrigger(v => v + 1);
+      setSuccessMsg('Stake settled into Trophy Room!');
+      setTimeout(() => setSuccessMsg(''), 3000);
+    } catch (err) {
+      setError(err.message || 'Failed to archive stake (You might need to create the table first in Supabase)');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   // ─── HABITS (CREATE, EDIT, DELETE) ───
   const addHabit = async () => {
@@ -1748,7 +1786,7 @@ function VersaAppMain() {
   // ═══════════════════════════════════════
   const tourSteps = [
     { icon: '🎯', title: 'Track your habits', desc: 'Tap the + button on any habit to log it. Each completion earns you points. Try it now!' },
-    { icon: '🔥', title: 'Build your streak', desc: 'Complete at least one habit every day. The longer your streak, the higher your point multiplier — up to 2× at 60 days.' },
+    { icon: '🔥', title: 'Build your streak', desc: 'Complete at least one habit every day. The longer your streak, the higher your point multiplier — up to 3× at 30 days.' },
     { icon: '💎', title: 'Win crystals', desc: 'Score the most points in any category (Grind, Health, Discipline) to earn a crystal for the day.' },
     { icon: '🏆', title: 'Dominate the leaderboard', desc: 'Your weekly points determine the leaderboard rank. Set stakes to make losing hurt.' },
     { icon: '👥', title: 'Invite your friends', desc: 'Share your room code and start competing. The more rivals, the better.' },
@@ -2209,6 +2247,35 @@ function VersaAppMain() {
           </div>
         </div>
 
+        {/* Trophy Room & Hall of Shame */}
+        {archivedStakes.filter(st => st.winner_id === currentUser.id || st.loser_id === currentUser.id).length > 0 && (
+          <div className={`mt-4 p-3 ${T.bgCard} rounded-xl border ${T.border}`}>
+            <div className={`text-sm font-medium ${T.text} flex items-center justify-between mb-3`}>
+              <span>Trophy Room & Hall of Shame</span>
+              <Trophy size={14} className="text-[#e8864a]" />
+            </div>
+            <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
+              {archivedStakes.filter(st => st.winner_id === currentUser.id || st.loser_id === currentUser.id).map(st => {
+                const isWinner = st.winner_id === currentUser.id;
+                const oppId = isWinner ? st.loser_id : st.winner_id;
+                const oppName = roomMembers.find(m => m.id === oppId)?.username || 'Someone';
+                return (
+                  <div key={st.id} className={`p-2.5 rounded-xl border flex justify-between items-center ${isWinner ? (darkMode ? 'border-[#d4a04a]/30 bg-[#d4a04a]/10 text-white' : 'border-[#d4a04a]/30 bg-[#d4a04a]/5 text-gray-900') : (darkMode ? 'border-red-500/20 bg-red-500/10 text-gray-300' : 'border-red-500/20 bg-red-500/5 text-gray-700')}`}>
+                    <div>
+                      <div className="font-bold uppercase tracking-wider text-[10px] mb-0.5 flex items-center gap-1.5">{isWinner ? <span className="text-[#d4a04a]">🏆 Trophy Winner</span> : <span className="text-red-400">💀 Hall of Shame</span>}</div>
+                      <div className="text-xs font-medium max-w-[200px] truncate" title={st.description}>"{st.description}"</div>
+                    </div>
+                    <div className="text-right">
+                      <div className="text-[10px] opacity-60 uppercase tracking-widest mb-0.5 mt-0.5">{st.type}</div>
+                      <div className="text-[10px] opacity-80 whitespace-nowrap">vs {oppName}</div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
         {/* Quick actions */}
         <div className="mt-5 space-y-2">
           <button onClick={() => { setShowProfile(false); setShowInviteModal(true); }} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border transition-all ${darkMode ? 'border-[#223858] bg-[#182544] hover:bg-[#1e2e50] text-gray-300' : 'border-gray-200 bg-gray-50 hover:bg-gray-100 text-gray-700'}`}><UserPlus size={16} className="text-blue-400" /><span className="text-sm">Invite to Room</span></button>
@@ -2227,7 +2294,7 @@ function VersaAppMain() {
             { i: '🎯', t: 'Track & Earn', d: 'Tap + to log habits. Each completion earns points. Hit ' + dailyTarget + 'pts for a perfect day.' },
             { i: '🔥', t: 'Streaks', d: 'Log at least ' + streakTarget + 'pts daily to maintain your streak (this threshold scales exponentially harder at higher tiers!). Tiers: 3d→1.5× · 7d→2× · 14d→2.5× · 30d→3×.' },
             { i: '🛡️', t: 'Streak Freeze', d: 'Hit 90% (' + Math.round(dailyTarget * 0.9) + 'pts) in a day to bank a freeze. If you miss tomorrow, the freeze saves your streak. Max 1 at a time — unlog habits and you lose it.' },
-            { i: '🎰', t: 'Mystery Bonus', d: '~10% chance on every tap: 1.25× (common), 1.5×, 2× (rare), 3× (epic), 5× (jackpot). Bonus points stack on top of streak multipliers.' },
+            { i: '🎰', t: 'Mystery Bonus', d: '~10% chance on every tap: +5 (common), +10, +15 (rare), +20 (epic), +50 (jackpot). Bonus points stack on top of streak multipliers.' },
             { i: '💎', t: 'Crystals', d: 'Score the most points in a category (Study, Health, Focus) to earn a crystal for the day. Ties = no crystal.' },
             { i: '🏆', t: 'Compete', d: 'Weekly leaderboard resets Sunday. Invite friends, set stakes, and see who actually follows through.' },
             { i: '⚡', t: 'Stakes', d: 'Set what the weekly loser has to do. Spin the punishment wheel for random consequences.' },
@@ -2835,11 +2902,52 @@ function VersaAppMain() {
         <div>
           <h3 className={`text-xs font-bold ${T.textMuted} tracking-wider uppercase mb-3`}>Room Actions</h3>
           <div className="space-y-2">
+            {roomStakes && <button onClick={() => { setShowRoomSettings(false); setShowSettleStake(true); }} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border transition-all text-left mb-2 ${darkMode ? 'border-[#d4a04a]/50 bg-[#d4a04a]/10 hover:bg-[#d4a04a]/20 text-[#d4a04a]' : 'border-[#d4a04a]/40 bg-[#d4a04a]/10 hover:bg-[#d4a04a]/20 text-[#c28e3b]'}`}><Trophy size={15} className="shrink-0" /><div><span className="text-sm font-bold">Settle Stake</span><div className={`text-[10px] opacity-80`}>Declare winner and move to Trophy Room</div></div></button>}
             {roomStakes && <button onClick={clearStake} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border transition-all text-left ${darkMode ? 'border-[#223858] bg-[#182544] hover:bg-[#1e2e50] text-gray-300' : 'border-gray-200 bg-gray-50 hover:bg-gray-100 text-gray-700'}`}><Zap size={15} className="text-red-400 shrink-0" /><div><span className="text-sm">Remove Stake</span><div className={`text-[10px] ${T.textDim}`}>Clear the current room stake</div></div></button>}
             <button onClick={clearAllHabits} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border transition-all text-left ${darkMode ? 'border-[#223858] bg-[#182544] hover:bg-red-500/5 text-gray-300' : 'border-gray-200 bg-gray-50 hover:bg-red-50 text-gray-700'}`}><X size={15} className="text-red-400 shrink-0" /><div><span className="text-sm">Clear All Habits</span><div className={`text-[10px] ${T.textDim}`}>Delete every habit in this room</div></div></button>
           </div>
         </div>
 
+        {error && <p className="text-red-400 text-xs text-center mt-3">{error}</p>}
+        {successMsg && <p className="text-emerald-400 text-xs text-center mt-3">{successMsg}</p>}
+      </Modal>
+
+      {/* Settle Stake Modal */}
+      <Modal show={showSettleStake} onClose={() => setShowSettleStake(false)} dark={darkMode}>
+        <ModalHeader title="Settle Stake" onClose={() => setShowSettleStake(false)} dark={darkMode} />
+        {roomStakes ? (
+          <div>
+            <div className={`p-4 rounded-xl border mb-6 text-center ${darkMode ? 'border-[#d4a04a]/30 bg-[#d4a04a]/10 text-white' : 'border-[#d4a04a]/30 bg-[#d4a04a]/5 text-gray-900'}`}>
+              <div className="text-[10px] uppercase tracking-wider text-[#d4a04a] mb-1 font-bold">{roomStakes.type} &middot; {roomStakes.duration}</div>
+              <div className="text-sm font-medium">"{roomStakes.description}"</div>
+            </div>
+            
+            <div className="space-y-4">
+              <div>
+                <label className={`block text-[10px] uppercase tracking-wider font-bold mb-2 ${T.textDim}`}>🏆 Who Won the Stake?</label>
+                <select value={settleStakeData.winnerId} onChange={e => setSettleStakeData(prev => ({...prev, winnerId: e.target.value}))} className={`w-full p-3 rounded-xl border appearance-none outline-none text-sm ${darkMode ? 'bg-[#182544] border-[#223858] text-white' : 'bg-gray-50 border-gray-200 text-gray-900'}`}>
+                  <option value="" disabled>Select Winner...</option>
+                  {roomMembers.map(m => <option key={m.id} value={m.id}>{m.username}</option>)}
+                </select>
+              </div>
+              
+              <div>
+                <label className={`block text-[10px] uppercase tracking-wider font-bold mb-2 ${T.textDim}`}>💀 Who Lost & Mentions the Hall of Shame?</label>
+                <select value={settleStakeData.loserId} onChange={e => setSettleStakeData(prev => ({...prev, loserId: e.target.value}))} className={`w-full p-3 rounded-xl border appearance-none outline-none text-sm ${darkMode ? 'bg-[#182544] border-[#223858] text-white' : 'bg-gray-50 border-gray-200 text-gray-900'}`}>
+                  <option value="" disabled>Select Loser...</option>
+                  {roomMembers.map(m => <option key={m.id} value={m.id}>{m.username}</option>)}
+                </select>
+              </div>
+            </div>
+
+            <button onClick={archiveStake} disabled={loading || !settleStakeData.winnerId || !settleStakeData.loserId} className="w-full mt-6 px-4 py-3.5 bg-gradient-to-r from-[#d4a04a] to-[#c28e3b] text-white rounded-xl text-sm font-bold shadow-lg shadow-[#d4a04a]/20 active:scale-[0.98] disabled:opacity-50 transition-all">
+              {loading ? 'Saving...' : 'Finalize & Archive Stake'}
+            </button>
+            <p className={`text-[10px] text-center mt-3 ${T.textDim}`}>Archiving this stake will send it to the winner's Trophy Room and remove it from the room, allowing you to set a new one for next week.</p>
+          </div>
+        ) : (
+          <p className="text-sm text-center text-gray-500 py-4">No active stake to settle</p>
+        )}
         {error && <p className="text-red-400 text-xs text-center mt-3">{error}</p>}
         {successMsg && <p className="text-emerald-400 text-xs text-center mt-3">{successMsg}</p>}
       </Modal>
