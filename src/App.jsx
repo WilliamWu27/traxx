@@ -1815,42 +1815,55 @@ function VersaAppMain() {
   return (
     <div className={`min-h-screen ${T.bg} ${T.text} transition-all duration-500`}>
       <style>{`
-        @keyframes fadeUp { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes fadeUp { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-        @keyframes scaleIn { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
-        @keyframes slideDown { from { opacity: 0; transform: translateY(-8px); } to { opacity: 1; transform: translateY(0); } }
-        @keyframes popIn { 0% { transform: scale(0.8); opacity: 0; } 50% { transform: scale(1.05); } 100% { transform: scale(1); opacity: 1; } }
-        @keyframes checkBounce { 0% { transform: scale(0); } 50% { transform: scale(1.3); } 100% { transform: scale(1); } }
+        @keyframes scaleIn { from { opacity: 0; transform: scale(0.92); } to { opacity: 1; transform: scale(1); } }
+        @keyframes slideDown { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes popIn { 0% { transform: scale(0.85); opacity: 0; } 40% { transform: scale(1.03); } 100% { transform: scale(1); opacity: 1; } }
+        @keyframes checkBounce { 0% { transform: scale(0); } 50% { transform: scale(1.4); } 70% { transform: scale(0.9); } 100% { transform: scale(1); } }
         @keyframes shimmer { 0% { background-position: -200% 0; } 100% { background-position: 200% 0; } }
-        @keyframes pulseGlow { 0%, 100% { box-shadow: 0 0 0 0 rgba(91,124,245,0.3); } 50% { box-shadow: 0 0 12px 4px rgba(91,124,245,0.15); } }
+        @keyframes pulseGlow { 0%, 100% { box-shadow: 0 0 0 0 rgba(91,124,245,0.4); } 50% { box-shadow: 0 0 16px 6px rgba(91,124,245,0.1); } }
         @keyframes slideUp { from { opacity: 0; transform: translateY(100%); } to { opacity: 1; transform: translateY(0); } }
-        .anim-fade-up { animation: fadeUp 0.4s ease-out both; }
+        @keyframes float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-4px); } }
+        @keyframes ripple { 0% { transform: scale(0); opacity: 0.5; } 100% { transform: scale(2.5); opacity: 0; } }
+        @keyframes countUp { from { opacity: 0; transform: translateY(8px) scale(0.8); } to { opacity: 1; transform: translateY(0) scale(1); } }
+        @keyframes slideInRight { from { opacity: 0; transform: translateX(20px); } to { opacity: 1; transform: translateX(0); } }
+        @keyframes heroShine { 0% { left: -100%; } 100% { left: 200%; } }
+        .anim-fade-up { animation: fadeUp 0.45s cubic-bezier(0.22, 1, 0.36, 1) both; }
         .anim-fade-in { animation: fadeIn 0.3s ease-out both; }
-        .anim-scale-in { animation: scaleIn 0.3s ease-out both; }
-        .anim-slide-down { animation: slideDown 0.25s ease-out both; }
-        .anim-pop-in { animation: popIn 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.275) both; }
-        .anim-stagger > * { animation: fadeUp 0.4s ease-out both; }
+        .anim-scale-in { animation: scaleIn 0.35s cubic-bezier(0.22, 1, 0.36, 1) both; }
+        .anim-slide-down { animation: slideDown 0.25s cubic-bezier(0.22, 1, 0.36, 1) both; }
+        .anim-pop-in { animation: popIn 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) both; }
+        .anim-slide-right { animation: slideInRight 0.35s cubic-bezier(0.22, 1, 0.36, 1) both; }
+        .anim-count { animation: countUp 0.4s cubic-bezier(0.22, 1, 0.36, 1) both; }
+        .anim-float { animation: float 3s ease-in-out infinite; }
+        .anim-stagger > * { animation: fadeUp 0.45s cubic-bezier(0.22, 1, 0.36, 1) both; }
         .anim-stagger > *:nth-child(1) { animation-delay: 0ms; }
-        .anim-stagger > *:nth-child(2) { animation-delay: 60ms; }
-        .anim-stagger > *:nth-child(3) { animation-delay: 120ms; }
-        .anim-stagger > *:nth-child(4) { animation-delay: 180ms; }
-        .anim-stagger > *:nth-child(5) { animation-delay: 240ms; }
-        .anim-stagger > *:nth-child(6) { animation-delay: 300ms; }
-        .anim-stagger > *:nth-child(7) { animation-delay: 360ms; }
-        .anim-stagger > *:nth-child(8) { animation-delay: 420ms; }
-        .anim-stagger > *:nth-child(n+9) { animation-delay: 480ms; }
+        .anim-stagger > *:nth-child(2) { animation-delay: 50ms; }
+        .anim-stagger > *:nth-child(3) { animation-delay: 100ms; }
+        .anim-stagger > *:nth-child(4) { animation-delay: 150ms; }
+        .anim-stagger > *:nth-child(5) { animation-delay: 200ms; }
+        .anim-stagger > *:nth-child(6) { animation-delay: 250ms; }
+        .anim-stagger > *:nth-child(7) { animation-delay: 300ms; }
+        .anim-stagger > *:nth-child(8) { animation-delay: 350ms; }
+        .anim-stagger > *:nth-child(n+9) { animation-delay: 400ms; }
         .habit-card { transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1); }
         .habit-card:active { transform: scale(0.97); }
-        .habit-card:hover { transform: translateX(2px); }
-        .tab-content { animation: fadeUp 0.35s ease-out both; }
+        .habit-card:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(0,0,0,0.08); }
+        .tab-content { animation: fadeUp 0.4s cubic-bezier(0.22, 1, 0.36, 1) both; }
         .modal-overlay { animation: fadeIn 0.2s ease-out both; }
-        .modal-content { animation: popIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275) both; }
-        .check-anim { animation: checkBounce 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
-        .progress-shimmer { background: linear-gradient(90deg, transparent, rgba(255,255,255,0.15), transparent); background-size: 200% 100%; animation: shimmer 2s infinite; }
-        .bottom-nav { animation: slideUp 0.4s ease-out both; }
-        * { transition-property: background-color, border-color, color, opacity; transition-duration: 0.3s; transition-timing-function: ease; }
-        button, a { transition-property: all; transition-duration: 0.15s; }
+        .modal-content { animation: popIn 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.275) both; }
+        .check-anim { animation: checkBounce 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
+        .progress-shimmer { background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent); background-size: 200% 100%; animation: shimmer 2s ease-in-out infinite; }
+        .bottom-nav { animation: slideUp 0.5s cubic-bezier(0.22, 1, 0.36, 1) both; animation-delay: 0.2s; }
+        .hero-card { position: relative; overflow: hidden; }
+        .hero-card::after { content: ''; position: absolute; top: 0; left: -100%; width: 50%; height: 100%; background: linear-gradient(90deg, transparent, rgba(255,255,255,0.08), transparent); animation: heroShine 4s ease-in-out infinite; }
+        .hero-glow { animation: pulseGlow 4s ease-in-out infinite; }
+        .btn-bounce:active { animation: checkBounce 0.2s ease; }
+        * { transition-property: background-color, border-color, color, opacity, box-shadow; transition-duration: 0.35s; transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1); }
+        button, a { transition-property: all; transition-duration: 0.2s; transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1); }
         input, select { transition-property: border-color, background-color, box-shadow; transition-duration: 0.2s; }
+        input:focus, select:focus { box-shadow: 0 0 0 3px rgba(91,124,245,0.15); }
       `}</style>
       <ConfettiCanvas trigger={confettiTrigger} />
 
@@ -1896,7 +1909,7 @@ function VersaAppMain() {
       {maxedHabit && <div className="fixed inset-0 z-[99] pointer-events-none animate-pulse" style={{ background: 'radial-gradient(circle at center, rgba(255,255,255,0.1) 0%, transparent 70%)' }} />}
       {/* Mystery Bonus popup */}
       {bonusMsg && (
-        <div className="fixed top-20 left-1/2 -translate-x-1/2 z-[101] animate-bounce">
+        <div className="fixed top-20 left-1/2 -translate-x-1/2 z-[101] anim-pop-in">
           <div className={`px-6 py-3 rounded-2xl shadow-2xl text-center ${bonusMsg.type === 'jackpot' ? 'bg-gradient-to-r from-[#e8864a] to-[#d4a04a] text-white' : bonusMsg.type === 'epic' ? 'bg-gradient-to-r from-red-500 to-orange-500 text-white' : bonusMsg.type === 'rare' ? 'bg-gradient-to-r from-purple-600 to-blue-600 text-white' : bonusMsg.type === 'bonus' ? 'bg-gradient-to-r from-blue-500 to-cyan-500 text-white' : 'bg-gradient-to-r from-emerald-500 to-green-500 text-white'}`}>
             <div className="text-lg font-black">{bonusMsg.label}</div>
           </div>
@@ -1904,7 +1917,7 @@ function VersaAppMain() {
       )}
       {/* Streak milestone popup */}
       {streakMilestone && (
-        <div className="fixed top-20 left-1/2 -translate-x-1/2 z-[101] animate-bounce">
+        <div className="fixed top-20 left-1/2 -translate-x-1/2 z-[101] anim-pop-in">
           <div className="px-6 py-3 rounded-2xl shadow-2xl text-center bg-gradient-to-r from-orange-500 to-red-500 text-white">
             <div className="text-lg font-black">🔥 {streakMilestone.days}-Day Streak!</div>
             <div className="text-xs font-bold opacity-90">Unlocked: {streakMilestone.tier}</div>
@@ -1913,7 +1926,7 @@ function VersaAppMain() {
       )}
       {/* Freeze popup */}
       {freezeMsg && (
-        <div className="fixed top-20 left-1/2 -translate-x-1/2 z-[101] animate-bounce">
+        <div className="fixed top-20 left-1/2 -translate-x-1/2 z-[101] anim-pop-in">
           <div className="px-6 py-3 rounded-2xl shadow-2xl text-center bg-gradient-to-r from-cyan-500 to-blue-500 text-white">
             <div className="text-sm font-black">{freezeMsg}</div>
           </div>
@@ -1926,7 +1939,7 @@ function VersaAppMain() {
             <>
               <div className="flex items-center gap-3">
                 <h1 className={`text-xl font-black tracking-widest ${isSunset ? "text-[#e8864a]" : "text-[#5b7cf5]"}`>VERSA <span className="text-xl">✨</span></h1>
-                <div className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wide ${darkMode ? 'bg-gray-800 text-gray-300' : 'bg-gray-100 text-gray-500'}`}>Study Group Code: <span className={darkMode ? 'text-white' : 'text-gray-900'}>{currentRoom?.id}</span></div>
+                <div className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wide ${darkMode ? (isSunset ? 'bg-[#2a1a28] text-gray-300' : 'bg-gray-800 text-gray-300') : 'bg-gray-100 text-gray-500'}`}>Study Group Code: <span className={T.text}>{currentRoom?.id}</span></div>
               </div>
               <div className="flex items-center cursor-pointer" onClick={() => setActiveTab('profile')}>
                 <div className="relative">
@@ -1939,7 +1952,7 @@ function VersaAppMain() {
           {activeTab === 'habits' && (
             <>
               <div>
-                <h1 className={`text-2xl font-black ${darkMode ? 'text-white' : 'text-[#1e2532]'}`}>Log Progress</h1>
+                <h1 className={`text-2xl font-black ${T.text}`}>Log Progress</h1>
                 <div className="text-[11px] font-semibold text-gray-400 mt-1">Consistency builds momentum.</div>
               </div>
               <div className="flex items-center gap-2">
@@ -1952,10 +1965,10 @@ function VersaAppMain() {
           {activeTab === 'cohort' && (
             <>
               <div>
-                <h1 className={`text-2xl font-black flex items-center gap-2 ${darkMode ? 'text-white' : 'text-[#1e2532]'}`}>Cohort <Users size={20} className="text-[#5b7cf5]"/ ></h1>
+                <h1 className={`text-2xl font-black flex items-center gap-2 ${T.text}`}>Cohort <Users size={20} className="text-[#5b7cf5]"/ ></h1>
                 <div className="text-[11px] font-semibold text-gray-400 mt-1">Stay accountable with your group.</div>
               </div>
-              <button onClick={() => { setHistoryDate(getYesterday()); loadHistoryDate(getYesterday()); setShowHistory(true); }} className={`p-2.5 rounded-2xl border ${darkMode ? 'border-[#223858] text-gray-400 bg-[#182544]' : 'border-gray-200 text-gray-500 bg-white'} shadow-sm`}>
+              <button onClick={() => { setHistoryDate(getYesterday()); loadHistoryDate(getYesterday()); setShowHistory(true); }} className={`p-2.5 rounded-2xl border ${T.border + ' text-gray-400 ' + T.bgCard} shadow-sm`}>
                 <Calendar size={18} />
               </button>
             </>
@@ -1963,7 +1976,7 @@ function VersaAppMain() {
           {activeTab === 'stakes' && (
             <>
               <div>
-                <h1 className={`text-2xl font-black flex items-center gap-2 ${darkMode ? 'text-white' : 'text-[#1e2532]'}`}>Weekly Stakes <Target size={20} className="text-red-500" /></h1>
+                <h1 className={`text-2xl font-black flex items-center gap-2 ${T.text}`}>Weekly Stakes <Target size={20} className="text-red-500" /></h1>
                 <div className="text-[11px] font-semibold text-gray-400 mt-1">Set a consequence for the lowest performer.</div>
               </div>
             </>
@@ -1973,27 +1986,43 @@ function VersaAppMain() {
               <div className="flex items-center gap-3">
                  {currentUser.photoURL ? <img src={currentUser.photoURL} className="w-12 h-12 rounded-full object-cover shadow-sm bg-gray-200" referrerPolicy="no-referrer" /> : <div className="w-12 h-12 rounded-full bg-gray-200 flex items-center justify-center"><User size={24} className="text-gray-500" /></div>}
                  <div>
-                   <h1 className={`text-xl font-black ${darkMode ? 'text-white' : 'text-[#1e2532]'}`}>{currentUser.username} {isRoomCreator && <span className="text-[10px] text-gray-500 font-medium">(You)</span>}</h1>
+                   <h1 className={`text-xl font-black ${T.text}`}>{currentUser.username} {isRoomCreator && <span className="text-[10px] text-gray-500 font-medium">(You)</span>}</h1>
                    <div className="text-xs font-semibold text-gray-500">Total Score: {myPts}</div>
                  </div>
               </div>
-              <button onClick={() => setShowSettingsMenu(!showSettingsMenu)} className={`p-2.5 rounded-2xl border ${darkMode ? 'border-[#223858] text-gray-400 bg-[#182544]' : 'border-gray-200 text-gray-500 bg-white'} shadow-sm relative`}>
+              <button onClick={() => setShowSettingsMenu(!showSettingsMenu)} className={`p-2.5 rounded-2xl border ${T.border + ' text-gray-400 ' + T.bgCard} shadow-sm relative`}>
                 <Settings size={18} />
                  {showSettingsMenu && <>
                   <div className="fixed inset-0 z-40" onClick={(e) => { e.stopPropagation(); setShowSettingsMenu(false); }} />
-                  <div className={`anim-slide-down absolute right-0 top-full mt-2 w-56 rounded-2xl border shadow-xl z-50 overflow-hidden ${darkMode ? 'bg-[#182544] border-[#223858]' : 'bg-white border-gray-200'}`}>
+                  <div className={`anim-slide-down absolute right-0 top-full mt-2 w-56 rounded-2xl border shadow-xl z-50 overflow-hidden ${T.bgCard} ${T.border}`}>
                     <div className="py-1">
-                      <button onClick={(e) => { e.stopPropagation(); setShowAddHabit(true); setShowSettingsMenu(false); }} className={`w-full flex items-center gap-3 px-4 py-3 text-sm transition-all ${darkMode ? 'text-[#9aaec0] hover:bg-[#1e3050]' : 'text-gray-700 hover:bg-gray-50'}`}><Plus size={15} className="text-blue-400" />Add Habit</button>
-                      <button onClick={(e) => { e.stopPropagation(); setShowAddCategory(true); setShowSettingsMenu(false); }} className={`w-full flex items-center gap-3 px-4 py-3 text-sm transition-all ${darkMode ? 'text-[#9aaec0] hover:bg-[#1e3050]' : 'text-gray-700 hover:bg-gray-50'}`}><Plus size={15} className="text-purple-400" />Add Category</button>
-                      {habits.length > 0 && <button onClick={(e) => { e.stopPropagation(); setEditMode(!editMode); setShowSettingsMenu(false); }} className={`w-full flex items-center gap-3 px-4 py-3 text-sm transition-all ${editMode ? 'text-blue-400' : (darkMode ? 'text-[#9aaec0] hover:bg-[#1e3050]' : 'text-gray-700 hover:bg-gray-50')}`}><Edit3 size={15} className={editMode ? 'text-blue-400' : 'text-gray-500'} />{editMode ? 'Done Editing' : 'Edit Habits'}</button>}
+                      <button onClick={(e) => { e.stopPropagation(); setShowAddHabit(true); setShowSettingsMenu(false); }} className={`w-full flex items-center gap-3 px-4 py-3 text-sm transition-all ${T.textMuted} ${T.bgCardHover}`}><Plus size={15} className="text-blue-400" />Add Habit</button>
+                      <button onClick={(e) => { e.stopPropagation(); setShowAddCategory(true); setShowSettingsMenu(false); }} className={`w-full flex items-center gap-3 px-4 py-3 text-sm transition-all ${T.textMuted} ${T.bgCardHover}`}><Plus size={15} className="text-purple-400" />Add Category</button>
+                      {habits.length > 0 && <button onClick={(e) => { e.stopPropagation(); setEditMode(!editMode); setShowSettingsMenu(false); }} className={`w-full flex items-center gap-3 px-4 py-3 text-sm transition-all ${editMode ? 'text-blue-400' : (T.textMuted + ' ' + T.bgCardHover)}`}><Edit3 size={15} className={editMode ? 'text-blue-400' : 'text-gray-500'} />{editMode ? 'Done Editing' : 'Edit Habits'}</button>}
                       
-                      {isRoomCreator && <button onClick={(e) => { e.stopPropagation(); setShowRoomSettings(true); setShowSettingsMenu(false); }} className={`w-full flex items-center gap-3 px-4 py-3 text-sm transition-all ${darkMode ? 'text-[#9aaec0] hover:bg-[#1e3050]' : 'text-gray-700 hover:bg-gray-50'}`}><Crown size={15} className="text-[#e8864a]" />Room Settings</button>}
-                      <div className={`px-4 py-2 ${darkMode ? 'border-t border-[#223858]' : 'border-t border-gray-100'}`}>
-                        <div className={`text-[9px] font-bold tracking-widest uppercase mb-2 ${T.textDim}`}>Theme</div>
-                        <div className="grid grid-cols-2 gap-1.5">
-                          {THEMES.map(t => (
-                            <button key={t} onClick={(e) => { e.stopPropagation(); setAppTheme(t); }} className={`px-2.5 py-2 rounded-lg text-[10px] font-bold transition-all ${theme === t ? (t.includes('sunset') ? 'bg-[#e8864a]/20 text-[#e8864a] ring-1 ring-[#e8864a]/40' : 'bg-[#5b7cf5]/20 text-[#5b7cf5] ring-1 ring-[#5b7cf5]/40') : (darkMode ? 'text-[#7a8ba8] hover:bg-[#1e3050]' : 'text-gray-500 hover:bg-gray-100')}`}>{THEME_LABELS[t]}</button>
-                          ))}
+                      {isRoomCreator && <button onClick={(e) => { e.stopPropagation(); setShowRoomSettings(true); setShowSettingsMenu(false); }} className={`w-full flex items-center gap-3 px-4 py-3 text-sm transition-all ${T.textMuted} ${T.bgCardHover}`}><Crown size={15} className="text-[#e8864a]" />Room Settings</button>}
+                      <div className={`px-4 py-3 border-t ${T.border}`}>
+                        <div className={`text-[9px] font-bold tracking-widest uppercase mb-2.5 ${T.textDim}`}>Theme</div>
+                        <div className="grid grid-cols-2 gap-2">
+                          {THEMES.map(t => {
+                            const isSun = t.includes('sunset');
+                            const isDk = t.includes('dark');
+                            const isActive = theme === t;
+                            const previewBg = isDk ? (isSun ? '#1a1018' : '#0f1b2d') : (isSun ? '#fdf6f0' : '#f0f4f8');
+                            const accent = isSun ? '#e8864a' : '#5b7cf5';
+                            return (
+                              <button key={t} onClick={(e) => { e.stopPropagation(); setAppTheme(t); }} className={`p-2 rounded-xl text-left transition-all ${isActive ? (isSun ? 'ring-2 ring-[#e8864a] bg-[#e8864a]/10' : 'ring-2 ring-[#5b7cf5] bg-[#5b7cf5]/10') : (darkMode ? 'hover:bg-[#1e3050]' : 'hover:bg-gray-100')}`}>
+                                <div className="rounded-lg mb-1.5 overflow-hidden" style={{backgroundColor: previewBg, height: 28}}>
+                                  <div className="flex items-end gap-[2px] p-1.5 h-full">
+                                    <div className="w-2 h-1.5 rounded-sm" style={{backgroundColor: accent, opacity: 0.5}}/>
+                                    <div className="w-2 h-2 rounded-sm" style={{backgroundColor: accent, opacity: 0.7}}/>
+                                    <div className="w-2 h-3 rounded-sm" style={{backgroundColor: accent}}/>
+                                  </div>
+                                </div>
+                                <div className={`text-[9px] font-bold ${isActive ? (isSun ? 'text-[#e8864a]' : 'text-[#5b7cf5]') : T.textDim}`}>{THEME_LABELS[t]}</div>
+                              </button>
+                            );
+                          })}
                         </div>
                       </div>
                     </div>
@@ -2012,13 +2041,13 @@ function VersaAppMain() {
         {activeTab === 'overview' && (
           <div className="tab-content">
             {/* HERO CARD */}
-            <div className={`relative overflow-hidden w-full rounded-[2rem] ${isSunset ? "bg-gradient-to-br from-[#e8864a] to-[#c44a6a]" : "bg-gradient-to-br from-[#5b7cf5] to-indigo-700"} leading-none text-white p-7 shadow-xl mb-8`}>
-              <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2 pointer-events-none" />
-              <div className="font-bold tracking-widest uppercase text-[10px] text-blue-100 mb-2">WEEKLY POINTS</div>
-              <div className="text-6xl font-black mb-1">{getWeeklyPts(currentUser.id)}</div>
+            <div className={`hero-card anim-scale-in relative overflow-hidden w-full rounded-[2rem] ${isSunset ? "bg-gradient-to-br from-[#e8864a] to-[#c44a6a]" : "bg-gradient-to-br from-[#5b7cf5] to-indigo-700"} leading-none text-white p-7 shadow-xl mb-8`}>
+              <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2 pointer-events-none hero-glow" />
+              <div className={`font-bold tracking-widest uppercase text-[10px] mb-2 ${isSunset ? 'text-orange-100' : 'text-blue-100'}`}>WEEKLY POINTS</div>
+              <div className="text-6xl font-black mb-1 anim-count">{getWeeklyPts(currentUser.id)}</div>
               
               <div className="absolute right-6 top-1/2 -translate-y-1/2 flex flex-col items-end gap-2">
-                <div className="flex items-center gap-2 px-4 py-2 bg-white/20 backdrop-blur-md rounded-full border border-white/20 text-xs font-bold shadow-sm">
+                <div className="flex items-center gap-2 px-4 py-2 anim-slide-right bg-white/20 backdrop-blur-md rounded-full border border-white/20 text-xs font-bold shadow-sm">
                   <TrendingUp size={14} /> {streakMulti.multi}x Multiplier
                 </div>
                 <div className="text-[10px] font-semibold text-blue-200">Consistency mode active</div>
@@ -2027,7 +2056,7 @@ function VersaAppMain() {
 
             {/* LIVE COHORT LEADERBOARD */}
             <div className="flex items-center justify-between mb-4">
-              <h2 className={`text-lg font-black ${darkMode ? 'text-white' : 'text-[#1e2532]'}`}>Live Cohort Leaderboard</h2>
+              <h2 className={`text-lg font-black ${T.text}`}>Live Cohort Leaderboard</h2>
               <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full border ${darkMode ? 'border-gray-700 bg-gray-800' : 'border-gray-200 bg-white'} shadow-sm text-[10px] text-gray-500 font-semibold`}><Clock size={12}/> Resets Sunday</div>
             </div>
             
@@ -2035,24 +2064,24 @@ function VersaAppMain() {
               {[...activeMembers].map(m => { m.weeklyPts = getWeeklyPts(m.id); return m; }).sort((a,b) => b.weeklyPts - a.weeklyPts).map((member, i) => {
                 const isMe = member.id === currentUser.id;
                 return (
-                  <div key={member.id} className={`relative flex items-center p-4 rounded-2xl border ${isMe ? (darkMode ? 'border-[#5b7cf5]/50 bg-[#5b7cf5]/10' : 'border-[#5b7cf5]/30 bg-white shadow-md shadow-blue-500/5') : (darkMode ? 'border-[#223858] bg-[#182544]' : 'border-gray-100 bg-white shadow-sm')} transition-all`}>
+                  <div key={member.id} className={`anim-fade-up relative flex items-center p-4 rounded-2xl border ${isMe ? (darkMode ? 'border-[#5b7cf5]/50 bg-[#5b7cf5]/10' : 'border-[#5b7cf5]/30 bg-white shadow-md shadow-blue-500/5') : (T.border + ' ' + T.bgCard + (darkMode ? '' : ' shadow-sm'))} transition-all`}>
                     {isMe && <div className={`absolute left-0 top-1/2 -translate-y-1/2 w-1 h-10 ${isSunset ? "bg-[#e8864a]" : "bg-[#5b7cf5]"} rounded-r-full`} />}
                     
                     <div className="w-8 flex justify-center text-sm font-black mr-2">
-                       {i === 0 ? <Crown size={18} className="text-amber-500" /> : <span className={darkMode ? 'text-[#4a6080]' : 'text-gray-400'}>{i + 1}</span>}
+                       {i === 0 ? <Crown size={18} className="text-amber-500" /> : <span className={T.textDim}>{i + 1}</span>}
                     </div>
                     
                     {member.photoURL ? <img src={member.photoURL} className="w-10 h-10 rounded-full object-cover mr-4" /> : <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center mr-4"><User size={16} className="text-gray-400"/></div>}
                     
                     <div className="flex-1">
-                      <div className={`font-black text-sm ${darkMode ? 'text-white' : 'text-gray-900'}`}>{member.username} {isMe && <span className="text-gray-500 font-medium">(You)</span>}</div>
+                      <div className={`font-black text-sm ${T.text}`}>{member.username} {isMe && <span className="text-gray-500 font-medium">(You)</span>}</div>
                       <div className="flex items-center gap-2 mt-1">
                         {member.streak > 0 && <span className="flex items-center gap-1 text-[10px] font-bold text-gray-400"><Flame size={10} className="text-amber-500"/>{member.streak}</span>}
                       </div>
                     </div>
                     
                     <div className="text-right">
-                      <div className={`text-xl font-black ${isMe ? (isSunset ? 'text-[#e8864a]' : 'text-[#5b7cf5]') : (darkMode ? 'text-white' : 'text-gray-900')}`}>{member.weeklyPts}</div>
+                      <div className={`text-xl font-black ${isMe ? (isSunset ? 'text-[#e8864a]' : 'text-[#5b7cf5]') : (T.text)}`}>{member.weeklyPts}</div>
                       <div className="text-[9px] font-bold tracking-widest text-gray-400 uppercase">PTS</div>
                     </div>
                   </div>
@@ -2068,12 +2097,12 @@ function VersaAppMain() {
         {activeTab === 'habits' && (
           <div className="tab-content">
              {/* Daily Target Progress */}
-             <div className={`p-5 rounded-3xl border ${darkMode ? 'border-[#223858] bg-[#182544]' : 'border-gray-100 bg-white shadow-sm'} mb-8`}>
+             <div className={`p-5 rounded-3xl border ${T.border} ${T.bgCard} ${darkMode ? '' : 'shadow-sm'} mb-8 anim-fade-up`}>
                <div className="flex justify-between items-center mb-3">
-                 <span className={`text-sm font-bold ${darkMode ? 'text-white' : 'text-gray-900'}`}>Daily Target</span>
+                 <span className={`text-sm font-bold ${T.text}`}>Daily Target</span>
                  <span className={`text-sm font-black ${isSunset ? "text-[#e8864a]" : "text-[#5b7cf5]"}`}>{Math.min(100, Math.round(dailyProg * 100))}%</span>
                </div>
-               <div className={`h-3 w-full ${darkMode ? 'bg-[#0f1b2d]' : 'bg-gray-100'} rounded-full overflow-hidden mb-3`}>
+               <div className={`h-3 w-full ${darkMode ? (isSunset ? 'bg-[#120a14]' : 'bg-[#0f1b2d]') : 'bg-gray-100'} rounded-full overflow-hidden mb-3`}>
                  <div className={`h-full ${isSunset ? "bg-[#e8864a]" : "bg-[#5b7cf5]"} rounded-full transition-all duration-1000 ease-out relative overflow-hidden`} style={{width: `${Math.min(100, dailyProg * 100)}%`}}><div className="progress-shimmer absolute inset-0 rounded-full"/></div>
                </div>
                <div className="text-[9px] font-bold tracking-widest text-gray-400 uppercase text-right">HIT 90% TO BANK A STREAK FREEZE</div>
@@ -2090,7 +2119,7 @@ function VersaAppMain() {
                    <div className="flex items-center gap-2 mb-3 px-1">
                      <span className="text-sm">{catIcon}</span>
                      <span className={`text-[10px] font-bold tracking-widest uppercase ${ct.txt}`}>{cat}</span>
-                     <span className={`text-[10px] ${darkMode ? 'text-[#4a6080]' : 'text-gray-400'}`}>{catHabits.length}</span>
+                     <span className={`text-[10px] ${T.textDim}`}>{catHabits.length}</span>
                    </div>
                    <div className="space-y-3 anim-stagger">
                      {catHabits.map(h => {
@@ -2099,7 +2128,7 @@ function VersaAppMain() {
                        const isNeg = h.points < 0;
                        const maxed = !h.isRepeatable && cnt >= 1;
                        const doneBorder = isNeg ? (darkMode ? 'border-rose-500/30 bg-rose-500/10' : 'border-rose-200 bg-rose-50/50') : (darkMode ? `${ct.bdr} ${ct.bgS}` : `${ct.bdr} bg-blue-50/30`);
-                       const defaultBorder = darkMode ? 'border-[#223858] bg-[#182544]' : 'border-gray-100 bg-white shadow-sm';
+                       const defaultBorder = T.border + ' ' + T.bgCard + (darkMode ? '' : ' shadow-sm');
                        return (
                          <div key={h.id} className={`habit-card flex items-center p-4 rounded-2xl border ${done ? doneBorder : defaultBorder}`}>
                            {editMode ? (
@@ -2114,10 +2143,10 @@ function VersaAppMain() {
                              </button>
                            )}
                            <div className="flex-1">
-                             <div className={`text-sm font-bold ${done ? (darkMode ? 'text-[#7a8ba8]' : 'text-gray-600') : (darkMode ? 'text-white' : 'text-gray-900')}`}>{h.name} {(h.isRepeatable || isNeg) && cnt > 0 && <span className={isNeg ? 'text-rose-400 ml-1' : `${ct.txt} ml-1`}>x{cnt}</span>}</div>
+                             <div className={`text-sm font-bold ${done ? (darkMode ? 'text-[#7a8ba8]' : 'text-gray-600') : (T.text)}`}>{h.name} {(h.isRepeatable || isNeg) && cnt > 0 && <span className={isNeg ? 'text-rose-400 ml-1' : `${ct.txt} ml-1`}>x{cnt}</span>}</div>
                              <div className="flex items-center gap-2 mt-1.5">
                                <span className={`px-2 py-0.5 rounded-full ${isNeg ? (darkMode ? 'bg-rose-500/20 text-rose-400' : 'bg-rose-50 text-rose-600') : (darkMode ? `${ct.bgS} ${ct.txt}` : `bg-blue-50 text-blue-600`)} text-[9px] font-bold tracking-widest uppercase`}>{isNeg ? '-' : '+'}{Math.abs(h.points)} pts</span>
-                               {h.unit && <span className={`text-[9px] ${darkMode ? 'text-[#4a6080]' : 'text-gray-400'}`}>{h.unit}</span>}
+                               {h.unit && <span className={`text-[9px] ${T.textDim}`}>{h.unit}</span>}
                              </div>
                            </div>
                            <div className="flex items-center gap-1.5">
@@ -2141,19 +2170,19 @@ function VersaAppMain() {
         {/* TAB 3: COHORT (FEED) */}
         {/* ======================================= */}
         {activeTab === 'cohort' && (
-          <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 space-y-4 relative">
+          <div className="tab-content anim-stagger space-y-4 relative">
              {activityFeed.length === 0 ? <p className="text-center text-gray-400 py-10 text-sm">No activity yet</p> : activityFeed.map(a => {
                const ts = a.ts ? new Date(a.ts) : null;
                const timeAgo = ts ? (Math.floor((Date.now() - ts.getTime()) / 60000) < 60 ? Math.floor((Date.now() - ts.getTime()) / 60000) + 'M' : Math.floor((Date.now() - ts.getTime()) / 3600000) + 'H') + ' AGO' : '';
                const reactions = a.reactions || {};
                return (
-                 <div key={a.id} className={`p-4 rounded-3xl border ${darkMode ? 'border-[#223858] bg-[#182544]' : 'border-gray-100 bg-white shadow-sm'}`}>
+                 <div key={a.id} className={`p-4 rounded-3xl border ${T.border} ${T.bgCard} ${darkMode ? '' : 'shadow-sm'}`}>
                     <div className="flex gap-3 mb-4">
                        <div className={`w-10 h-10 rounded-full border ${darkMode ? 'border-[#223858] bg-[#0f1b2d]' : 'border-gray-100 bg-gray-50'} flex items-center justify-center text-lg shrink-0`}>
                           {a.text.includes('streak') ? '🔥' : a.bonus === 'jackpot' ? '🎰' : a.text.includes('caved') ? '💀' : '⚡'}
                        </div>
                        <div className="flex-1 mt-0.5">
-                         <div className={`text-sm ${darkMode ? 'text-[#9aaec0]' : 'text-gray-600'}`}><span className={`font-black ${darkMode ? 'text-white' : 'text-gray-900'}`}>{a.username}</span> {a.text}</div>
+                         <div className={`text-sm ${darkMode ? 'text-[#9aaec0]' : 'text-gray-600'}`}><span className={`font-black ${T.text}`}>{a.username}</span> {a.text}</div>
                          <div className="text-[9px] font-bold tracking-widest text-gray-400 mt-1">{timeAgo}</div>
                        </div>
                     </div>
@@ -2205,28 +2234,28 @@ function VersaAppMain() {
         {activeTab === 'profile' && (
           <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 space-y-4">
              <div className="grid grid-cols-2 gap-4 mb-4 anim-stagger">
-               <div className={`p-4 rounded-3xl border ${darkMode ? 'border-[#223858] bg-[#182544]' : 'border-gray-100 bg-white shadow-sm'}`}>
+               <div className={`p-4 rounded-3xl border ${T.border} ${T.bgCard} ${darkMode ? '' : 'shadow-sm'}`}>
                  <div className="text-[10px] font-bold tracking-widest text-[#9aaec0] uppercase mb-2">Trophies</div>
                  <div className="flex items-end justify-between">
-                   <div className={`text-4xl font-black ${darkMode ? 'text-white' : 'text-gray-900'}`}>{archivedStakes.filter(st => st.winner_id === currentUser.id).length}</div>
+                   <div className={`text-4xl font-black ${T.text}`}>{archivedStakes.filter(st => st.winner_id === currentUser.id).length}</div>
                    <Trophy size={28} className="text-amber-400 opacity-50" strokeWidth={1.5}/>
                  </div>
                </div>
-               <div className={`p-4 rounded-3xl border ${darkMode ? 'border-[#223858] bg-[#182544]' : 'border-gray-100 bg-white shadow-sm'}`}>
+               <div className={`p-4 rounded-3xl border ${T.border} ${T.bgCard} ${darkMode ? '' : 'shadow-sm'}`}>
                  <div className="text-[10px] font-bold tracking-widest text-[#9aaec0] uppercase mb-2">Penalties</div>
                  <div className="flex items-end justify-between">
-                   <div className={`text-4xl font-black ${darkMode ? 'text-white' : 'text-gray-900'}`}>{archivedStakes.filter(st => st.loser_id === currentUser.id).length}</div>
+                   <div className={`text-4xl font-black ${T.text}`}>{archivedStakes.filter(st => st.loser_id === currentUser.id).length}</div>
                    <div className="w-7 h-7 rounded-full border border-red-400 text-red-400 flex items-center justify-center opacity-50 font-bold">!</div>
                  </div>
                </div>
-               <div className={`p-4 rounded-3xl border ${darkMode ? 'border-[#5b7cf5]/30 bg-[#5b7cf5]/10' : 'border-blue-100 bg-blue-50/50 shadow-sm'}`}>
+               <div className={`anim-fade-up p-4 rounded-3xl border ${darkMode ? 'border-[#5b7cf5]/30 bg-[#5b7cf5]/10' : 'border-blue-100 bg-blue-50/50 shadow-sm'}`}>
                  <div className="text-[10px] font-bold tracking-widest text-[#5b7cf5] uppercase mb-2">Top Streak</div>
                  <div className="flex items-end justify-between">
                    <div className={`text-4xl font-black ${darkMode ? 'text-blue-300' : 'text-blue-900'}`}>{streakData.streak}</div>
                    <TrendingUp size={28} className="text-[#5b7cf5] opacity-50" strokeWidth={1.5}/>
                  </div>
                </div>
-               <div className={`p-4 rounded-3xl border ${darkMode ? 'border-cyan-900/50 bg-cyan-900/20' : 'border-cyan-100 bg-cyan-50/50 shadow-sm'}`}>
+               <div className={`anim-fade-up p-4 rounded-3xl border ${darkMode ? 'border-cyan-900/50 bg-cyan-900/20' : 'border-cyan-100 bg-cyan-50/50 shadow-sm'}`}>
                  <div className="text-[10px] font-bold tracking-widest text-cyan-500 uppercase mb-2">Freezes</div>
                  <div className="flex items-end justify-between">
                    <div className={`text-4xl font-black ${darkMode ? 'text-cyan-300' : 'text-cyan-900'}`}>{streakFreeze}</div>
@@ -2235,14 +2264,50 @@ function VersaAppMain() {
                </div>
              </div>
              
-             <div className={`p-5 rounded-3xl border ${darkMode ? 'border-[#223858] bg-[#182544]' : 'border-gray-100 bg-white shadow-sm'}`}>
+             <div className={`p-5 rounded-3xl border ${T.border} ${T.bgCard} ${darkMode ? '' : 'shadow-sm'}`}>
                <div className="flex justify-between items-center mb-4">
                  <div className="text-[10px] font-bold tracking-widest text-[#9aaec0] uppercase">Consistency</div>
-                 <div className={`px-2 py-1 rounded ${darkMode ? 'bg-[#0f1b2d]' : 'bg-gray-100'} text-[10px] font-bold ${darkMode ? 'text-gray-400' : 'text-gray-400'}`}>Last 90 Days</div>
+                 <div className={`px-2 py-1 rounded ${darkMode ? (isSunset ? 'bg-[#120a14]' : 'bg-[#0f1b2d]') : 'bg-gray-100'} text-[10px] font-bold ${darkMode ? 'text-gray-400' : 'text-gray-400'}`}>Last 90 Days</div>
                </div>
                <button onClick={loadHeatMap} className={`w-full flex items-center justify-center gap-2 py-6 border-2 border-dashed ${darkMode ? (isSunset ? 'border-[#3d2640] text-gray-500 hover:text-[#e8864a] hover:bg-[#e8864a]/5' : 'border-[#223858] text-gray-500 hover:text-[#5b7cf5] hover:bg-[#5b7cf5]/5') : 'border-gray-200 text-gray-400 hover:text-blue-600 hover:bg-gray-50'} rounded-xl transition-all font-bold`}>
                  <BarChart3 size={20} /> View Heatmap
                </button>
+             </div>
+
+             {/* Theme Picker */}
+             <div className={`p-5 rounded-3xl border ${T.border} ${T.bgCard} ${darkMode ? '' : 'shadow-sm'} mt-4`}>
+               <div className="text-[10px] font-bold tracking-widest text-[#9aaec0] uppercase mb-3">Appearance</div>
+               <div className="grid grid-cols-2 gap-2">
+                 {THEMES.map(t => {
+                   const isActive = theme === t;
+                   const isSun = t.includes('sunset');
+                   const isDk = t.includes('dark');
+                   const previewBg = isDk ? (isSun ? '#1a1018' : '#0f1b2d') : (isSun ? '#fdf6f0' : '#f0f4f8');
+                   const previewAccent = isSun ? '#e8864a' : '#5b7cf5';
+                   return (
+                     <button key={t} onClick={() => setAppTheme(t)} className={`relative p-3 rounded-2xl border-2 transition-all active:scale-[0.97] ${isActive ? (isSun ? 'border-[#e8864a] shadow-lg shadow-[#e8864a]/20' : 'border-[#5b7cf5] shadow-lg shadow-[#5b7cf5]/20') : (darkMode ? 'border-[#223858] hover:border-[#334868]' : 'border-gray-200 hover:border-gray-300')}`}>
+                       {/* Mini preview */}
+                       <div className="rounded-xl overflow-hidden mb-2" style={{ backgroundColor: previewBg, height: 40 }}>
+                         <div className="flex items-end gap-1 p-2 h-full">
+                           <div className="w-3 h-2 rounded-sm" style={{ backgroundColor: previewAccent, opacity: 0.8 }}/>
+                           <div className="w-3 h-3 rounded-sm" style={{ backgroundColor: previewAccent, opacity: 0.6 }}/>
+                           <div className="w-3 h-4 rounded-sm" style={{ backgroundColor: previewAccent }}/>
+                         </div>
+                       </div>
+                       <div className={`text-[10px] font-bold ${isActive ? (isSun ? 'text-[#e8864a]' : 'text-[#5b7cf5]') : T.textMuted}`}>{THEME_LABELS[t]}</div>
+                       {isActive && <div className={`absolute top-1.5 right-1.5 w-4 h-4 rounded-full flex items-center justify-center text-white text-[8px] ${isSun ? 'bg-[#e8864a]' : 'bg-[#5b7cf5]'}`}>✓</div>}
+                     </button>
+                   );
+                 })}
+               </div>
+             </div>
+
+             {/* Quick Actions */}
+             <div className="space-y-2 anim-fade-up">
+               <button onClick={() => setShowInviteModal(true)} className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-2xl border transition-all active:scale-[0.98] ${T.border} ${T.bgCard} ${T.textMuted} ${T.bgCardHover}`}><UserPlus size={16} className={isSunset ? "text-[#e8864a]" : "text-blue-400"}/><span className="text-sm font-medium">Invite to Room</span></button>
+               {lastWeekData && <button onClick={() => setShowWeeklyRecap(true)} className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-2xl border transition-all active:scale-[0.98] ${T.border} ${T.bgCard} ${T.textMuted} ${T.bgCardHover}`}><BarChart3 size={16} className="text-purple-400"/><span className="text-sm font-medium">Weekly Recap</span></button>}
+               <button onClick={() => setShowHelp(true)} className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-2xl border transition-all active:scale-[0.98] ${T.border} ${T.bgCard} ${T.textMuted} ${T.bgCardHover}`}><HelpCircle size={16} className="text-gray-400"/><span className="text-sm font-medium">How Versa Works</span></button>
+               <button onClick={() => supabase.auth.signOut()} className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-2xl border transition-all active:scale-[0.98] ${T.border} ${T.bgCard} hover:bg-red-500/5 text-red-400`}><LogOut size={16}/><span className="text-sm font-medium">Sign Out</span></button>
              </div>
           </div>
         )}
@@ -2258,7 +2323,7 @@ function VersaAppMain() {
              { id: 'stakes', icon: <Target size={22} className="mb-1" strokeWidth={2.5}/>, label: 'STAKES' },
              { id: 'profile', icon: <User size={22} className="mb-1" strokeWidth={2.5}/>, label: 'PROFILE' }
            ].map(tab => (
-             <button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`flex flex-col items-center justify-center w-16 transition-all ${activeTab === tab.id ? (isSunset ? 'text-[#e8864a] scale-110' : 'text-[#5b7cf5] scale-110') : (darkMode ? 'text-[#7a8ba8] hover:text-white' : 'text-gray-400 hover:text-gray-600')}`}>
+             <button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`flex flex-col items-center justify-center w-16 btn-bounce transition-all ${activeTab === tab.id ? (T.accentTxt + ' scale-110') : (T.textMuted + ' hover:' + T.text)}`}>
                {tab.icon}
                <span className="text-[8px] font-black tracking-widest">{tab.label}</span>
              </button>
@@ -2321,7 +2386,7 @@ function VersaAppMain() {
             </div>
           );
         })}</div>
-        <div className={`border-t ${darkMode ? 'border-[#223858]' : 'border-gray-200'} pt-4`}>
+        <div className={`border-t ${T.border} pt-4`}>
           <p className={`text-xs ${T.textMuted} mb-3`}>Add a new category</p>
           <input type="text" placeholder="Category name" value={newCatName} onChange={e => setNewCatName(e.target.value)} className={inputCls + ' mb-3'} maxLength={20} />
           <p className={`text-[10px] ${T.textDim} mb-2`}>Icon</p>
@@ -2381,10 +2446,10 @@ function VersaAppMain() {
           <div>
             <p className={`${T.textMuted} text-sm mb-4`}>Set what's on the line. The weekly loser pays up.</p>
             <div className="grid grid-cols-2 gap-2 mb-4">{stakePresets.map(sp => (
-              <button key={sp.type} onClick={() => setNewStake({ ...newStake, type: sp.type, description: sp.ph.replace('e.g. ', '') })} className={'p-3 rounded-xl border text-left transition-all ' + (newStake.type === sp.type ? 'border-red-500/40 bg-red-500/10' : (darkMode ? 'border-[#223858] bg-[#182544] hover:bg-[#1e2e50]' : 'border-gray-200 bg-gray-50 hover:bg-gray-100'))}><div className={'text-xs font-bold mb-0.5 ' + (newStake.type === sp.type ? 'text-red-400' : 'text-gray-400')}>{sp.label}</div><div className="text-[10px] text-gray-600">{sp.desc}</div></button>
+              <button key={sp.type} onClick={() => setNewStake({ ...newStake, type: sp.type, description: sp.ph.replace('e.g. ', '') })} className={'p-3 rounded-xl border text-left transition-all ' + (newStake.type === sp.type ? 'border-red-500/40 bg-red-500/10' : (T.border + ' ' + T.bgCard + ' ' + T.bgCardHover))}><div className={'text-xs font-bold mb-0.5 ' + (newStake.type === sp.type ? 'text-red-400' : 'text-gray-400')}>{sp.label}</div><div className="text-[10px] text-gray-600">{sp.desc}</div></button>
             ))}</div>
             <input type="text" placeholder={stakePresets.find(s => s.type === newStake.type)?.ph || 'Describe the stake...'} value={newStake.description} onChange={e => setNewStake({ ...newStake, description: e.target.value })} className={inputCls + ' mb-3'} maxLength={60} />
-            <div className="flex gap-2 mb-4">{['weekly', 'monthly'].map(d => <button key={d} onClick={() => setNewStake({ ...newStake, duration: d })} className={'flex-1 py-2.5 text-xs font-bold rounded-xl transition-all uppercase tracking-wider ' + (newStake.duration === d ? (darkMode ? 'bg-[#223858] text-white' : 'bg-gray-200 text-gray-900') : (darkMode ? 'bg-[#182544] text-gray-600' : 'bg-gray-100 text-gray-400'))}>{d}</button>)}</div>
+            <div className="flex gap-2 mb-4">{['weekly', 'monthly'].map(d => <button key={d} onClick={() => setNewStake({ ...newStake, duration: d })} className={'flex-1 py-2.5 text-xs font-bold rounded-xl transition-all uppercase tracking-wider ' + (newStake.duration === d ? (isSunset ? (darkMode ? 'bg-[#3d2640] text-white' : 'bg-orange-100 text-orange-900') : (darkMode ? 'bg-[#223858] text-white' : 'bg-gray-200 text-gray-900')) : (darkMode ? 'bg-[#182544] text-gray-600' : 'bg-gray-100 text-gray-400'))}>{d}</button>)}</div>
             <button onClick={saveStake} disabled={!newStake.description.trim() || loading} className="w-full px-4 py-4 bg-[#d06b4a] text-white rounded-xl text-base font-bold shadow-lg shadow-red-500/20 active:scale-[0.98] disabled:opacity-30 transition-all">{loading ? 'Saving...' : !newStake.description.trim() ? 'Type a stake above' : '⚡ Set Stakes'}</button>
             {error && <p className="text-red-400 text-xs text-center mt-2">{error}</p>}
           </div>
@@ -2395,14 +2460,14 @@ function VersaAppMain() {
       {/* Leaderboard */}
       <Modal show={showLeaderboard} onClose={() => setShowLeaderboard(false)} wide dark={darkMode}>
         <ModalHeader title="Leaderboard" onClose={() => setShowLeaderboard(false)} icon={<span className="text-xl">&#x1F3C6;</span>} dark={darkMode} />
-        <div className="flex gap-1 mb-5 bg-[#151d30] rounded-xl p-1">{['today', 'week'].map(tab => <button key={tab} onClick={() => setLeaderboardTab(tab)} className={'flex-1 py-2 text-xs font-bold rounded-lg transition-all tracking-wider uppercase ' + (leaderboardTab === tab ? (darkMode ? 'bg-[#223858] text-white' : 'bg-gray-200 text-gray-900') : (darkMode ? 'text-gray-600 hover:text-gray-400' : 'text-gray-400 hover:text-gray-600'))}>{tab === 'today' ? 'Today' : 'This Week'}</button>)}</div>
+        <div className="flex gap-1 mb-5 bg-[#151d30] rounded-xl p-1">{['today', 'week'].map(tab => <button key={tab} onClick={() => setLeaderboardTab(tab)} className={'flex-1 py-2 text-xs font-bold rounded-lg transition-all tracking-wider uppercase ' + (leaderboardTab === tab ? (isSunset ? (darkMode ? 'bg-[#3d2640] text-white' : 'bg-orange-100 text-orange-900') : (darkMode ? 'bg-[#223858] text-white' : 'bg-gray-200 text-gray-900')) : (darkMode ? 'text-gray-600 hover:text-gray-400' : 'text-gray-400 hover:text-gray-600'))}>{tab === 'today' ? 'Today' : 'This Week'}</button>)}</div>
         <div className="space-y-2">{getLeaderboard().map((item, i) => {
           const pts = leaderboardTab === 'today' ? item.todayPts : item.weeklyPts, isMe = item.member.id === currentUser.id;
           const medals = ['\u{1F947}', '\u{1F948}', '\u{1F949}'];
           const ms = !isMe ? (mutualStreaks[item.member.id] || 0) : 0;
           return (
             <div key={item.member.id} className={'rounded-xl p-4 border transition-all ' + (isMe ? 'bg-gradient-to-r from-blue-600/20 to-indigo-600/20 border-blue-500/30 shadow-lg shadow-[#5b7cf5]/10' : i === 0 ? 'bg-[#e8864a]/5 border-[#e8864a]/20' : (darkMode ? 'bg-[#182544] border-[#1e3050] hover:bg-[#1e2e50]' : 'bg-gray-50 border-gray-200 hover:bg-gray-100'))}>
-              <div className="flex items-center justify-between"><div className="flex items-center gap-3"><div className="text-lg w-8 text-center">{i < 3 ? medals[i] : <span className="text-sm text-gray-600">{i + 1}</span>}</div><Avatar user={item.member} size={28} className={isMe ? 'bg-blue-500/20 text-blue-400' : (darkMode ? 'bg-[#1e3050] text-gray-400' : 'bg-gray-100 text-gray-500')} /><div><div className={'text-sm font-semibold flex items-center gap-1.5 ' + (isMe ? 'text-blue-300' : (darkMode ? 'text-[#9aaec0]' : 'text-[#4a6080]'))}>{item.member.username}{isMe && <span className="text-[10px] text-gray-600">(you)</span>}{getRoomRole(item.member.id) && <span className={`text-[9px] font-bold ${getRoomRole(item.member.id).color}`}>{getRoomRole(item.member.id).icon}</span>}{ms > 0 && <span className={`text-[9px] font-bold ${ms >= 7 ? 'text-[#e8864a]' : 'text-[#e8864a]'}`}>🔗{ms}</span>}</div><div className="text-xs text-gray-600">{pts} pts{leaderboardTab === 'week' ? ' \u00b7 ' + item.weeklyCrystals + ' crystals' : ''}</div></div></div>
+              <div className="flex items-center justify-between"><div className="flex items-center gap-3"><div className="text-lg w-8 text-center">{i < 3 ? medals[i] : <span className="text-sm text-gray-600">{i + 1}</span>}</div><Avatar user={item.member} size={28} className={isMe ? 'bg-blue-500/20 text-blue-400' : (darkMode ? 'bg-[#1e3050] text-gray-400' : 'bg-gray-100 text-gray-500')} /><div><div className={'text-sm font-semibold flex items-center gap-1.5 ' + (isMe ? 'text-blue-300' : (T.textMuted))}>{item.member.username}{isMe && <span className="text-[10px] text-gray-600">(you)</span>}{getRoomRole(item.member.id) && <span className={`text-[9px] font-bold ${getRoomRole(item.member.id).color}`}>{getRoomRole(item.member.id).icon}</span>}{ms > 0 && <span className={`text-[9px] font-bold ${ms >= 7 ? 'text-[#e8864a]' : 'text-[#e8864a]'}`}>🔗{ms}</span>}</div><div className="text-xs text-gray-600">{pts} pts{leaderboardTab === 'week' ? ' \u00b7 ' + item.weeklyCrystals + ' crystals' : ''}</div></div></div>
                 <div className="flex items-center gap-3">{leaderboardTab === 'today' && <div className="flex items-center gap-1.5">{allCatNames.map(c => <div key={c} className={'w-2.5 h-2.5 rounded-full ' + (item.crystals[c] ? getCT(c).bg + ' shadow-sm' : (isMe ? 'bg-[#1e3050]' : (darkMode ? 'bg-[#1e3050]' : 'bg-gray-200')))} />)}</div>}{!isMe && <button onClick={() => { setShowLeaderboard(false); setShowCompetitor(item.member); }} className={`text-[10px] uppercase tracking-wider font-medium ${darkMode ? 'text-gray-600 hover:text-white' : 'text-gray-400 hover:text-gray-700'}`}>View</button>}</div>
               </div>
             </div>
@@ -2463,11 +2528,11 @@ function VersaAppMain() {
 
         {/* Quick actions */}
         <div className="mt-5 space-y-2">
-          <button onClick={() => { setShowProfile(false); setShowInviteModal(true); }} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border transition-all ${darkMode ? 'border-[#223858] bg-[#182544] hover:bg-[#1e2e50] text-gray-300' : 'border-gray-200 bg-gray-50 hover:bg-gray-100 text-gray-700'}`}><UserPlus size={16} className="text-blue-400" /><span className="text-sm">Invite to Room</span></button>
-          <button onClick={() => { setShowProfile(false); setShowStakes(true); }} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border transition-all ${darkMode ? 'border-[#223858] bg-[#182544] hover:bg-[#1e2e50] text-gray-300' : 'border-gray-200 bg-gray-50 hover:bg-gray-100 text-gray-700'}`}><Zap size={16} className="text-red-400" /><span className="text-sm">Stakes</span></button>
-          {lastWeekData && <button onClick={() => { setShowProfile(false); setShowWeeklyRecap(true); }} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border transition-all ${darkMode ? 'border-[#223858] bg-[#182544] hover:bg-[#1e2e50] text-gray-300' : 'border-gray-200 bg-gray-50 hover:bg-gray-100 text-gray-700'}`}><BarChart3 size={16} className="text-purple-400" /><span className="text-sm">Weekly Recap</span></button>}
-          <button onClick={() => { setShowProfile(false); setShowHelp(true); }} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border transition-all ${darkMode ? 'border-[#223858] bg-[#182544] hover:bg-[#1e2e50] text-gray-300' : 'border-gray-200 bg-gray-50 hover:bg-gray-100 text-gray-700'}`}><HelpCircle size={16} className="text-gray-400" /><span className="text-sm">How Versa Works</span></button>
-          <button onClick={() => supabase.auth.signOut()} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border transition-all ${darkMode ? 'border-[#223858] bg-[#182544] hover:bg-red-500/5 text-red-400' : 'border-gray-200 bg-gray-50 hover:bg-red-50 text-red-500'}`}><LogOut size={16} /><span className="text-sm">Sign Out</span></button>
+          <button onClick={() => { setShowProfile(false); setShowInviteModal(true); }} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border transition-all ${T.border + ' ' + T.bgCard + ' ' + T.bgCardHover + ' ' + T.textMuted}`}><UserPlus size={16} className="text-blue-400" /><span className="text-sm">Invite to Room</span></button>
+          <button onClick={() => { setShowProfile(false); setShowStakes(true); }} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border transition-all ${T.border + ' ' + T.bgCard + ' ' + T.bgCardHover + ' ' + T.textMuted}`}><Zap size={16} className="text-red-400" /><span className="text-sm">Stakes</span></button>
+          {lastWeekData && <button onClick={() => { setShowProfile(false); setShowWeeklyRecap(true); }} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border transition-all ${T.border + ' ' + T.bgCard + ' ' + T.bgCardHover + ' ' + T.textMuted}`}><BarChart3 size={16} className="text-purple-400" /><span className="text-sm">Weekly Recap</span></button>}
+          <button onClick={() => { setShowProfile(false); setShowHelp(true); }} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border transition-all ${T.border + ' ' + T.bgCard + ' ' + T.bgCardHover + ' ' + T.textMuted}`}><HelpCircle size={16} className="text-gray-400" /><span className="text-sm">How Versa Works</span></button>
+          <button onClick={() => supabase.auth.signOut()} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border transition-all ${T.border + ' ' + T.bgCard + ' hover:bg-red-500/5 text-red-400'}`}><LogOut size={16} /><span className="text-sm">Sign Out</span></button>
         </div>
       </Modal>
 
@@ -2511,7 +2576,7 @@ function VersaAppMain() {
           <div className={`border-t ${T.border} pt-4 mt-4`}>
             <p className={`text-xs ${T.textMuted} mb-2 font-bold tracking-wider uppercase`}>Your Rooms</p>
             <div className="space-y-1.5">{userRooms.map(rid => (
-              <div key={rid} className={`px-3 py-2.5 rounded-xl border flex items-center justify-between transition-all ${currentRoom?.id === rid ? 'border-blue-500/30 bg-blue-500/10' : (darkMode ? 'border-[#223858] bg-[#182544] hover:bg-[#1e2e50]' : 'border-gray-200 bg-gray-50 hover:bg-gray-100')}`}>
+              <div key={rid} className={`px-3 py-2.5 rounded-xl border flex items-center justify-between transition-all ${currentRoom?.id === rid ? 'border-blue-500/30 bg-blue-500/10' : (T.border + ' ' + T.bgCard + ' ' + T.bgCardHover)}`}>
                 <div className="flex items-center gap-2"><span className={`font-mono text-sm tracking-widest ${T.text}`}>{rid}</span>{currentRoom?.id === rid && <span className="text-[9px] bg-blue-500/20 text-blue-400 px-2 py-0.5 rounded-full font-bold">ACTIVE</span>}</div>
                 <div className="flex items-center gap-2">{currentRoom?.id !== rid && <button onClick={() => { switchRoom(rid); setShowInviteModal(false); setShowSwitchRoom(false); }} className="text-[10px] text-blue-400 hover:text-blue-300 font-medium uppercase tracking-wider">Switch</button>}<button onClick={() => leaveRoom(rid)} className="text-[10px] text-gray-600 hover:text-red-400 font-medium uppercase tracking-wider">Leave</button></div>
               </div>
@@ -2543,9 +2608,9 @@ function VersaAppMain() {
             {/* Comparison bar */}
             {uid !== currentUser.id && <div className={`p-4 rounded-xl mb-4 ${ahead ? (darkMode ? 'bg-red-500/5 border border-red-500/15' : 'bg-red-50 border border-red-200') : (darkMode ? 'bg-emerald-500/5 border border-emerald-500/15' : 'bg-emerald-50 border border-emerald-200')}`}>
               <div className="flex items-center justify-between mb-2">
-                <span className={`text-xs font-medium ${darkMode ? 'text-[#7a8ba8]' : 'text-[#6b7e96]'}`}>You</span>
+                <span className={`text-xs font-medium ${T.textMuted}`}>You</span>
                 <span className={`text-[10px] font-bold ${ahead ? 'text-red-400' : 'text-emerald-400'}`}>{ahead ? 'Behind by ' + diff : (diff === 0 ? 'Tied' : 'Ahead by ' + diff)}</span>
-                <span className={`text-xs font-medium ${darkMode ? 'text-[#7a8ba8]' : 'text-[#6b7e96]'}`}>{showCompetitor.username}</span>
+                <span className={`text-xs font-medium ${T.textMuted}`}>{showCompetitor.username}</span>
               </div>
               <div className="flex items-center gap-3">
                 <span className="text-lg font-black text-blue-400 w-12 text-right">{myPts}</span>
@@ -2568,8 +2633,8 @@ function VersaAppMain() {
             })}</div>
 
             {/* What they logged today */}
-            <div className={`rounded-xl border p-4 mb-4 ${darkMode ? 'border-[#223858] bg-[#182544]' : 'border-gray-200 bg-gray-50'}`}>
-              <div className={`text-[10px] font-bold tracking-wider uppercase mb-3 ${darkMode ? 'text-[#4a6080]' : 'text-[#9aaec0]'}`}>Logged today</div>
+            <div className={`rounded-xl border p-4 mb-4 ${T.border} ${T.bgCard}`}>
+              <div className={`text-[10px] font-bold tracking-wider uppercase mb-3 ${T.textDim}`}>Logged today</div>
               {theirComps.length > 0 ? (
                 <div className="space-y-2">{theirComps.map(c => {
                   const h = habits.find(x => x.id === c.habitId);
@@ -2579,20 +2644,20 @@ function VersaAppMain() {
                   return <div key={c.id} className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <div className={`w-1.5 h-1.5 rounded-full ${ct.bg}`} />
-                      <span className={`text-sm ${darkMode ? 'text-[#9aaec0]' : 'text-[#4a6080]'}`}>{h?.name || c.habitName || 'Unknown'}</span>
+                      <span className={`text-sm ${T.textMuted}`}>{h?.name || c.habitName || 'Unknown'}</span>
                       {c.count > 1 && <span className={`text-[10px] font-bold ${ct.txt}`}>×{c.count}</span>}
                     </div>
                     <span className={`text-sm font-bold ${ct.txt}`}>{pts}</span>
                   </div>;
                 })}</div>
               ) : (
-                <div className={`text-sm text-center py-3 ${darkMode ? 'text-[#4a6080]' : 'text-[#9aaec0]'}`}>Nothing logged yet</div>
+                <div className={`text-sm text-center py-3 ${T.textDim}`}>Nothing logged yet</div>
               )}
             </div>
 
             {/* Weekly + mutual streak */}
             <div className="flex gap-2">
-              <div className={`flex-1 text-center p-3 rounded-xl border ${darkMode ? 'border-[#223858] bg-[#182544]' : 'border-gray-200 bg-gray-50'}`}>
+              <div className={`flex-1 text-center p-3 rounded-xl border ${T.border} ${T.bgCard}`}>
                 <div className="text-lg font-black text-emerald-400">{theirWeekPts}</div>
                 <div className="text-[9px] text-gray-600 tracking-wider uppercase">This week</div>
               </div>
@@ -2613,7 +2678,7 @@ function VersaAppMain() {
             <p className={`text-xs ${T.textDim} mb-4`}>{lastWeekData.dateRange}</p>
             {lastWeekData.scores.length > 0 && (
               <div className="text-center p-5 bg-gradient-to-r from-[#e8864a]/10 to-[#d4a04a]/10 border border-[#e8864a]/15 rounded-xl mb-4">
-                <span className="text-3xl">🏆</span>
+                <span className="text-3xl anim-float">🏆</span>
                 <h3 className="text-xl font-black text-[#e8864a] mt-2">{lastWeekData.scores[0].member.username}</h3>
                 <p className={`text-sm ${T.textMuted} mt-1`}>{lastWeekData.scores[0].pts} points &middot; {lastWeekData.scores[0].activeDays} active days</p>
               </div>
@@ -2623,7 +2688,7 @@ function VersaAppMain() {
               return (
                 <div key={s.member.id} className={'rounded-xl p-3 border transition-all ' + (isMe ? 'bg-blue-600/10 border-blue-500/20' : darkMode ? 'bg-[#182544] border-[#1e3050]' : 'bg-gray-50 border-gray-200')}>
                   <div className="flex items-center justify-between mb-2">
-                    <div className="flex items-center gap-2"><span className="text-sm">{i < 3 ? medals[i] : (i + 1) + '.'}</span><Avatar user={s.member} size={22} className={isMe ? 'bg-blue-500/20 text-blue-400' : 'bg-[#1e3050] text-gray-400'} /><span className={'text-sm font-semibold ' + (isMe ? 'text-blue-300' : darkMode ? 'text-[#9aaec0]' : 'text-[#4a6080]')}>{s.member.username}</span></div>
+                    <div className="flex items-center gap-2"><span className="text-sm">{i < 3 ? medals[i] : (i + 1) + '.'}</span><Avatar user={s.member} size={22} className={isMe ? 'bg-blue-500/20 text-blue-400' : 'bg-[#1e3050] text-gray-400'} /><span className={'text-sm font-semibold ' + (isMe ? 'text-blue-300' : T.textMuted)}>{s.member.username}</span></div>
                     <span className={`text-sm font-bold ${T.text}`}>{s.pts} pts</span>
                   </div>
                   <div className="flex flex-wrap gap-2">{allCatNames.map(c => (
@@ -2883,7 +2948,7 @@ function VersaAppMain() {
               {/* Month labels */}
               <div className="flex mb-1" style={{ paddingLeft: labelW }}>
                 {months.map((m, i) => (
-                  <div key={i} className={`text-[9px] font-bold ${darkMode ? 'text-[#4a6080]' : 'text-gray-400'}`} style={{ position: 'relative', left: m.idx * (cellSize + gap) }}>{m.label}</div>
+                  <div key={i} className={`text-[9px] font-bold ${T.textDim}`} style={{ position: 'relative', left: m.idx * (cellSize + gap) }}>{m.label}</div>
                 ))}
               </div>
 
@@ -2892,7 +2957,7 @@ function VersaAppMain() {
                 {/* Day labels */}
                 <div className="flex flex-col shrink-0" style={{ width: labelW, gap }}>
                   {['S','M','T','W','T','F','S'].map((d, i) => (
-                    <div key={i} className={`flex items-center justify-end pr-1.5 text-[9px] font-bold ${i % 2 === 1 ? (darkMode ? 'text-[#4a6080]' : 'text-gray-400') : 'text-transparent'}`} style={{ height: cellSize }}>{d}</div>
+                    <div key={i} className={`flex items-center justify-end pr-1.5 text-[9px] font-bold ${i % 2 === 1 ? (T.textDim) : 'text-transparent'}`} style={{ height: cellSize }}>{d}</div>
                   ))}
                 </div>
 
@@ -2966,7 +3031,7 @@ function VersaAppMain() {
                 { v: insightsData.avgPtsPerDay, l: 'Avg pts/day', c: 'text-purple-400', icon: '⚡' },
                 { v: insightsData.bestStreak + 'd', l: 'Best streak', c: 'text-[#e8864a]', icon: '🏆' },
               ].map((s, i) => (
-                <div key={i} className={`p-3 rounded-xl ${darkMode ? 'bg-[#151d30] border border-[#1e3050]' : 'bg-gray-50 border border-gray-200'}`}>
+                <div key={i} className={`p-3 rounded-xl ${darkMode ? (isSunset ? 'bg-[#1e1220] border border-[#3d2640]' : 'bg-[#151d30] border border-[#1e3050]') : 'bg-gray-50 border border-gray-200'}`}>
                   <div className="text-sm mb-0.5">{s.icon}</div>
                   <div className={`text-lg font-black ${s.c}`}>{s.v}</div>
                   <div className={`text-[9px] ${T.textDim} tracking-wider uppercase`}>{s.l}</div>
@@ -2975,14 +3040,14 @@ function VersaAppMain() {
             </div>
 
             {/* Most consistent habit */}
-            <div className={`p-4 rounded-xl mb-4 ${darkMode ? 'bg-[#151d30] border border-[#1e3050]' : 'bg-gray-50 border border-gray-200'}`}>
+            <div className={`p-4 rounded-xl mb-4 ${darkMode ? (isSunset ? 'bg-[#1e1220] border border-[#3d2640]' : 'bg-[#151d30] border border-[#1e3050]') : 'bg-gray-50 border border-gray-200'}`}>
               <div className={`text-[10px] ${T.textDim} tracking-wider uppercase mb-1`}>Most Consistent Habit</div>
-              <div className={`text-sm font-bold ${darkMode ? 'text-white' : 'text-gray-900'}`}>{insightsData.bestHabitName}</div>
+              <div className={`text-sm font-bold ${T.text}`}>{insightsData.bestHabitName}</div>
               <div className={`text-xs ${T.textDim}`}>{insightsData.bestHabitDays} out of {insightsData.activeDays} active days</div>
             </div>
 
             {/* Weekly pattern bar chart */}
-            <div className={`p-4 rounded-xl mb-4 ${darkMode ? 'bg-[#151d30] border border-[#1e3050]' : 'bg-gray-50 border border-gray-200'}`}>
+            <div className={`p-4 rounded-xl mb-4 ${darkMode ? (isSunset ? 'bg-[#1e1220] border border-[#3d2640]' : 'bg-[#151d30] border border-[#1e3050]') : 'bg-gray-50 border border-gray-200'}`}>
               <div className={`text-[10px] ${T.textDim} tracking-wider uppercase mb-3`}>Weekly Pattern</div>
               <div className="flex items-end justify-between gap-1 h-20">
                 {insightsData.weekdayNames.map((day, i) => {
@@ -3006,8 +3071,8 @@ function VersaAppMain() {
                 { v: insightsData.completionRate + '%', l: 'Active Rate' },
                 { v: insightsData.totalPts, l: 'Total Pts' },
               ].map((s, i) => (
-                <div key={i} className={`text-center p-2 rounded-lg ${darkMode ? 'bg-[#182544]' : 'bg-gray-50'}`}>
-                  <div className={`text-sm font-bold ${darkMode ? 'text-white' : 'text-gray-800'}`}>{s.v}</div>
+                <div key={i} className={`text-center p-2 rounded-lg ${T.bgCard}`}>
+                  <div className={`text-sm font-bold ${T.text}`}>{s.v}</div>
                   <div className={`text-[8px] ${T.textDim} tracking-wider uppercase`}>{s.l}</div>
                 </div>
               ))}
@@ -3044,7 +3109,7 @@ function VersaAppMain() {
                 <div className={`w-5 h-5 rounded-md border-2 flex items-center justify-center text-xs ${selected ? ct.bg + ' border-transparent text-white' : 'border-gray-600'
                   }`}>{selected && '✔'}</div>
                 <div className="flex-1 min-w-0">
-                  <div className={`text-sm font-medium truncate ${selected ? (darkMode ? 'text-white' : 'text-gray-900') : T.textDim}`}>{h.name}</div>
+                  <div className={`text-sm font-medium truncate ${selected ? (T.text) : T.textDim}`}>{h.name}</div>
                   <div className={`text-[10px] ${T.textDim}`}>{h.category} · {h.points} pts</div>
                 </div>
               </button>
@@ -3052,7 +3117,7 @@ function VersaAppMain() {
           })}
         </div>
         {/* Inline add habit */}
-        <details className={`mb-4 rounded-xl border overflow-hidden ${darkMode ? 'border-[#223858] bg-[#182544]' : 'border-gray-200 bg-gray-50'}`}>
+        <details className={`mb-4 rounded-xl border overflow-hidden ${T.border} ${T.bgCard}`}>
           <summary className={`px-4 py-2.5 cursor-pointer text-xs font-medium ${T.textDim} hover:${T.text} transition-colors`}><Plus size={12} className="inline mr-1" />Add a new habit</summary>
           <div className="px-4 pb-4 pt-2 space-y-3">
             <input value={newHabit.name} onChange={e => setNewHabit(p => ({ ...p, name: e.target.value }))} placeholder="Habit name" className={inputCls} maxLength={30} />
@@ -3108,12 +3173,12 @@ function VersaAppMain() {
               const isMe = m.id === currentUser.id;
               const isCreator = m.id === (roomCreatedBy || currentRoom?.createdBy);
               return (
-                <div key={m.id} className={`flex items-center justify-between p-3 rounded-xl border ${darkMode ? 'border-[#223858] bg-[#182544]' : 'border-gray-200 bg-gray-50'}`}>
+                <div key={m.id} className={`flex items-center justify-between p-3 rounded-xl border ${T.border} ${T.bgCard}`}>
                   <div className="flex items-center gap-3">
                     <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-black ${isCreator ? 'bg-[#e8864a]/20 text-[#e8864a]' : 'bg-blue-500/20 text-blue-400'}`}>{m.photoURL ? <img src={m.photoURL} className="w-8 h-8 rounded-full object-cover" referrerPolicy="no-referrer" /> : m.username?.charAt(0)?.toUpperCase()}</div>
                     <div>
                       <div className="flex items-center gap-1.5">
-                        <span className={`text-sm font-medium ${darkMode ? 'text-gray-200' : 'text-gray-800'}`}>{m.username}</span>
+                        <span className={`text-sm font-medium ${T.text}`}>{m.username}</span>
                         {isCreator && <span className="text-[9px] bg-[#e8864a]/20 text-[#e8864a] px-1.5 py-0.5 rounded-full font-bold">Creator</span>}
                         {isMe && <span className={`text-[9px] ${T.textDim}`}>(you)</span>}
                       </div>
@@ -3135,7 +3200,7 @@ function VersaAppMain() {
               <h3 className={`text-xs font-bold ${T.textDim} tracking-wider uppercase mb-2`}>Removed</h3>
               <div className="space-y-2">
                 {roomMembers.filter(m => kickedIds.includes(m.id)).map(m => (
-                  <div key={m.id} className={`flex items-center justify-between p-3 rounded-xl border opacity-50 ${darkMode ? 'border-[#223858] bg-[#182544]' : 'border-gray-200 bg-gray-50'}`}>
+                  <div key={m.id} className={`flex items-center justify-between p-3 rounded-xl border opacity-50 ${T.border} ${T.bgCard}`}>
                     <div className="flex items-center gap-3">
                       <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-black bg-red-500/20 text-red-400">{m.username?.charAt(0)?.toUpperCase()}</div>
                       <span className={`text-sm font-medium ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>{m.username}</span>
@@ -3153,8 +3218,8 @@ function VersaAppMain() {
           <h3 className={`text-xs font-bold ${T.textMuted} tracking-wider uppercase mb-3`}>Room Actions</h3>
           <div className="space-y-2">
             {roomStakes && <button onClick={() => { setShowRoomSettings(false); setShowSettleStake(true); }} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border transition-all text-left mb-2 ${darkMode ? 'border-[#d4a04a]/50 bg-[#d4a04a]/10 hover:bg-[#d4a04a]/20 text-[#d4a04a]' : 'border-[#d4a04a]/40 bg-[#d4a04a]/10 hover:bg-[#d4a04a]/20 text-[#c28e3b]'}`}><Trophy size={15} className="shrink-0" /><div><span className="text-sm font-bold">Settle Stake</span><div className={`text-[10px] opacity-80`}>Declare winner and move to Trophy Room</div></div></button>}
-            {roomStakes && <button onClick={clearStake} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border transition-all text-left ${darkMode ? 'border-[#223858] bg-[#182544] hover:bg-[#1e2e50] text-gray-300' : 'border-gray-200 bg-gray-50 hover:bg-gray-100 text-gray-700'}`}><Zap size={15} className="text-red-400 shrink-0" /><div><span className="text-sm">Remove Stake</span><div className={`text-[10px] ${T.textDim}`}>Clear the current room stake</div></div></button>}
-            <button onClick={clearAllHabits} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border transition-all text-left ${darkMode ? 'border-[#223858] bg-[#182544] hover:bg-red-500/5 text-gray-300' : 'border-gray-200 bg-gray-50 hover:bg-red-50 text-gray-700'}`}><X size={15} className="text-red-400 shrink-0" /><div><span className="text-sm">Clear All Habits</span><div className={`text-[10px] ${T.textDim}`}>Delete every habit in this room</div></div></button>
+            {roomStakes && <button onClick={clearStake} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border transition-all text-left ${T.border + ' ' + T.bgCard + ' ' + T.bgCardHover + ' ' + T.textMuted}`}><Zap size={15} className="text-red-400 shrink-0" /><div><span className="text-sm">Remove Stake</span><div className={`text-[10px] ${T.textDim}`}>Clear the current room stake</div></div></button>}
+            <button onClick={clearAllHabits} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border transition-all text-left ${T.border + ' ' + T.bgCard + ' hover:bg-red-500/5 ' + T.textMuted}`}><X size={15} className="text-red-400 shrink-0" /><div><span className="text-sm">Clear All Habits</span><div className={`text-[10px] ${T.textDim}`}>Delete every habit in this room</div></div></button>
           </div>
         </div>
 
