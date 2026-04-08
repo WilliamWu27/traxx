@@ -115,8 +115,8 @@ function Modal({ show, onClose, children, wide, dark }) {
   const isDark = dark !== undefined ? dark : true;
   const mbg = isDark ? 'bg-[#122040] border-[#1e3050]' : 'bg-white border-[#dce4ee]';
   return (
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50" onClick={onClose}>
-      <div className={`rounded-2xl w-full p-6 border shadow-2xl max-h-[85vh] overflow-y-auto ${mbg} ` + (wide ? 'max-w-md' : 'max-w-sm')} onClick={e => e.stopPropagation()}>
+    <div className="modal-overlay fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50" onClick={onClose}>
+      <div className={`modal-content rounded-2xl w-full p-6 border shadow-2xl max-h-[85vh] overflow-y-auto ${mbg} ` + (wide ? 'max-w-md' : 'max-w-sm')} onClick={e => e.stopPropagation()}>
         {children}
       </div>
     </div>
@@ -220,9 +220,16 @@ function VersaAppMain() {
   const [habitOrder, setHabitOrder] = useState([]);
   const [showWeeklyRecap, setShowWeeklyRecap] = useState(false);
   const [lastWeekData, setLastWeekData] = useState(null);
-  const [darkMode, setDarkMode] = useState(() => {
-    try { const stored = localStorage.getItem('versa-theme'); return stored ? stored === 'dark' : true; } catch { return true; }
+  const [theme, setTheme] = useState(() => {
+    try {
+      const stored = localStorage.getItem('versa-theme');
+      if (stored === 'dark') return 'navy-dark';
+      if (stored === 'light') return 'navy-light';
+      return stored || 'navy-dark';
+    } catch { return 'navy-dark'; }
   });
+  const darkMode = theme.includes('dark');
+  const isSunset = theme.includes('sunset');
   const [roomCategories, setRoomCategories] = useState([]);
   const [showAddCategory, setShowAddCategory] = useState(false);
   const [newCatName, setNewCatName] = useState('');
@@ -301,9 +308,12 @@ function VersaAppMain() {
   const getDaysUntilReset = () => { const d = new Date(); const day = d.getDay(); return 6 - day; }; // Saturday = 0 days left, Sunday = 6
   const getLastWeekStart = () => { const d = new Date(getWeekStart() + 'T12:00:00'); d.setDate(d.getDate() - 7); return formatDateStr(d); };
   const getLastWeekEnd = () => { const d = new Date(getWeekStart() + 'T12:00:00'); d.setDate(d.getDate() - 1); return formatDateStr(d); };
-  const toggleTheme = () => { const next = !darkMode; setDarkMode(next); try { localStorage.setItem('versa-theme', next ? 'dark' : 'light'); } catch { } };
+  const THEMES = ['navy-dark', 'navy-light', 'sunset-dark', 'sunset-light'];
+  const THEME_LABELS = { 'navy-dark': '🌙 Navy Dark', 'navy-light': '☀️ Navy Light', 'sunset-dark': '🌅 Sunset Dark', 'sunset-light': '🌇 Sunset Light' };
+  const setAppTheme = (t) => { setTheme(t); try { localStorage.setItem('versa-theme', t); } catch {} };
+  const toggleTheme = () => { const idx = THEMES.indexOf(theme); setAppTheme(THEMES[(idx + 1) % THEMES.length]); };
   const getOrderedHabits = (cat) => {
-    const pool = (myBoardIds && !editMode) ? habits.filter(h => myBoardIds.includes(h.id)) : habits;
+    const pool = habits;
     const ch = pool.filter(h => h.category === cat);
     if (!habitOrder.length) return ch;
     return [...ch].sort((a, b) => { const ai = habitOrder.indexOf(a.id), bi = habitOrder.indexOf(b.id); if (ai === -1 && bi === -1) return 0; if (ai === -1) return 1; if (bi === -1) return -1; return ai - bi; });
@@ -337,11 +347,8 @@ function VersaAppMain() {
       { name: 'Slept 7+ hours', category: 'Health', points: 30, is_repeatable: false },
       { name: 'Woke up before 7', category: 'Health', points: 30, is_repeatable: false },
       { name: 'Junk food', category: 'Health', points: -15, is_repeatable: true, unit: 'per meal/snack' },
-      // FOCUS — screen time, substances, mindset
-      { name: '30 mins screen time', category: 'Focus', points: -10, is_repeatable: true, unit: 'per 30 min' },
-      { name: 'Hitting the yart', category: 'Focus', points: -30, is_repeatable: true, unit: 'per instance' },
+      // FOCUS — mindset, productivity
       { name: 'Work done before 9pm', category: 'Focus', points: 30, is_repeatable: false },
-      { name: 'Journaled', category: 'Focus', points: 10, is_repeatable: true, unit: 'per 5 min' },
     ];
     try {
       setLoading(true);
@@ -727,20 +734,16 @@ function VersaAppMain() {
 
   // ─── HEAT MAP (load on demand) ───
   const loadHeatMap = async () => {
-    if (!currentUser) return;
+    if (!currentUser || !currentRoom) return;
     try {
-      const ago = new Date(); ago.setDate(ago.getDate() - 90);
+      const ago = new Date(); ago.setDate(ago.getDate() - 91);
       const agoStr = formatDateStr(ago);
-      // Use single where to avoid needing a composite index
-      const { data: heatData2 } = await supabase.from('completions').select('*').eq('user_id', currentUser.id);
-      const snap = { docs: (heatData2 || []).map(d => ({ data: () => ({ ...d, habitId: d.habit_id, habitPoints: d.habit_points, bonusPoints: d.bonus_points }) })) };
+      const { data: heatData2 } = await supabase.from('completions').select('*').eq('user_id', currentUser.id).eq('room_id', currentRoom.id).gte('date', agoStr);
       const map = {};
-      snap.docs.forEach(d => {
-        const dt = d.data();
-        if (dt.date < agoStr) return; // filter client-side
-        const basePts = dt.habitPoints || habits.find(h => h.id === dt.habitId)?.points || 0;
-        const pts = (basePts * (dt.count || 1)) + (dt.bonusPoints || 0);
-        if (pts > 0) map[dt.date] = (map[dt.date] || 0) + pts;
+      (heatData2 || []).forEach(d => {
+        const basePts = d.habit_points || habits.find(h => h.id === d.habit_id)?.points || 0;
+        const pts = (basePts * (d.count || 1)) + (d.bonus_points || 0);
+        if (pts > 0) map[d.date] = (map[d.date] || 0) + pts;
       });
       setHeatMapData(map);
       setShowHeatMap(true);
@@ -881,7 +884,7 @@ function VersaAppMain() {
   useEffect(() => {
     if (!currentUser || !currentRoom) return;
     // Calculate progress inline (points / daily target)
-    const dh = myBoardIds ? habits.filter(h => myBoardIds.includes(h.id)) : habits;
+    const dh = habits;
     if (!dh.length) return;
     const pts = completions.filter(c => c.userId === currentUser.id && c.date === getToday()).reduce((s, c) => { return s + ((c.habitPoints || habits.find(x => x.id === c.habitId)?.points || 0) * (c.count || 1)) + (c.bonusPoints || 0); }, 0);
     const prog = Math.min(pts / dailyTarget, 1);
@@ -1329,7 +1332,7 @@ function VersaAppMain() {
   const myPts = currentUser && currentRoom ? getTodayPts(currentUser.id) : 0;
   const isPerfect = allCatNames.length > 0 && allCatNames.every(c => myCr[c]);
   const dailyProg = currentUser && currentRoom ? getDailyProgress() : 0;
-  const displayHabits = (myBoardIds && !editMode) ? habits.filter(h => myBoardIds.includes(h.id)) : habits;
+  const displayHabits = habits;
 
   const addCategory = async () => {
     if (!newCatName.trim() || activeCategories.find(c => c.name.toLowerCase() === newCatName.trim().toLowerCase())) return;
@@ -1354,17 +1357,33 @@ function VersaAppMain() {
   ];
 
   // ─── THEME CLASSES ───
-  const T = darkMode ? {
-    bg: 'bg-[#0f1b2d]', bgCard: 'bg-[#182544]', bgCardHover: 'hover:bg-[#1e2e50]', bgInput: 'bg-[#182544]',
-    border: 'border-[#223858]', borderInput: 'border-[#264060]', text: 'text-white', textMuted: 'text-[#7a8ba8]',
-    textDim: 'text-[#4a6080]', textFaint: 'text-[#2a4060]', headerBg: 'bg-[#0f1b2d]/95', modalBg: 'bg-[#122040]',
-    selectBg: 'bg-[#122040]', glowOrb: '/8', blurBg: 'backdrop-blur-xl'
-  } : {
-    bg: 'bg-[#f0f4f8]', bgCard: 'bg-white', bgCardHover: 'hover:bg-gray-50', bgInput: 'bg-[#eef2f7]',
-    border: 'border-[#dce4ee]', borderInput: 'border-[#ccd6e4]', text: 'text-[#1a2744]', textMuted: 'text-[#6b7e96]',
-    textDim: 'text-[#9aaec0]', textFaint: 'text-[#c4d2e0]', headerBg: 'bg-[#f0f4f8]/95', modalBg: 'bg-white',
-    selectBg: 'bg-white', glowOrb: '/5', blurBg: 'backdrop-blur-xl'
+  const THEME_DEFS = {
+    'navy-dark': {
+      bg: 'bg-[#0f1b2d]', bgCard: 'bg-[#182544]', bgCardHover: 'hover:bg-[#1e2e50]', bgInput: 'bg-[#182544]',
+      border: 'border-[#223858]', borderInput: 'border-[#264060]', text: 'text-white', textMuted: 'text-[#7a8ba8]',
+      textDim: 'text-[#4a6080]', textFaint: 'text-[#2a4060]', headerBg: 'bg-[#0f1b2d]/95', modalBg: 'bg-[#122040]',
+      selectBg: 'bg-[#122040]', glowOrb: '/8', blurBg: 'backdrop-blur-xl', accent: '#5b7cf5', accentTxt: 'text-[#5b7cf5]', accentBg: 'bg-[#5b7cf5]',
+    },
+    'navy-light': {
+      bg: 'bg-[#f0f4f8]', bgCard: 'bg-white', bgCardHover: 'hover:bg-gray-50', bgInput: 'bg-[#eef2f7]',
+      border: 'border-[#dce4ee]', borderInput: 'border-[#ccd6e4]', text: 'text-[#1a2744]', textMuted: 'text-[#6b7e96]',
+      textDim: 'text-[#9aaec0]', textFaint: 'text-[#c4d2e0]', headerBg: 'bg-[#f0f4f8]/95', modalBg: 'bg-white',
+      selectBg: 'bg-white', glowOrb: '/5', blurBg: 'backdrop-blur-xl', accent: '#5b7cf5', accentTxt: 'text-[#5b7cf5]', accentBg: 'bg-[#5b7cf5]',
+    },
+    'sunset-dark': {
+      bg: 'bg-[#1a1018]', bgCard: 'bg-[#2a1a28]', bgCardHover: 'hover:bg-[#362238]', bgInput: 'bg-[#2a1a28]',
+      border: 'border-[#3d2640]', borderInput: 'border-[#4a2e4e]', text: 'text-white', textMuted: 'text-[#a8889a]',
+      textDim: 'text-[#6a4a60]', textFaint: 'text-[#3d2640]', headerBg: 'bg-[#1a1018]/95', modalBg: 'bg-[#221428]',
+      selectBg: 'bg-[#221428]', glowOrb: '/8', blurBg: 'backdrop-blur-xl', accent: '#e8864a', accentTxt: 'text-[#e8864a]', accentBg: 'bg-[#e8864a]',
+    },
+    'sunset-light': {
+      bg: 'bg-[#fdf6f0]', bgCard: 'bg-white', bgCardHover: 'hover:bg-orange-50/50', bgInput: 'bg-[#fef8f4]',
+      border: 'border-[#f0ddd0]', borderInput: 'border-[#e8ccba]', text: 'text-[#3a2018]', textMuted: 'text-[#8a6a58]',
+      textDim: 'text-[#c0a090]', textFaint: 'text-[#e0ccc0]', headerBg: 'bg-[#fdf6f0]/95', modalBg: 'bg-white',
+      selectBg: 'bg-white', glowOrb: '/5', blurBg: 'backdrop-blur-xl', accent: '#e8864a', accentTxt: 'text-[#e8864a]', accentBg: 'bg-[#e8864a]',
+    },
   };
+  const T = THEME_DEFS[theme] || THEME_DEFS['navy-dark'];
   const inputCls = `w-full px-4 py-3 ${T.bgInput} border ${T.borderInput} rounded-xl focus:outline-none focus:border-[#4a90e8]/50 ${T.text} placeholder-[#4a6080] text-sm transition-all`;
   const btnPrimary = "w-full py-3.5 rounded-xl text-sm font-bold tracking-wide transition-all disabled:opacity-50 active:scale-[0.98]";
 
@@ -1794,7 +1813,45 @@ function VersaAppMain() {
   ];
 
   return (
-    <div className={`min-h-screen ${T.bg} ${T.text} transition-colors duration-300`}>
+    <div className={`min-h-screen ${T.bg} ${T.text} transition-all duration-500`}>
+      <style>{`
+        @keyframes fadeUp { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes scaleIn { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
+        @keyframes slideDown { from { opacity: 0; transform: translateY(-8px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes popIn { 0% { transform: scale(0.8); opacity: 0; } 50% { transform: scale(1.05); } 100% { transform: scale(1); opacity: 1; } }
+        @keyframes checkBounce { 0% { transform: scale(0); } 50% { transform: scale(1.3); } 100% { transform: scale(1); } }
+        @keyframes shimmer { 0% { background-position: -200% 0; } 100% { background-position: 200% 0; } }
+        @keyframes pulseGlow { 0%, 100% { box-shadow: 0 0 0 0 rgba(91,124,245,0.3); } 50% { box-shadow: 0 0 12px 4px rgba(91,124,245,0.15); } }
+        @keyframes slideUp { from { opacity: 0; transform: translateY(100%); } to { opacity: 1; transform: translateY(0); } }
+        .anim-fade-up { animation: fadeUp 0.4s ease-out both; }
+        .anim-fade-in { animation: fadeIn 0.3s ease-out both; }
+        .anim-scale-in { animation: scaleIn 0.3s ease-out both; }
+        .anim-slide-down { animation: slideDown 0.25s ease-out both; }
+        .anim-pop-in { animation: popIn 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.275) both; }
+        .anim-stagger > * { animation: fadeUp 0.4s ease-out both; }
+        .anim-stagger > *:nth-child(1) { animation-delay: 0ms; }
+        .anim-stagger > *:nth-child(2) { animation-delay: 60ms; }
+        .anim-stagger > *:nth-child(3) { animation-delay: 120ms; }
+        .anim-stagger > *:nth-child(4) { animation-delay: 180ms; }
+        .anim-stagger > *:nth-child(5) { animation-delay: 240ms; }
+        .anim-stagger > *:nth-child(6) { animation-delay: 300ms; }
+        .anim-stagger > *:nth-child(7) { animation-delay: 360ms; }
+        .anim-stagger > *:nth-child(8) { animation-delay: 420ms; }
+        .anim-stagger > *:nth-child(n+9) { animation-delay: 480ms; }
+        .habit-card { transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1); }
+        .habit-card:active { transform: scale(0.97); }
+        .habit-card:hover { transform: translateX(2px); }
+        .tab-content { animation: fadeUp 0.35s ease-out both; }
+        .modal-overlay { animation: fadeIn 0.2s ease-out both; }
+        .modal-content { animation: popIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275) both; }
+        .check-anim { animation: checkBounce 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
+        .progress-shimmer { background: linear-gradient(90deg, transparent, rgba(255,255,255,0.15), transparent); background-size: 200% 100%; animation: shimmer 2s infinite; }
+        .bottom-nav { animation: slideUp 0.4s ease-out both; }
+        * { transition-property: background-color, border-color, color, opacity; transition-duration: 0.3s; transition-timing-function: ease; }
+        button, a { transition-property: all; transition-duration: 0.15s; }
+        input, select { transition-property: border-color, background-color, box-shadow; transition-duration: 0.2s; }
+      `}</style>
       <ConfettiCanvas trigger={confettiTrigger} />
 
       {/* Onboarding Tour Overlay */}
@@ -1868,7 +1925,7 @@ function VersaAppMain() {
           {activeTab === 'overview' && (
             <>
               <div className="flex items-center gap-3">
-                <h1 className="text-xl font-black tracking-widest text-[#5b7cf5]">VERSA <span className="text-xl">✨</span></h1>
+                <h1 className={`text-xl font-black tracking-widest ${isSunset ? "text-[#e8864a]" : "text-[#5b7cf5]"}`>VERSA <span className="text-xl">✨</span></h1>
                 <div className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wide ${darkMode ? 'bg-gray-800 text-gray-300' : 'bg-gray-100 text-gray-500'}`}>Study Group Code: <span className={darkMode ? 'text-white' : 'text-gray-900'}>{currentRoom?.id}</span></div>
               </div>
               <div className="flex items-center cursor-pointer" onClick={() => setActiveTab('profile')}>
@@ -1924,14 +1981,21 @@ function VersaAppMain() {
                 <Settings size={18} />
                  {showSettingsMenu && <>
                   <div className="fixed inset-0 z-40" onClick={(e) => { e.stopPropagation(); setShowSettingsMenu(false); }} />
-                  <div className={`absolute right-0 top-full mt-2 w-56 rounded-2xl border shadow-xl z-50 overflow-hidden ${darkMode ? 'bg-[#182544] border-[#223858]' : 'bg-white border-gray-200'}`}>
+                  <div className={`anim-slide-down absolute right-0 top-full mt-2 w-56 rounded-2xl border shadow-xl z-50 overflow-hidden ${darkMode ? 'bg-[#182544] border-[#223858]' : 'bg-white border-gray-200'}`}>
                     <div className="py-1">
                       <button onClick={(e) => { e.stopPropagation(); setShowAddHabit(true); setShowSettingsMenu(false); }} className={`w-full flex items-center gap-3 px-4 py-3 text-sm transition-all ${darkMode ? 'text-[#9aaec0] hover:bg-[#1e3050]' : 'text-gray-700 hover:bg-gray-50'}`}><Plus size={15} className="text-blue-400" />Add Habit</button>
                       <button onClick={(e) => { e.stopPropagation(); setShowAddCategory(true); setShowSettingsMenu(false); }} className={`w-full flex items-center gap-3 px-4 py-3 text-sm transition-all ${darkMode ? 'text-[#9aaec0] hover:bg-[#1e3050]' : 'text-gray-700 hover:bg-gray-50'}`}><Plus size={15} className="text-purple-400" />Add Category</button>
                       {habits.length > 0 && <button onClick={(e) => { e.stopPropagation(); setEditMode(!editMode); setShowSettingsMenu(false); }} className={`w-full flex items-center gap-3 px-4 py-3 text-sm transition-all ${editMode ? 'text-blue-400' : (darkMode ? 'text-[#9aaec0] hover:bg-[#1e3050]' : 'text-gray-700 hover:bg-gray-50')}`}><Edit3 size={15} className={editMode ? 'text-blue-400' : 'text-gray-500'} />{editMode ? 'Done Editing' : 'Edit Habits'}</button>}
-                      <button onClick={(e) => { e.stopPropagation(); setCustomBoardHabits(myBoardIds || habits.map(h => h.id)); setShowCustomBoard(true); setShowSettingsMenu(false); }} className={`w-full flex items-center gap-3 px-4 py-3 text-sm transition-all ${darkMode ? 'text-[#9aaec0] hover:bg-[#1e3050]' : 'text-gray-700 hover:bg-gray-50'}`}><Target size={15} className="text-indigo-400" />My Board</button>
+                      
                       {isRoomCreator && <button onClick={(e) => { e.stopPropagation(); setShowRoomSettings(true); setShowSettingsMenu(false); }} className={`w-full flex items-center gap-3 px-4 py-3 text-sm transition-all ${darkMode ? 'text-[#9aaec0] hover:bg-[#1e3050]' : 'text-gray-700 hover:bg-gray-50'}`}><Crown size={15} className="text-[#e8864a]" />Room Settings</button>}
-                      <button onClick={(e) => { e.stopPropagation(); toggleTheme(); setShowSettingsMenu(false); }} className={`w-full flex items-center gap-3 px-4 py-3 text-sm transition-all ${darkMode ? 'text-[#9aaec0] hover:bg-[#1e3050]' : 'text-gray-700 hover:bg-gray-50'}`}>{darkMode ? <Sun size={15} className="text-gray-500" /> : <Moon size={15} className="text-gray-400" />}{darkMode ? 'Light Mode' : 'Dark Mode'}</button>
+                      <div className={`px-4 py-2 ${darkMode ? 'border-t border-[#223858]' : 'border-t border-gray-100'}`}>
+                        <div className={`text-[9px] font-bold tracking-widest uppercase mb-2 ${T.textDim}`}>Theme</div>
+                        <div className="grid grid-cols-2 gap-1.5">
+                          {THEMES.map(t => (
+                            <button key={t} onClick={(e) => { e.stopPropagation(); setAppTheme(t); }} className={`px-2.5 py-2 rounded-lg text-[10px] font-bold transition-all ${theme === t ? (t.includes('sunset') ? 'bg-[#e8864a]/20 text-[#e8864a] ring-1 ring-[#e8864a]/40' : 'bg-[#5b7cf5]/20 text-[#5b7cf5] ring-1 ring-[#5b7cf5]/40') : (darkMode ? 'text-[#7a8ba8] hover:bg-[#1e3050]' : 'text-gray-500 hover:bg-gray-100')}`}>{THEME_LABELS[t]}</button>
+                          ))}
+                        </div>
+                      </div>
                     </div>
                   </div>
                 </>}
@@ -1946,9 +2010,9 @@ function VersaAppMain() {
         {/* TAB 1: OVERVIEW */}
         {/* ======================================= */}
         {activeTab === 'overview' && (
-          <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+          <div className="tab-content">
             {/* HERO CARD */}
-            <div className="relative overflow-hidden w-full rounded-[2rem] bg-gradient-to-br from-[#5b7cf5] leading-none to-indigo-700 text-white p-7 shadow-xl mb-8">
+            <div className={`relative overflow-hidden w-full rounded-[2rem] ${isSunset ? "bg-gradient-to-br from-[#e8864a] to-[#c44a6a]" : "bg-gradient-to-br from-[#5b7cf5] to-indigo-700"} leading-none text-white p-7 shadow-xl mb-8`}>
               <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2 pointer-events-none" />
               <div className="font-bold tracking-widest uppercase text-[10px] text-blue-100 mb-2">WEEKLY POINTS</div>
               <div className="text-6xl font-black mb-1">{getWeeklyPts(currentUser.id)}</div>
@@ -1967,12 +2031,12 @@ function VersaAppMain() {
               <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full border ${darkMode ? 'border-gray-700 bg-gray-800' : 'border-gray-200 bg-white'} shadow-sm text-[10px] text-gray-500 font-semibold`}><Clock size={12}/> Resets Sunday</div>
             </div>
             
-            <div className="space-y-3">
+            <div className="space-y-3 anim-stagger">
               {[...activeMembers].map(m => { m.weeklyPts = getWeeklyPts(m.id); return m; }).sort((a,b) => b.weeklyPts - a.weeklyPts).map((member, i) => {
                 const isMe = member.id === currentUser.id;
                 return (
                   <div key={member.id} className={`relative flex items-center p-4 rounded-2xl border ${isMe ? (darkMode ? 'border-[#5b7cf5]/50 bg-[#5b7cf5]/10' : 'border-[#5b7cf5]/30 bg-white shadow-md shadow-blue-500/5') : (darkMode ? 'border-[#223858] bg-[#182544]' : 'border-gray-100 bg-white shadow-sm')} transition-all`}>
-                    {isMe && <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-10 bg-[#5b7cf5] rounded-r-full" />}
+                    {isMe && <div className={`absolute left-0 top-1/2 -translate-y-1/2 w-1 h-10 ${isSunset ? "bg-[#e8864a]" : "bg-[#5b7cf5]"} rounded-r-full`} />}
                     
                     <div className="w-8 flex justify-center text-sm font-black mr-2">
                        {i === 0 ? <Crown size={18} className="text-amber-500" /> : <span className={darkMode ? 'text-[#4a6080]' : 'text-gray-400'}>{i + 1}</span>}
@@ -1988,7 +2052,7 @@ function VersaAppMain() {
                     </div>
                     
                     <div className="text-right">
-                      <div className={`text-xl font-black ${isMe ? 'text-[#5b7cf5]' : (darkMode ? 'text-white' : 'text-gray-900')}`}>{member.weeklyPts}</div>
+                      <div className={`text-xl font-black ${isMe ? (isSunset ? 'text-[#e8864a]' : 'text-[#5b7cf5]') : (darkMode ? 'text-white' : 'text-gray-900')}`}>{member.weeklyPts}</div>
                       <div className="text-[9px] font-bold tracking-widest text-gray-400 uppercase">PTS</div>
                     </div>
                   </div>
@@ -2002,15 +2066,15 @@ function VersaAppMain() {
         {/* TAB 2: HABITS */}
         {/* ======================================= */}
         {activeTab === 'habits' && (
-          <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+          <div className="tab-content">
              {/* Daily Target Progress */}
              <div className={`p-5 rounded-3xl border ${darkMode ? 'border-[#223858] bg-[#182544]' : 'border-gray-100 bg-white shadow-sm'} mb-8`}>
                <div className="flex justify-between items-center mb-3">
                  <span className={`text-sm font-bold ${darkMode ? 'text-white' : 'text-gray-900'}`}>Daily Target</span>
-                 <span className="text-sm font-black text-[#5b7cf5]">{Math.min(100, Math.round(dailyProg * 100))}%</span>
+                 <span className={`text-sm font-black ${isSunset ? "text-[#e8864a]" : "text-[#5b7cf5]"}`}>{Math.min(100, Math.round(dailyProg * 100))}%</span>
                </div>
                <div className={`h-3 w-full ${darkMode ? 'bg-[#0f1b2d]' : 'bg-gray-100'} rounded-full overflow-hidden mb-3`}>
-                 <div className="h-full bg-[#5b7cf5] rounded-full transition-all duration-1000 ease-out" style={{width: `${Math.min(100, dailyProg * 100)}%`}} />
+                 <div className={`h-full ${isSunset ? "bg-[#e8864a]" : "bg-[#5b7cf5]"} rounded-full transition-all duration-1000 ease-out relative overflow-hidden`} style={{width: `${Math.min(100, dailyProg * 100)}%`}}><div className="progress-shimmer absolute inset-0 rounded-full"/></div>
                </div>
                <div className="text-[9px] font-bold tracking-widest text-gray-400 uppercase text-right">HIT 90% TO BANK A STREAK FREEZE</div>
              </div>
@@ -2022,13 +2086,13 @@ function VersaAppMain() {
                const ct = getCT(cat);
                const catIcon = activeCategories.find(c => c.name === cat)?.icon || '⭐';
                return (
-                 <div key={cat} className="mb-6">
+                 <div key={cat} className="mb-6 anim-fade-up">
                    <div className="flex items-center gap-2 mb-3 px-1">
                      <span className="text-sm">{catIcon}</span>
                      <span className={`text-[10px] font-bold tracking-widest uppercase ${ct.txt}`}>{cat}</span>
                      <span className={`text-[10px] ${darkMode ? 'text-[#4a6080]' : 'text-gray-400'}`}>{catHabits.length}</span>
                    </div>
-                   <div className="space-y-3">
+                   <div className="space-y-3 anim-stagger">
                      {catHabits.map(h => {
                        const cnt = getCount(h.id);
                        const done = cnt > 0;
@@ -2037,7 +2101,7 @@ function VersaAppMain() {
                        const doneBorder = isNeg ? (darkMode ? 'border-rose-500/30 bg-rose-500/10' : 'border-rose-200 bg-rose-50/50') : (darkMode ? `${ct.bdr} ${ct.bgS}` : `${ct.bdr} bg-blue-50/30`);
                        const defaultBorder = darkMode ? 'border-[#223858] bg-[#182544]' : 'border-gray-100 bg-white shadow-sm';
                        return (
-                         <div key={h.id} className={`flex items-center p-4 rounded-2xl border ${done ? doneBorder : defaultBorder} transition-all`}>
+                         <div key={h.id} className={`habit-card flex items-center p-4 rounded-2xl border ${done ? doneBorder : defaultBorder}`}>
                            {editMode ? (
                              <button onClick={() => deleteHabit(h.id)} className="w-6 h-6 rounded-full bg-red-500/20 text-red-400 flex items-center justify-center mr-4"><X size={12} strokeWidth={3}/></button>
                            ) : isNeg ? (
@@ -2045,7 +2109,7 @@ function VersaAppMain() {
                                {done ? <X size={12} strokeWidth={4}/> : null}
                              </button>
                            ) : (
-                             <button onClick={() => !maxed ? handleIncrement(h.id) : handleDecrement(h.id)} className={`w-6 h-6 rounded-full border-2 flex items-center justify-center mr-4 transition-all ${done ? 'bg-[#5b7cf5] border-[#5b7cf5] text-white' : (darkMode ? 'border-gray-600' : 'border-gray-300')}`}>
+                             <button onClick={() => !maxed ? handleIncrement(h.id) : handleDecrement(h.id)} className={`w-6 h-6 rounded-full border-2 flex items-center justify-center mr-4 transition-all ${done ? (isSunset ? 'bg-[#e8864a] border-[#e8864a] text-white' : 'bg-[#5b7cf5] border-[#5b7cf5] text-white') : (darkMode ? 'border-gray-600' : 'border-gray-300')}`}>
                                {done && <Check size={14} strokeWidth={4} />}
                              </button>
                            )}
@@ -2108,7 +2172,7 @@ function VersaAppMain() {
         {/* TAB 4: STAKES */}
         {/* ======================================= */}
         {activeTab === 'stakes' && (
-          <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+          <div className="tab-content anim-stagger">
              {roomMembers.length > 0 && (() => {
                const sorted = [...activeMembers].map(m => { m.weeklyPts = getWeeklyPts(m.id); return m; }).sort((a,b) => a.weeklyPts - b.weeklyPts);
                const lowest = sorted[0];
@@ -2140,7 +2204,7 @@ function VersaAppMain() {
         {/* ======================================= */}
         {activeTab === 'profile' && (
           <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 space-y-4">
-             <div className="grid grid-cols-2 gap-4 mb-4">
+             <div className="grid grid-cols-2 gap-4 mb-4 anim-stagger">
                <div className={`p-4 rounded-3xl border ${darkMode ? 'border-[#223858] bg-[#182544]' : 'border-gray-100 bg-white shadow-sm'}`}>
                  <div className="text-[10px] font-bold tracking-widest text-[#9aaec0] uppercase mb-2">Trophies</div>
                  <div className="flex items-end justify-between">
@@ -2176,7 +2240,7 @@ function VersaAppMain() {
                  <div className="text-[10px] font-bold tracking-widest text-[#9aaec0] uppercase">Consistency</div>
                  <div className={`px-2 py-1 rounded ${darkMode ? 'bg-[#0f1b2d]' : 'bg-gray-100'} text-[10px] font-bold ${darkMode ? 'text-gray-400' : 'text-gray-400'}`}>Last 90 Days</div>
                </div>
-               <button onClick={() => setShowHeatMap(true)} className={`w-full flex items-center justify-center gap-2 py-6 border-2 border-dashed ${darkMode ? 'border-[#223858] text-gray-500 hover:text-[#5b7cf5] hover:bg-[#5b7cf5]/5' : 'border-gray-200 text-gray-400 hover:text-blue-600 hover:bg-gray-50'} rounded-xl transition-all font-bold`}>
+               <button onClick={loadHeatMap} className={`w-full flex items-center justify-center gap-2 py-6 border-2 border-dashed ${darkMode ? (isSunset ? 'border-[#3d2640] text-gray-500 hover:text-[#e8864a] hover:bg-[#e8864a]/5' : 'border-[#223858] text-gray-500 hover:text-[#5b7cf5] hover:bg-[#5b7cf5]/5') : 'border-gray-200 text-gray-400 hover:text-blue-600 hover:bg-gray-50'} rounded-xl transition-all font-bold`}>
                  <BarChart3 size={20} /> View Heatmap
                </button>
              </div>
@@ -2185,7 +2249,7 @@ function VersaAppMain() {
       </div>
 
       {/* ═══ BOTTOM NAVIGATION TABS ═══ */}
-      <div className={`fixed bottom-0 w-full z-50 border-t ${darkMode ? 'bg-[#182544] border-[#223858]' : 'bg-white border-gray-200'} pb-safe`}>
+      <div className={`bottom-nav fixed bottom-0 w-full z-50 border-t ${T.bgCard} ${T.border} pb-safe`}>
          <div className="max-w-xl mx-auto flex items-center justify-between px-6 py-3">
            {[ 
              { id: 'overview', icon: <Home size={22} className="mb-1" strokeWidth={2.5}/>, label: 'OVERVIEW' },
@@ -2194,7 +2258,7 @@ function VersaAppMain() {
              { id: 'stakes', icon: <Target size={22} className="mb-1" strokeWidth={2.5}/>, label: 'STAKES' },
              { id: 'profile', icon: <User size={22} className="mb-1" strokeWidth={2.5}/>, label: 'PROFILE' }
            ].map(tab => (
-             <button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`flex flex-col items-center justify-center w-16 transition-all ${activeTab === tab.id ? 'text-[#5b7cf5] scale-110' : (darkMode ? 'text-[#7a8ba8] hover:text-white' : 'text-gray-400 hover:text-gray-600')}`}>
+             <button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`flex flex-col items-center justify-center w-16 transition-all ${activeTab === tab.id ? (isSunset ? 'text-[#e8864a] scale-110' : 'text-[#5b7cf5] scale-110') : (darkMode ? 'text-[#7a8ba8] hover:text-white' : 'text-gray-400 hover:text-gray-600')}`}>
                {tab.icon}
                <span className="text-[8px] font-black tracking-widest">{tab.label}</span>
              </button>
@@ -2208,7 +2272,7 @@ function VersaAppMain() {
       {/* Add Habit */}
       <Modal show={showAddHabit} onClose={() => setShowAddHabit(false)} dark={darkMode}>
         <ModalHeader title="Add Habit" onClose={() => setShowAddHabit(false)} dark={darkMode} />
-        <button onClick={loadDefaultHabits} disabled={loading} className="w-full mb-5 px-4 py-3 bg-[#7c82a8] text-white rounded-xl shadow-lg shadow-violet-500/20 text-sm font-bold active:scale-[0.98] disabled:opacity-50">{loading ? 'Loading...' : '⚡ Load Preset (12 habits)'}</button>
+        <button onClick={loadDefaultHabits} disabled={loading} className="w-full mb-5 px-4 py-3 bg-[#7c82a8] text-white rounded-xl shadow-lg shadow-violet-500/20 text-sm font-bold active:scale-[0.98] disabled:opacity-50">{loading ? 'Loading...' : '⚡ Load Preset (9 habits)'}</button>
         <div className="space-y-3">
           <input type="text" placeholder="Habit name" value={newHabit.name} onChange={e => setNewHabit({ ...newHabit, name: e.target.value })} className={inputCls} maxLength={30} />
           <div className="grid grid-cols-2 gap-3">
@@ -2355,7 +2419,7 @@ function VersaAppMain() {
         <div className="grid grid-cols-2 gap-3 mb-4"><div className={`text-center p-3 ${T.bgCard} rounded-xl border ${T.border}`}><div className="text-lg font-black text-purple-400">{streakData.activeDays || 0}</div><div className="text-[9px] text-gray-600 tracking-wider uppercase mt-0.5">Active Days</div></div><div className={`text-center p-3 ${T.bgCard} rounded-xl border ${T.border}`}><div className="text-lg font-black text-cyan-400">{streakData.totalCompletions || 0}</div><div className="text-[9px] text-gray-600 tracking-wider uppercase mt-0.5">Completions</div></div></div>
         <div className={`p-3 ${T.bgCard} rounded-xl border ${T.border}`}><div className="text-[9px] text-gray-600 tracking-wider uppercase mb-2">Crystals</div><div className="flex justify-center gap-4">{allCatNames.map(c => <div key={c} className="text-center"><div className={'w-6 h-6 rounded-full mx-auto mb-1 transition-all ' + (myCr[c] ? getCT(c).bg + ' shadow-md ' + getCT(c).glow : 'bg-[#1e3050]')} /><span className="text-[9px] text-gray-600">{c}</span></div>)}</div></div>
         <div className={`mt-4 p-3 ${T.bgCard} rounded-xl border ${T.border} flex items-center justify-between`}><div><div className={`text-sm font-medium ${T.text}`}>Email Reminders</div><div className="text-[10px] text-gray-500">Daily nudges at 12pm & 6pm</div></div><button onClick={async () => { const current = currentUser.emailReminders !== false; const next = !current; try { await supabase.from('users').update({ email_reminders: next }).eq('id', currentUser.id); setCurrentUser(p => ({ ...p, emailReminders: next })); } catch (e) { console.error(e); } }} className={'relative w-11 h-6 rounded-full transition-all ' + (currentUser.emailReminders !== false ? 'bg-[#5b7cf5]' : (darkMode ? 'bg-[#223858]' : 'bg-gray-200'))}><div className={'absolute top-1 w-4 h-4 rounded-full bg-white transition-all shadow-sm ' + (currentUser.emailReminders !== false ? 'left-6' : 'left-1')} /></button></div>
-        <div className={`mt-2 p-3 ${T.bgCard} rounded-xl border ${T.border} flex items-center justify-between`}><div><div className={`text-sm font-medium ${T.text}`}>Push Notifications</div><div className="text-[10px] text-gray-500">{notifPermission === 'granted' ? 'Rivals, streaks, reminders' : notifPermission === 'denied' ? 'Blocked in browser settings' : 'Get notified when rivals log habits'}</div></div>{notifPermission === 'granted' ? <div className="text-[#4aba7a] text-sm font-bold">✔ On</div> : notifPermission === 'denied' ? <div className="text-red-400 text-xs">Check browser settings</div> : <button onClick={async () => { try { const p = await Notification.requestPermission(); setNotifPermission(p); if (p === 'granted') { const r = await registerServiceWorker(); if (r) { const sub = await subscribeToPush(r); if (sub && currentUser) { await supabase.from('push_subscriptions').upsert({ id: currentUser.id + '_' + Date.now(), user_id: currentUser.id, subscription: sub.toJSON() }); } } } } catch (e) { console.error('Push setup error:', e); } }} className="px-3 py-1.5 bg-[#5b7cf5] text-white text-xs font-bold rounded-lg active:scale-[0.97]">Enable</button>}</div>
+        <div className={`mt-2 p-3 ${T.bgCard} rounded-xl border ${T.border} flex items-center justify-between`}><div><div className={`text-sm font-medium ${T.text}`}>Push Notifications</div><div className="text-[10px] text-gray-500">{notifPermission === 'granted' ? 'Rivals, streaks, reminders' : notifPermission === 'denied' ? 'Blocked in browser settings' : 'Get notified when rivals log habits'}</div></div>{notifPermission === 'granted' ? <div className="text-[#4aba7a] text-sm font-bold">✔ On</div> : notifPermission === 'denied' ? <div className="text-red-400 text-xs">Check browser settings</div> : <button onClick={async () => { try { const p = await Notification.requestPermission(); setNotifPermission(p); if (p === 'granted') { const r = await registerServiceWorker(); if (r) { const sub = await subscribeToPush(r); if (sub && currentUser) { await supabase.from('push_subscriptions').upsert({ id: currentUser.id + '_' + Date.now(), user_id: currentUser.id, subscription: sub.toJSON() }); } } } } catch (e) { console.error('Push setup error:', e); } }} className={`px-3 py-1.5 ${isSunset ? "bg-[#e8864a]" : "bg-[#5b7cf5]"} text-white text-xs font-bold rounded-lg active:scale-[0.97]`}>Enable</button>}</div>
         <div className={`mt-2 p-3 ${T.bgCard} rounded-xl border ${T.border}`}>
           <div className={`text-sm font-medium ${T.text} mb-3`}>Custom Thresholds</div>
           <div className="flex items-center justify-between mb-3">
@@ -3017,7 +3081,7 @@ function VersaAppMain() {
                 setCustomBoardHabits(prev => [...prev, hid]);
                 setNewHabit({ name: '', category: newHabit.category, points: 10, isRepeatable: false });
               } catch { setError('Failed to add'); }
-            }} disabled={!newHabit.name.trim()} className="w-full py-2.5 bg-[#5b7cf5] text-white rounded-xl text-xs font-bold active:scale-[0.98] disabled:opacity-40">Add & Select</button>
+            }} disabled={!newHabit.name.trim()} className={`w-full py-2.5 ${isSunset ? "bg-[#e8864a]" : "bg-[#5b7cf5]"} text-white rounded-xl text-xs font-bold active:scale-[0.98] disabled:opacity-40`}>Add & Select</button>
           </div>
         </details>
         <div className={`text-xs ${T.textDim} mb-3`}>{customBoardHabits.length} habit{customBoardHabits.length !== 1 ? 's' : ''} selected</div>
