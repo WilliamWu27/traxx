@@ -2004,8 +2004,10 @@ function VersaAppMain() {
                    <div className="text-xs font-semibold text-gray-500">Total Score: {myPts}</div>
                  </div>
               </div>
-              <button onClick={() => setShowSettingsMenu(!showSettingsMenu)} className={`p-2.5 rounded-2xl border ${T.border + ' text-gray-400 ' + T.bgCard} shadow-sm relative`}>
-                <Settings size={18} />
+              <div className="relative">
+                <button onClick={() => setShowSettingsMenu(!showSettingsMenu)} className={`p-2.5 rounded-2xl border ${T.border + ' text-gray-400 ' + T.bgCard} shadow-sm`}>
+                  <Settings size={18} />
+                </button>
                  {showSettingsMenu && <>
                   <div className="fixed inset-0 z-40" onClick={(e) => { e.stopPropagation(); setShowSettingsMenu(false); }} />
                   <div className={`anim-slide-down absolute right-0 top-full mt-2 w-56 rounded-2xl border shadow-xl z-50 overflow-hidden ${T.bgCard} ${T.border}`}>
@@ -2042,7 +2044,7 @@ function VersaAppMain() {
                     </div>
                   </div>
                 </>}
-              </button>
+              </div>
             </>
           )}
         </div>
