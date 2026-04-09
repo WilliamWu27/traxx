@@ -1827,7 +1827,7 @@ function VersaAppMain() {
   ];
 
   return (
-    <div className={`fixed inset-0 overflow-hidden flex flex-col ${T.bg} ${T.text} transition-all duration-500`}>
+    <div className={`min-h-screen pb-24 relative overflow-x-hidden ${T.bg} ${T.text} transition-all duration-500`}>
       <style>{`
         @keyframes fadeUp { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
@@ -1947,7 +1947,7 @@ function VersaAppMain() {
         </div>
       )}
       {/* ═══ HEADER ═══ */}
-      <div className={`shrink-0 relative ${T.headerBg} border-b ${T.border} z-40 shadow-sm`}>
+      <div className={`sticky top-0 ${T.headerBg} border-b ${T.border} z-40 shadow-sm`}>
         <div className="max-w-xl mx-auto px-5 py-4 flex items-center justify-between">
           {activeTab === 'overview' && (
             <>
@@ -2050,7 +2050,7 @@ function VersaAppMain() {
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto overflow-x-hidden w-full relative" id="scroll-wrapper">
+      <div className="w-full relative">
         <div className="max-w-xl mx-auto px-5 pt-6 pb-12">
         {/* ======================================= */}
         {/* TAB 1: OVERVIEW */}
@@ -2334,7 +2334,7 @@ function VersaAppMain() {
       </div>
 
       {/* ═══ BOTTOM NAVIGATION TABS ═══ */}
-      <div className={`shrink-0 w-full bottom-nav z-[999] border-t shadow-[0_-10px_40px_rgba(0,0,0,0.1)] ${T.bgCard} ${T.border}`}>
+      <div className={`fixed bottom-0 left-0 right-0 w-full bottom-nav z-[999] border-t shadow-[0_-10px_40px_rgba(0,0,0,0.1)] ${T.bgCard} ${T.border}`}>
         <div className="max-w-xl mx-auto flex items-center justify-between px-6 pt-2 pb-8 relative">
           {[
             { id: 'overview', icon: <Home size={22} className="mb-1" strokeWidth={2.5} />, label: 'OVERVIEW' },
@@ -2346,8 +2346,7 @@ function VersaAppMain() {
             <button key={tab.id} onClick={(e) => { 
                e.preventDefault(); 
                setActiveTab(tab.id); 
-               const scroller = document.getElementById('scroll-wrapper');
-               if (scroller) scroller.scrollTop = 0;
+               window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
             }} className={`flex flex-col items-center justify-center w-16 h-14 touch-manipulation cursor-pointer select-none transition-all ${activeTab === tab.id ? (T.accentTxt + ' scale-110') : (T.textMuted + ' hover:' + T.text)}`}>
               {tab.icon}
               <span className="text-[8px] font-black tracking-widest mt-0.5">{tab.label}</span>
