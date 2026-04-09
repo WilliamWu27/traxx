@@ -12,10 +12,10 @@
   margin: 0;
   padding: 0;
 }
-html, body {
-  overflow: hidden;
-  height: 100%;
-  width: 100%;
+html {
+  scroll-behavior: smooth;
+  overflow-y: scroll;
+  overflow-x: hidden;
 }
 
 body {
@@ -25,12 +25,11 @@ body {
   -moz-osx-font-smoothing: grayscale;
   background-color: #0a0a0f;
   color: #ffffff;
+  overflow-x: hidden;
 }
 
 #root {
-  height: 100%;
-  width: 100%;
-  overflow: hidden;
+  min-height: 100vh;
 }
 
 /* Completely hide scrollbars to prevent layout shifting between tabs */
