@@ -2,20 +2,14 @@
 @tailwind components;
 @tailwind utilities;
 
-@layer utilities {
-  .pb-safe {
-    padding-bottom: env(safe-area-inset-bottom, 20px);
-  }
-}
 * {
   box-sizing: border-box;
   margin: 0;
   padding: 0;
 }
+
 html {
   scroll-behavior: smooth;
-  overflow-y: scroll;
-  overflow-x: hidden;
 }
 
 body {
@@ -25,23 +19,25 @@ body {
   -moz-osx-font-smoothing: grayscale;
   background-color: #0a0a0f;
   color: #ffffff;
-  overflow-x: hidden;
 }
 
 #root {
   min-height: 100vh;
 }
 
-/* Completely hide scrollbars to prevent layout shifting between tabs */
+/* Custom scrollbar for dark mode */
 ::-webkit-scrollbar {
-  display: none;
-  width: 0;
-  height: 0;
+  width: 6px;
 }
-
-* {
-  scrollbar-width: none; /* Firefox */
-  -ms-overflow-style: none; /* IE/Edge */
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.15);
 }
 
 /* Prevent select dropdown white bg */
