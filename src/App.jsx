@@ -1971,7 +1971,7 @@ function VersaAppMain() {
             <>
               <div className="flex items-center gap-3">
                 <h1 className={`text-xl font-black tracking-widest ${isSunset ? "text-[#ff7b29]" : "text-[#5b7cf5]"}`}>VERSA <span className="text-xl">✨</span></h1>
-                <div className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wide ${darkMode ? (isSunset ? 'bg-[#2a1a28] text-gray-300' : 'bg-gray-800 text-gray-300') : 'bg-gray-100 text-gray-500'}`}>Study Group Code: <span className={T.text}>{currentRoom?.id}</span></div>
+                <div className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wide ${darkMode ? (isSunset ? 'bg-[#2a1a28] text-gray-300' : 'bg-gray-800 text-gray-300') : 'bg-gray-100 text-gray-500'}`}>Group Code: <span className={T.text}>{currentRoom?.id}</span></div>
               </div>
               <div className="flex items-center cursor-pointer" onClick={() => setActiveTab('profile')}>
                 <div className="relative">
@@ -2219,7 +2219,7 @@ function VersaAppMain() {
                 </div>
                 <div className="flex flex-wrap gap-2 mb-3">
                   {reactionEmojis.map((em, i) => (
-                    <div key={i} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full border ${darkMode ? 'border-[#223858] bg-[#0f1b2d]' : 'border-gray-200 bg-gray-50'}`}>
+                    <div key={i} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full border ${darkMode ? (isSunset ? 'border-[#323236] bg-[#1c1c1e]' : 'border-[#223858] bg-[#0f1b2d]') : 'border-gray-200 bg-gray-50'}`}>
                       <span className="text-lg">{em}</span>
                       <button onClick={() => saveReactionEmojis(reactionEmojis.filter((_, idx) => idx !== i))} className="text-gray-500 hover:text-red-400"><X size={12} /></button>
                     </div>
@@ -2234,27 +2234,25 @@ function VersaAppMain() {
             )}
             {activityFeed.length === 0 ? <p className="text-center text-gray-400 py-10 text-sm">No activity yet</p> : activityFeed.map(a => {
               const ts = a.ts ? new Date(a.ts) : null;
-              const timeAgo = ts ? (Math.floor((Date.now() - ts.getTime()) / 60000) < 60 ? Math.floor((Date.now() - ts.getTime()) / 60000) + 'M' : Math.floor((Date.now() - ts.getTime()) / 3600000) + 'H') + ' AGO' : '';
+              const timeAgo = ts ? (Math.floor((Date.now() - ts.getTime()) / 60000) < 60 ? Math.floor((Date.now() - ts.getTime()) / 60000) + 'm' : Math.floor((Date.now() - ts.getTime()) / 3600000) + 'h') + ' ago' : '';
               const reactions = a.reactions || {};
+              const hasReactions = Object.keys(reactions).length > 0;
               return (
                 <div key={a.id} className={`p-4 rounded-3xl border ${T.border} ${T.bgCard} ${darkMode ? '' : 'shadow-sm'}`}>
-                  <div className="flex gap-3 mb-4">
-                    <div className={`w-10 h-10 rounded-full border ${darkMode ? 'border-[#223858] bg-[#0f1b2d]' : 'border-gray-100 bg-gray-50'} flex items-center justify-center text-lg shrink-0`}>
-                      {a.text.includes('streak') ? '🔥' : a.bonus === 'jackpot' ? '🎰' : a.text.includes('caved') ? '💀' : '⚡'}
-                    </div>
-                    <div className="flex-1 mt-0.5">
-                      <div className={`text-sm ${darkMode ? 'text-[#9aaec0]' : 'text-gray-600'}`}><span className={`font-black ${T.text}`}>{a.username}</span> {a.text}</div>
-                      <div className="text-[9px] font-bold tracking-widest text-gray-400 mt-1">{timeAgo}</div>
+                  <div className="flex gap-3">
+                    <div className="flex-1">
+                      <div className={`text-sm ${T.textMuted}`}><span className={`font-bold ${T.text}`}>{a.username}</span> {a.text}</div>
+                      <div className={`text-[10px] font-semibold ${T.textDim} mt-1`}>{timeAgo}</div>
                     </div>
                   </div>
-                  <div className="flex items-center gap-2">
-                    {reactionEmojis.map(emoji => {
+                  <div className={`flex items-center gap-1.5 mt-3 ${hasReactions ? '' : ''}`}>
+                    {reactionEmojis.slice(0, 3).map(emoji => {
                       const rxValues = Object.values(reactions);
                       const count = rxValues.filter(r => r === emoji).length;
                       const myReaction = reactions[currentUser.id] === emoji;
                       return (
-                        <button key={emoji} onClick={() => reactToActivity(a.id, emoji)} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-xs font-bold transition-all active:scale-95 ${myReaction ? (isSunset ? 'border-[#ff7b29]/50 bg-[#ff7b29]/15 text-[#ff7b29]' : 'border-[#5b7cf5]/50 bg-[#5b7cf5]/15 text-[#5b7cf5]') : (darkMode ? 'border-[#223858] bg-[#0f1b2d] text-gray-400 hover:bg-[#182544]' : 'border-gray-200 bg-gray-50 text-gray-600 hover:bg-gray-100')}`}>
-                          <span>{emoji}</span>{count > 0 && <span className="tabular-nums">{count}</span>}
+                        <button key={emoji} onClick={() => reactToActivity(a.id, emoji)} className={`flex items-center gap-1 px-2.5 py-1 rounded-full border text-xs font-semibold transition-all active:scale-95 ${myReaction ? (isSunset ? 'border-[#ff7b29]/40 bg-[#ff7b29]/10 text-[#ff7b29]' : 'border-[#5b7cf5]/40 bg-[#5b7cf5]/10 text-[#5b7cf5]') : (darkMode ? (isSunset ? 'border-[#323236] bg-transparent text-gray-500 hover:bg-[#1c1c1e]' : 'border-[#223858] bg-transparent text-gray-500 hover:bg-[#182544]') : 'border-gray-200 bg-transparent text-gray-400 hover:bg-gray-50')}`}>
+                          <span className="text-xs">{emoji}</span>{count > 0 && <span className="tabular-nums text-[10px]">{count}</span>}
                         </button>
                       );
                     })}
