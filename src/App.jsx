@@ -239,6 +239,7 @@ function VersaAppMain() {
   const [activityFeed, setActivityFeed] = useState([]);
   const [showHeatMap, setShowHeatMap] = useState(false);
   const [heatMapData, setHeatMapData] = useState({});
+  const [heatMapRange, setHeatMapRange] = useState('30d');
   const [bonusMsg, setBonusMsg] = useState(null);
   const [rivalStatus, setRivalStatus] = useState([]);
   const [showInsights, setShowInsights] = useState(false);
@@ -735,7 +736,7 @@ function VersaAppMain() {
   const loadHeatMap = async () => {
     if (!currentUser || !currentRoom) return;
     try {
-      const ago = new Date(); ago.setDate(ago.getDate() - 91);
+      const ago = new Date(); ago.setDate(ago.getDate() - 365);
       const agoStr = formatDateStr(ago);
       const { data: heatData2 } = await supabase.from('completions').select('*').eq('user_id', currentUser.id).eq('room_id', currentRoom.id).gte('date', agoStr);
       const map = {};
@@ -1370,16 +1371,16 @@ function VersaAppMain() {
       selectBg: 'bg-white', glowOrb: '/5', blurBg: 'backdrop-blur-xl', accent: '#5b7cf5', accentTxt: 'text-[#5b7cf5]', accentBg: 'bg-[#5b7cf5]',
     },
     'sunset-dark': {
-      bg: 'bg-[#1a1018]', bgCard: 'bg-[#2a1a28]', bgCardHover: 'hover:bg-[#362238]', bgInput: 'bg-[#2a1a28]',
-      border: 'border-[#3d2640]', borderInput: 'border-[#4a2e4e]', text: 'text-white', textMuted: 'text-[#a8889a]',
-      textDim: 'text-[#6a4a60]', textFaint: 'text-[#3d2640]', headerBg: 'bg-[#1a1018]/95', modalBg: 'bg-[#221428]',
-      selectBg: 'bg-[#221428]', glowOrb: '/8', blurBg: 'backdrop-blur-xl', accent: '#e8864a', accentTxt: 'text-[#e8864a]', accentBg: 'bg-[#e8864a]',
+      bg: 'bg-[#151516]', bgCard: 'bg-[#1c1c1e]', bgCardHover: 'hover:bg-[#262628]', bgInput: 'bg-[#1c1c1e]',
+      border: 'border-[#323236]', borderInput: 'border-[#404044]', text: 'text-white', textMuted: 'text-[#a1a1aa]',
+      textDim: 'text-[#616168]', textFaint: 'text-[#38383e]', headerBg: 'bg-[#151516]/95', modalBg: 'bg-[#1c1c1e]',
+      selectBg: 'bg-[#1c1c1e]', glowOrb: '/8', blurBg: 'backdrop-blur-xl', accent: '#ff7b29', accentTxt: 'text-[#ff7b29]', accentBg: 'bg-[#ff7b29]',
     },
     'sunset-light': {
-      bg: 'bg-[#fdf6f0]', bgCard: 'bg-white', bgCardHover: 'hover:bg-orange-50/50', bgInput: 'bg-[#fef8f4]',
-      border: 'border-[#f0ddd0]', borderInput: 'border-[#e8ccba]', text: 'text-[#3a2018]', textMuted: 'text-[#8a6a58]',
-      textDim: 'text-[#c0a090]', textFaint: 'text-[#e0ccc0]', headerBg: 'bg-[#fdf6f0]/95', modalBg: 'bg-white',
-      selectBg: 'bg-white', glowOrb: '/5', blurBg: 'backdrop-blur-xl', accent: '#e8864a', accentTxt: 'text-[#e8864a]', accentBg: 'bg-[#e8864a]',
+      bg: 'bg-[#fcfcfc]', bgCard: 'bg-white', bgCardHover: 'hover:bg-orange-50/40', bgInput: 'bg-[#fafafa]',
+      border: 'border-[#f0f0f0]', borderInput: 'border-[#e5e5e5]', text: 'text-[#1f1f22]', textMuted: 'text-[#85858a]',
+      textDim: 'text-[#b8b8bc]', textFaint: 'text-[#e5e5e5]', headerBg: 'bg-[#fcfcfc]/95', modalBg: 'bg-white',
+      selectBg: 'bg-white', glowOrb: '/5', blurBg: 'backdrop-blur-xl', accent: '#ff6200', accentTxt: 'text-[#ff6200]', accentBg: 'bg-[#ff6200]',
     },
   };
   const T = THEME_DEFS[theme] || THEME_DEFS['navy-dark'];
@@ -1937,7 +1938,7 @@ function VersaAppMain() {
           {activeTab === 'overview' && (
             <>
               <div className="flex items-center gap-3">
-                <h1 className={`text-xl font-black tracking-widest ${isSunset ? "text-[#e8864a]" : "text-[#5b7cf5]"}`}>VERSA <span className="text-xl">✨</span></h1>
+                <h1 className={`text-xl font-black tracking-widest ${isSunset ? "text-[#ff7b29]" : "text-[#5b7cf5]"}`}>VERSA <span className="text-xl">✨</span></h1>
                 <div className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wide ${darkMode ? (isSunset ? 'bg-[#2a1a28] text-gray-300' : 'bg-gray-800 text-gray-300') : 'bg-gray-100 text-gray-500'}`}>Study Group Code: <span className={T.text}>{currentRoom?.id}</span></div>
               </div>
               <div className="flex items-center cursor-pointer" onClick={() => setActiveTab('profile')}>
@@ -2008,9 +2009,9 @@ function VersaAppMain() {
                             const isDk = t.includes('dark');
                             const isActive = theme === t;
                             const previewBg = isDk ? (isSun ? '#1a1018' : '#0f1b2d') : (isSun ? '#fdf6f0' : '#f0f4f8');
-                            const accent = isSun ? '#e8864a' : '#5b7cf5';
+                            const accent = isSun ? '#ff7b29' : '#5b7cf5';
                             return (
-                              <button key={t} onClick={(e) => { e.stopPropagation(); setAppTheme(t); }} className={`p-2 rounded-xl text-left transition-all ${isActive ? (isSun ? 'ring-2 ring-[#e8864a] bg-[#e8864a]/10' : 'ring-2 ring-[#5b7cf5] bg-[#5b7cf5]/10') : (darkMode ? 'hover:bg-[#1e3050]' : 'hover:bg-gray-100')}`}>
+                              <button key={t} onClick={(e) => { e.stopPropagation(); setAppTheme(t); }} className={`p-2 rounded-xl text-left transition-all ${isActive ? (isSun ? 'ring-2 ring-[#ff7b29] bg-[#ff7b29]/10' : 'ring-2 ring-[#5b7cf5] bg-[#5b7cf5]/10') : (darkMode ? 'hover:bg-[#1e3050]' : 'hover:bg-gray-100')}`}>
                                 <div className="rounded-lg mb-1.5 overflow-hidden" style={{backgroundColor: previewBg, height: 28}}>
                                   <div className="flex items-end gap-[2px] p-1.5 h-full">
                                     <div className="w-2 h-1.5 rounded-sm" style={{backgroundColor: accent, opacity: 0.5}}/>
@@ -2018,7 +2019,7 @@ function VersaAppMain() {
                                     <div className="w-2 h-3 rounded-sm" style={{backgroundColor: accent}}/>
                                   </div>
                                 </div>
-                                <div className={`text-[9px] font-bold ${isActive ? (isSun ? 'text-[#e8864a]' : 'text-[#5b7cf5]') : T.textDim}`}>{THEME_LABELS[t]}</div>
+                                <div className={`text-[9px] font-bold ${isActive ? (isSun ? 'text-[#ff7b29]' : 'text-[#5b7cf5]') : T.textDim}`}>{THEME_LABELS[t]}</div>
                               </button>
                             );
                           })}
@@ -2040,7 +2041,7 @@ function VersaAppMain() {
         {activeTab === 'overview' && (
           <div className="tab-content">
             {/* HERO CARD */}
-            <div className={`hero-card anim-scale-in relative overflow-hidden w-full rounded-[2rem] ${isSunset ? "bg-gradient-to-br from-[#e8864a] to-[#c44a6a]" : "bg-gradient-to-br from-[#5b7cf5] to-indigo-700"} leading-none text-white p-7 shadow-xl mb-8`}>
+            <div className={`hero-card anim-scale-in relative overflow-hidden w-full rounded-[2rem] ${isSunset ? "bg-gradient-to-br from-[#ff7b29] to-[#c44a6a]" : "bg-gradient-to-br from-[#5b7cf5] to-indigo-700"} leading-none text-white p-7 shadow-xl mb-8`}>
               <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2 pointer-events-none hero-glow" />
               <div className={`font-bold tracking-widest uppercase text-[10px] mb-2 ${isSunset ? 'text-orange-100' : 'text-blue-100'}`}>WEEKLY POINTS</div>
               <div className="text-6xl font-black mb-1 anim-count">{getWeeklyPts(currentUser.id)}</div>
@@ -2064,7 +2065,7 @@ function VersaAppMain() {
                 const isMe = member.id === currentUser.id;
                 return (
                   <div key={member.id} className={`anim-fade-up relative flex items-center p-4 rounded-2xl border ${isMe ? (darkMode ? 'border-[#5b7cf5]/50 bg-[#5b7cf5]/10' : 'border-[#5b7cf5]/30 bg-white shadow-md shadow-blue-500/5') : (T.border + ' ' + T.bgCard + (darkMode ? '' : ' shadow-sm'))} transition-all`}>
-                    {isMe && <div className={`absolute left-0 top-1/2 -translate-y-1/2 w-1 h-10 ${isSunset ? "bg-[#e8864a]" : "bg-[#5b7cf5]"} rounded-r-full`} />}
+                    {isMe && <div className={`absolute left-0 top-1/2 -translate-y-1/2 w-1 h-10 ${isSunset ? "bg-[#ff7b29]" : "bg-[#5b7cf5]"} rounded-r-full`} />}
                     
                     <div className="w-8 flex justify-center text-sm font-black mr-2">
                        {i === 0 ? <Crown size={18} className="text-amber-500" /> : <span className={T.textDim}>{i + 1}</span>}
@@ -2080,7 +2081,7 @@ function VersaAppMain() {
                     </div>
                     
                     <div className="text-right">
-                      <div className={`text-xl font-black ${isMe ? (isSunset ? 'text-[#e8864a]' : 'text-[#5b7cf5]') : (T.text)}`}>{member.weeklyPts}</div>
+                      <div className={`text-xl font-black ${isMe ? (isSunset ? 'text-[#ff7b29]' : 'text-[#5b7cf5]') : (T.text)}`}>{member.weeklyPts}</div>
                       <div className="text-[9px] font-bold tracking-widest text-gray-400 uppercase">PTS</div>
                     </div>
                   </div>
@@ -2099,10 +2100,10 @@ function VersaAppMain() {
              <div className={`p-5 rounded-3xl border ${T.border} ${T.bgCard} ${darkMode ? '' : 'shadow-sm'} mb-8 anim-fade-up`}>
                <div className="flex justify-between items-center mb-3">
                  <span className={`text-sm font-bold ${T.text}`}>Daily Target</span>
-                 <span className={`text-sm font-black ${isSunset ? "text-[#e8864a]" : "text-[#5b7cf5]"}`}>{Math.min(100, Math.round(dailyProg * 100))}%</span>
+                 <span className={`text-sm font-black ${isSunset ? "text-[#ff7b29]" : "text-[#5b7cf5]"}`}>{Math.min(100, Math.round(dailyProg * 100))}%</span>
                </div>
                <div className={`h-3 w-full ${darkMode ? (isSunset ? 'bg-[#120a14]' : 'bg-[#0f1b2d]') : 'bg-gray-100'} rounded-full overflow-hidden mb-3`}>
-                 <div className={`h-full ${isSunset ? "bg-[#e8864a]" : "bg-[#5b7cf5]"} rounded-full transition-all duration-1000 ease-out relative overflow-hidden`} style={{width: `${Math.min(100, dailyProg * 100)}%`}}><div className="progress-shimmer absolute inset-0 rounded-full"/></div>
+                 <div className={`h-full ${isSunset ? "bg-[#ff7b29]" : "bg-[#5b7cf5]"} rounded-full transition-all duration-1000 ease-out relative overflow-hidden`} style={{width: `${Math.min(100, dailyProg * 100)}%`}}><div className="progress-shimmer absolute inset-0 rounded-full"/></div>
                </div>
                <div className="text-[9px] font-bold tracking-widest text-gray-400 uppercase text-right">HIT 90% TO BANK A STREAK FREEZE</div>
              </div>
@@ -2137,7 +2138,7 @@ function VersaAppMain() {
                                {done ? <X size={12} strokeWidth={4}/> : null}
                              </button>
                            ) : (
-                             <button onClick={() => !maxed ? handleIncrement(h.id) : handleDecrement(h.id)} className={`w-6 h-6 rounded-full border-2 flex items-center justify-center mr-4 transition-all ${done ? (isSunset ? 'bg-[#e8864a] border-[#e8864a] text-white' : 'bg-[#5b7cf5] border-[#5b7cf5] text-white') : (darkMode ? 'border-gray-600' : 'border-gray-300')}`}>
+                             <button onClick={() => !maxed ? handleIncrement(h.id) : handleDecrement(h.id)} className={`w-6 h-6 rounded-full border-2 flex items-center justify-center mr-4 transition-all ${done ? (isSunset ? 'bg-[#ff7b29] border-[#ff7b29] text-white' : 'bg-[#5b7cf5] border-[#5b7cf5] text-white') : (darkMode ? 'border-gray-600' : 'border-gray-300')}`}>
                                {done && <Check size={14} strokeWidth={4} />}
                              </button>
                            )}
@@ -2267,7 +2268,7 @@ function VersaAppMain() {
                  <div className="text-[10px] font-bold tracking-widest text-[#9aaec0] uppercase">Consistency</div>
                  <div className={`px-2 py-1 rounded ${darkMode ? (isSunset ? 'bg-[#120a14]' : 'bg-[#0f1b2d]') : 'bg-gray-100'} text-[10px] font-bold ${darkMode ? 'text-gray-400' : 'text-gray-400'}`}>Last 90 Days</div>
                </div>
-               <button onClick={loadHeatMap} className={`w-full flex items-center justify-center gap-2 py-6 border-2 border-dashed ${darkMode ? (isSunset ? 'border-[#3d2640] text-gray-500 hover:text-[#e8864a] hover:bg-[#e8864a]/5' : 'border-[#223858] text-gray-500 hover:text-[#5b7cf5] hover:bg-[#5b7cf5]/5') : 'border-gray-200 text-gray-400 hover:text-blue-600 hover:bg-gray-50'} rounded-xl transition-all font-bold`}>
+               <button onClick={loadHeatMap} className={`w-full flex items-center justify-center gap-2 py-6 border-2 border-dashed ${darkMode ? (isSunset ? 'border-[#3d2640] text-gray-500 hover:text-[#ff7b29] hover:bg-[#ff7b29]/5' : 'border-[#223858] text-gray-500 hover:text-[#5b7cf5] hover:bg-[#5b7cf5]/5') : 'border-gray-200 text-gray-400 hover:text-blue-600 hover:bg-gray-50'} rounded-xl transition-all font-bold`}>
                  <BarChart3 size={20} /> View Heatmap
                </button>
              </div>
@@ -2281,9 +2282,9 @@ function VersaAppMain() {
                    const isSun = t.includes('sunset');
                    const isDk = t.includes('dark');
                    const previewBg = isDk ? (isSun ? '#1a1018' : '#0f1b2d') : (isSun ? '#fdf6f0' : '#f0f4f8');
-                   const previewAccent = isSun ? '#e8864a' : '#5b7cf5';
+                   const previewAccent = isSun ? '#ff7b29' : '#5b7cf5';
                    return (
-                     <button key={t} onClick={() => setAppTheme(t)} className={`relative p-3 rounded-2xl border-2 transition-all active:scale-[0.97] ${isActive ? (isSun ? 'border-[#e8864a] shadow-lg shadow-[#e8864a]/20' : 'border-[#5b7cf5] shadow-lg shadow-[#5b7cf5]/20') : (darkMode ? 'border-[#223858] hover:border-[#334868]' : 'border-gray-200 hover:border-gray-300')}`}>
+                     <button key={t} onClick={() => setAppTheme(t)} className={`relative p-3 rounded-2xl border-2 transition-all active:scale-[0.97] ${isActive ? (isSun ? 'border-[#ff7b29] shadow-lg shadow-[#ff7b29]/20' : 'border-[#5b7cf5] shadow-lg shadow-[#5b7cf5]/20') : (darkMode ? 'border-[#223858] hover:border-[#334868]' : 'border-gray-200 hover:border-gray-300')}`}>
                        {/* Mini preview */}
                        <div className="rounded-xl overflow-hidden mb-2" style={{ backgroundColor: previewBg, height: 40 }}>
                          <div className="flex items-end gap-1 p-2 h-full">
@@ -2292,8 +2293,8 @@ function VersaAppMain() {
                            <div className="w-3 h-4 rounded-sm" style={{ backgroundColor: previewAccent }}/>
                          </div>
                        </div>
-                       <div className={`text-[10px] font-bold ${isActive ? (isSun ? 'text-[#e8864a]' : 'text-[#5b7cf5]') : T.textMuted}`}>{THEME_LABELS[t]}</div>
-                       {isActive && <div className={`absolute top-1.5 right-1.5 w-4 h-4 rounded-full flex items-center justify-center text-white text-[8px] ${isSun ? 'bg-[#e8864a]' : 'bg-[#5b7cf5]'}`}>✓</div>}
+                       <div className={`text-[10px] font-bold ${isActive ? (isSun ? 'text-[#ff7b29]' : 'text-[#5b7cf5]') : T.textMuted}`}>{THEME_LABELS[t]}</div>
+                       {isActive && <div className={`absolute top-1.5 right-1.5 w-4 h-4 rounded-full flex items-center justify-center text-white text-[8px] ${isSun ? 'bg-[#ff7b29]' : 'bg-[#5b7cf5]'}`}>✓</div>}
                      </button>
                    );
                  })}
@@ -2302,7 +2303,7 @@ function VersaAppMain() {
 
              {/* Quick Actions */}
              <div className="space-y-2 anim-fade-up">
-               <button onClick={() => setShowInviteModal(true)} className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-2xl border transition-all active:scale-[0.98] ${T.border} ${T.bgCard} ${T.textMuted} ${T.bgCardHover}`}><UserPlus size={16} className={isSunset ? "text-[#e8864a]" : "text-blue-400"}/><span className="text-sm font-medium">Invite to Room</span></button>
+               <button onClick={() => setShowInviteModal(true)} className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-2xl border transition-all active:scale-[0.98] ${T.border} ${T.bgCard} ${T.textMuted} ${T.bgCardHover}`}><UserPlus size={16} className={isSunset ? "text-[#ff7b29]" : "text-blue-400"}/><span className="text-sm font-medium">Invite to Room</span></button>
                {lastWeekData && <button onClick={() => setShowWeeklyRecap(true)} className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-2xl border transition-all active:scale-[0.98] ${T.border} ${T.bgCard} ${T.textMuted} ${T.bgCardHover}`}><BarChart3 size={16} className="text-purple-400"/><span className="text-sm font-medium">Weekly Recap</span></button>}
                <button onClick={() => setShowHelp(true)} className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-2xl border transition-all active:scale-[0.98] ${T.border} ${T.bgCard} ${T.textMuted} ${T.bgCardHover}`}><HelpCircle size={16} className="text-gray-400"/><span className="text-sm font-medium">How Versa Works</span></button>
                <button onClick={() => supabase.auth.signOut()} className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-2xl border transition-all active:scale-[0.98] ${T.border} ${T.bgCard} hover:bg-red-500/5 text-red-400`}><LogOut size={16}/><span className="text-sm font-medium">Sign Out</span></button>
@@ -2482,7 +2483,7 @@ function VersaAppMain() {
         <div className="grid grid-cols-2 gap-3 mb-4"><div className={`text-center p-3 ${T.bgCard} rounded-xl border ${T.border}`}><div className="text-lg font-black text-purple-400">{streakData.activeDays || 0}</div><div className="text-[9px] text-gray-600 tracking-wider uppercase mt-0.5">Active Days</div></div><div className={`text-center p-3 ${T.bgCard} rounded-xl border ${T.border}`}><div className="text-lg font-black text-cyan-400">{streakData.totalCompletions || 0}</div><div className="text-[9px] text-gray-600 tracking-wider uppercase mt-0.5">Completions</div></div></div>
         <div className={`p-3 ${T.bgCard} rounded-xl border ${T.border}`}><div className="text-[9px] text-gray-600 tracking-wider uppercase mb-2">Crystals</div><div className="flex justify-center gap-4">{allCatNames.map(c => <div key={c} className="text-center"><div className={'w-6 h-6 rounded-full mx-auto mb-1 transition-all ' + (myCr[c] ? getCT(c).bg + ' shadow-md ' + getCT(c).glow : 'bg-[#1e3050]')} /><span className="text-[9px] text-gray-600">{c}</span></div>)}</div></div>
         <div className={`mt-4 p-3 ${T.bgCard} rounded-xl border ${T.border} flex items-center justify-between`}><div><div className={`text-sm font-medium ${T.text}`}>Email Reminders</div><div className="text-[10px] text-gray-500">Daily nudges at 12pm & 6pm</div></div><button onClick={async () => { const current = currentUser.emailReminders !== false; const next = !current; try { await supabase.from('users').update({ email_reminders: next }).eq('id', currentUser.id); setCurrentUser(p => ({ ...p, emailReminders: next })); } catch (e) { console.error(e); } }} className={'relative w-11 h-6 rounded-full transition-all ' + (currentUser.emailReminders !== false ? 'bg-[#5b7cf5]' : (darkMode ? 'bg-[#223858]' : 'bg-gray-200'))}><div className={'absolute top-1 w-4 h-4 rounded-full bg-white transition-all shadow-sm ' + (currentUser.emailReminders !== false ? 'left-6' : 'left-1')} /></button></div>
-        <div className={`mt-2 p-3 ${T.bgCard} rounded-xl border ${T.border} flex items-center justify-between`}><div><div className={`text-sm font-medium ${T.text}`}>Push Notifications</div><div className="text-[10px] text-gray-500">{notifPermission === 'granted' ? 'Rivals, streaks, reminders' : notifPermission === 'denied' ? 'Blocked in browser settings' : 'Get notified when rivals log habits'}</div></div>{notifPermission === 'granted' ? <div className="text-[#4aba7a] text-sm font-bold">✔ On</div> : notifPermission === 'denied' ? <div className="text-red-400 text-xs">Check browser settings</div> : <button onClick={async () => { try { const p = await Notification.requestPermission(); setNotifPermission(p); if (p === 'granted') { const r = await registerServiceWorker(); if (r) { const sub = await subscribeToPush(r); if (sub && currentUser) { await supabase.from('push_subscriptions').upsert({ id: currentUser.id + '_' + Date.now(), user_id: currentUser.id, subscription: sub.toJSON() }); } } } } catch (e) { console.error('Push setup error:', e); } }} className={`px-3 py-1.5 ${isSunset ? "bg-[#e8864a]" : "bg-[#5b7cf5]"} text-white text-xs font-bold rounded-lg active:scale-[0.97]`}>Enable</button>}</div>
+        <div className={`mt-2 p-3 ${T.bgCard} rounded-xl border ${T.border} flex items-center justify-between`}><div><div className={`text-sm font-medium ${T.text}`}>Push Notifications</div><div className="text-[10px] text-gray-500">{notifPermission === 'granted' ? 'Rivals, streaks, reminders' : notifPermission === 'denied' ? 'Blocked in browser settings' : 'Get notified when rivals log habits'}</div></div>{notifPermission === 'granted' ? <div className="text-[#4aba7a] text-sm font-bold">✔ On</div> : notifPermission === 'denied' ? <div className="text-red-400 text-xs">Check browser settings</div> : <button onClick={async () => { try { const p = await Notification.requestPermission(); setNotifPermission(p); if (p === 'granted') { const r = await registerServiceWorker(); if (r) { const sub = await subscribeToPush(r); if (sub && currentUser) { await supabase.from('push_subscriptions').upsert({ id: currentUser.id + '_' + Date.now(), user_id: currentUser.id, subscription: sub.toJSON() }); } } } } catch (e) { console.error('Push setup error:', e); } }} className={`px-3 py-1.5 ${isSunset ? "bg-[#ff7b29]" : "bg-[#5b7cf5]"} text-white text-xs font-bold rounded-lg active:scale-[0.97]`}>Enable</button>}</div>
         <div className={`mt-2 p-3 ${T.bgCard} rounded-xl border ${T.border}`}>
           <div className={`text-sm font-medium ${T.text} mb-3`}>Custom Thresholds</div>
           <div className="flex items-center justify-between mb-3">
@@ -2898,104 +2899,88 @@ function VersaAppMain() {
         <ModalHeader title="Activity" onClose={() => setShowHeatMap(false)} icon={<Calendar size={18} className="text-emerald-400" />} dark={darkMode} />
         {(() => {
           const today = new Date();
-          const getColor = (pts) => {
-            if (pts >= 320) return '#4aba7a';
-            if (pts >= 200) return '#3a9a64';
-            if (pts >= 120) return '#2d7a50';
-            if (pts >= 40) return '#1e5a3a';
-            return darkMode ? '#1a2540' : '#eef2f7';
-          };
-          // Calculate grid: always 13 full weeks (91 days) ending on today's week
-          const endOfWeek = new Date(today);
-          const todayDow = endOfWeek.getDay();
-          endOfWeek.setDate(endOfWeek.getDate() + (6 - todayDow)); // move to Saturday
-          const startOfGrid = new Date(endOfWeek);
-          startOfGrid.setDate(startOfGrid.getDate() - (13 * 7 - 1)); // 13 weeks back
           
-          // Build 13 columns × 7 rows
-          const weeks = [];
-          for (let w = 0; w < 13; w++) {
-            const week = [];
-            for (let d = 0; d < 7; d++) {
-              const date = new Date(startOfGrid);
-              date.setDate(date.getDate() + w * 7 + d);
-              week.push(date);
-            }
-            weeks.push(week);
+          let rangeDays = 30;
+          if (heatMapRange === '7d') rangeDays = 7;
+          if (heatMapRange === '90d') rangeDays = 90;
+          if (heatMapRange === '1y') rangeDays = 365;
+
+          const chartDates = [];
+          for (let i = rangeDays - 1; i >= 0; i--) {
+            const d = new Date(today);
+            d.setDate(d.getDate() - i);
+            chartDates.push(formatDateStr(d));
           }
 
-          // Month labels
-          const months = [];
-          let lastMonth = -1;
-          weeks.forEach((week, wi) => {
-            const firstDay = week[0];
-            const m = firstDay.getMonth();
-            if (m !== lastMonth) {
-              months.push({ idx: wi, label: firstDay.toLocaleDateString('en-US', { month: 'short' }) });
-              lastMonth = m;
-            }
-          });
+          const points = chartDates.map(date => heatMapData[date] || 0);
+          const maxPoints = Math.max(dailyTarget * 1.5, ...points, 10); // Ensure peak is at least goal + 50%
+          const minPoints = Math.min(0, ...points); // Accommodate negative habits going below 0
 
-          const cellSize = 18;
-          const gap = 3;
-          const labelW = 24;
-          const gridW = labelW + weeks.length * (cellSize + gap);
+          const SVG_W = 400;
+          const SVG_H = 160;
+          const M_TOP = 20;
+          const M_BTM = 20;
+          const M_LR = 10;
+          const USE_W = SVG_W - (M_LR * 2);
+          const USE_H = SVG_H - M_TOP - M_BTM;
+          const rangeY = maxPoints - minPoints;
+
+          const getX = (idx) => M_LR + (idx / Math.max(1, rangeDays - 1)) * USE_W;
+          const getY = (val) => SVG_H - M_BTM - ((val - minPoints) / Math.max(1, rangeY) * USE_H);
+
+          // Path generation
+          const pathStart = `M ${getX(0)} ${getY(points[0])}`;
+          let lines = '';
+          for (let i = 1; i < points.length; i++) {
+             lines += ` L ${getX(i)} ${getY(points[i])}`;
+          }
+          
+          const strokePath = pathStart + lines;
+          // Filling down to the literal Y=0 line
+          const fillPath = `${strokePath} L ${getX(points.length - 1)} ${getY(0)} L ${getX(0)} ${getY(0)} Z`;
+
+          const yZero = getY(0);
+          const yGoal = getY(dailyTarget);
+
+          // Accent colors based on current theme
+          const accentStr = isSunset ? '#ff7b29' : '#5b7cf5';
+          const accentOp = isSunset ? 'rgba(255, 123, 41, 0.2)' : 'rgba(91, 124, 245, 0.2)';
 
           return (
             <div>
-              {/* Month labels */}
-              <div className="flex mb-1" style={{ paddingLeft: labelW }}>
-                {months.map((m, i) => (
-                  <div key={i} className={`text-[9px] font-bold ${T.textDim}`} style={{ position: 'relative', left: m.idx * (cellSize + gap) }}>{m.label}</div>
+              {/* Range Toggle */}
+              <div className={`flex gap-1 mb-5 p-1 rounded-xl ${darkMode ? 'bg-[#151d30]' : 'bg-gray-100'}`}>
+                {[{id: '7d', l: '1 Week'}, {id: '30d', l: '1 Month'}, {id: '90d', l: '3 Months'}, {id: '1y', l: '1 Year'}].map(r => (
+                  <button key={r.id} onClick={() => setHeatMapRange(r.id)} className={`flex-1 py-1.5 text-[10px] font-bold rounded-lg transition-all tracking-wider uppercase ${heatMapRange === r.id ? (isSunset ? (darkMode ? 'bg-[#ff7b29]/20 text-[#ff7b29]' : 'bg-orange-100 text-orange-900') : (darkMode ? 'bg-[#223858] text-white' : 'bg-white shadow-sm text-blue-600')) : (darkMode ? 'text-gray-500 hover:text-gray-400' : 'text-gray-400 hover:text-gray-600')}`}>{r.l}</button>
                 ))}
               </div>
 
-              {/* Grid */}
-              <div className="flex">
-                {/* Day labels */}
-                <div className="flex flex-col shrink-0" style={{ width: labelW, gap }}>
-                  {['S','M','T','W','T','F','S'].map((d, i) => (
-                    <div key={i} className={`flex items-center justify-end pr-1.5 text-[9px] font-bold ${i % 2 === 1 ? (T.textDim) : 'text-transparent'}`} style={{ height: cellSize }}>{d}</div>
-                  ))}
-                </div>
+              {/* Chart SVG */}
+              <div className="relative mb-6">
+                <svg viewBox={`0 0 ${SVG_W} ${SVG_H}`} className="w-full h-auto drop-shadow-xl overflow-visible">
+                  
+                  {/* Grid Lines */}
+                  {/* Goal Line */}
+                  <line x1={M_LR} y1={yGoal} x2={SVG_W - M_LR} y2={yGoal} stroke={darkMode ? "rgba(255,255,255,0.2)" : "rgba(0,0,0,0.15)"} strokeWidth={1} strokeDasharray="4 4" />
+                  <text x={M_LR} y={yGoal - 4} fontSize="8" fill={darkMode ? "#a1a1aa" : "#85858a"} fontWeight="bold">DAILY GOAL ({dailyTarget})</text>
 
-                {/* Cells */}
-                <div className="flex" style={{ gap }}>
-                  {weeks.map((week, wi) => (
-                    <div key={wi} className="flex flex-col" style={{ gap }}>
-                      {week.map((day, di) => {
-                        const ds = formatDateStr(day);
-                        const pts = heatMapData[ds] || 0;
-                        const isFuture = day > today;
-                        const isToday = ds === getToday();
-                        return (
-                          <div
-                            key={di}
-                            className={`rounded-[3px] transition-colors ${isToday ? 'ring-1.5 ring-white/40' : ''}`}
-                            style={{
-                              width: cellSize,
-                              height: cellSize,
-                              backgroundColor: isFuture ? 'transparent' : getColor(pts),
-                              opacity: isFuture ? 0.15 : 1,
-                            }}
-                            title={isFuture ? '' : `${formatDate(ds)}: ${pts} pts`}
-                          />
-                        );
-                      })}
-                    </div>
-                  ))}
-                </div>
-              </div>
+                  {/* Zero Line */}
+                  <line x1={M_LR} y1={yZero} x2={SVG_W - M_LR} y2={yZero} stroke={darkMode ? "rgba(255,255,255,0.4)" : "rgba(0,0,0,0.3)"} strokeWidth={1} />
+                  <text x={SVG_W - M_LR} y={yZero - 4} fontSize="8" fill={darkMode ? "#a1a1aa" : "#85858a"} fontWeight="bold" textAnchor="end">BASELINE (0)</text>
 
-              {/* Legend */}
-              <div className="flex items-center justify-between mt-4">
-                <span className={`text-[10px] font-medium ${T.textDim}`}>Less</span>
-                <div className="flex items-center gap-1">
-                  {[darkMode ? '#1a2540' : '#eef2f7', '#1e5a3a', '#2d7a50', '#3a9a64', '#4aba7a'].map((color, i) => (
-                    <div key={i} className="rounded-[3px]" style={{ width: cellSize, height: cellSize, backgroundColor: color }} />
-                  ))}
+                  {/* Data Paths */}
+                  <path d={fillPath} fill={accentOp} />
+                  <path d={strokePath} fill="none" stroke={accentStr} strokeWidth="2.5" strokeLinejoin="round" strokeLinecap="round" />
+                  
+                  {/* Active Point Highlight (Today) */}
+                  <circle cx={getX(points.length - 1)} cy={getY(points[points.length - 1])} r="3.5" fill={darkMode ? "#1c1c1e" : "#ffffff"} stroke={accentStr} strokeWidth="2" />
+                </svg>
+                
+                {/* Min / Max Date Labels */}
+                <div className={`flex justify-between px-2 mt-1 text-[9px] font-medium ${T.textDim}`}>
+                   <span>{new Date(chartDates[0]).toLocaleDateString(undefined, {month: 'short', day: 'numeric'})}</span>
+                   <span>Today</span>
                 </div>
-                <span className={`text-[10px] font-medium ${T.textDim}`}>More</span>
               </div>
 
               {/* Stats */}
@@ -3144,7 +3129,7 @@ function VersaAppMain() {
                 setCustomBoardHabits(prev => [...prev, hid]);
                 setNewHabit({ name: '', category: newHabit.category, points: 10, isRepeatable: false });
               } catch { setError('Failed to add'); }
-            }} disabled={!newHabit.name.trim()} className={`w-full py-2.5 ${isSunset ? "bg-[#e8864a]" : "bg-[#5b7cf5]"} text-white rounded-xl text-xs font-bold active:scale-[0.98] disabled:opacity-40`}>Add & Select</button>
+            }} disabled={!newHabit.name.trim()} className={`w-full py-2.5 ${isSunset ? "bg-[#ff7b29]" : "bg-[#5b7cf5]"} text-white rounded-xl text-xs font-bold active:scale-[0.98] disabled:opacity-40`}>Add & Select</button>
           </div>
         </details>
         <div className={`text-xs ${T.textDim} mb-3`}>{customBoardHabits.length} habit{customBoardHabits.length !== 1 ? 's' : ''} selected</div>
