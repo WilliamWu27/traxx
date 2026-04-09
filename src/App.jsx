@@ -279,7 +279,7 @@ function VersaAppMain() {
         const st = localStorage.getItem(`versa-st-${currentUser.id}`);
         if (dt) setDailyTarget(parseInt(dt));
         if (st) setStreakTarget(parseInt(st));
-      } catch {}
+      } catch { }
     }
   }, [currentUser]);
 
@@ -290,7 +290,7 @@ function VersaAppMain() {
       try {
         localStorage.setItem(`versa-dt-${currentUser.id}`, newDt);
         localStorage.setItem(`versa-st-${currentUser.id}`, newSt);
-      } catch {}
+      } catch { }
     }
   };
 
@@ -314,7 +314,7 @@ function VersaAppMain() {
   const getLastWeekEnd = () => { const d = new Date(getWeekStart() + 'T12:00:00'); d.setDate(d.getDate() - 1); return formatDateStr(d); };
   const THEMES = ['navy-dark', 'navy-light', 'sunset-dark', 'sunset-light'];
   const THEME_LABELS = { 'navy-dark': '🌙 Navy Dark', 'navy-light': '☀️ Navy Light', 'sunset-dark': '🌅 Sunset Dark', 'sunset-light': '🌇 Sunset Light' };
-  const setAppTheme = (t) => { setTheme(t); try { localStorage.setItem('versa-theme', t); } catch {} };
+  const setAppTheme = (t) => { setTheme(t); try { localStorage.setItem('versa-theme', t); } catch { } };
   const toggleTheme = () => { const idx = THEMES.indexOf(theme); setAppTheme(THEMES[(idx + 1) % THEMES.length]); };
   const getOrderedHabits = (cat) => {
     const pool = habits;
@@ -1971,15 +1971,15 @@ function VersaAppMain() {
               </div>
               <div className="flex items-center gap-2">
                 {streakMulti.multi > 1 && <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full border ${darkMode ? 'bg-blue-500/10 border-blue-500/20 text-blue-300' : 'bg-blue-50 border-blue-200 text-blue-600'} text-xs font-bold shadow-sm`}><TrendingUp size={14} />{streakMulti.label}</div>}
-                {habits.length>0&&<button onClick={()=>setEditMode(!editMode)} className={`p-2.5 rounded-2xl border shadow-sm ${editMode?(darkMode?'border-blue-500/50 bg-blue-500/10 text-blue-400':'border-blue-300 bg-blue-50 text-blue-600'):(darkMode?'border-[#223858] text-gray-400 bg-[#182544]':'border-gray-200 text-gray-500 bg-white')}`}><Edit3 size={16}/></button>}
-                <button onClick={()=>setShowAddHabit(true)} className={`p-2.5 rounded-2xl border shadow-sm ${darkMode?'border-[#223858] text-blue-400 bg-[#182544]':'border-gray-200 text-blue-600 bg-white'}`}><Plus size={18}/></button>
+                {habits.length > 0 && <button onClick={() => setEditMode(!editMode)} className={`p-2.5 rounded-2xl border shadow-sm ${editMode ? (darkMode ? 'border-blue-500/50 bg-blue-500/10 text-blue-400' : 'border-blue-300 bg-blue-50 text-blue-600') : (darkMode ? 'border-[#223858] text-gray-400 bg-[#182544]' : 'border-gray-200 text-gray-500 bg-white')}`}><Edit3 size={16} /></button>}
+                <button onClick={() => setShowAddHabit(true)} className={`p-2.5 rounded-2xl border shadow-sm ${darkMode ? 'border-[#223858] text-blue-400 bg-[#182544]' : 'border-gray-200 text-blue-600 bg-white'}`}><Plus size={18} /></button>
               </div>
             </>
           )}
           {activeTab === 'cohort' && (
             <>
               <div>
-                <h1 className={`text-2xl font-black flex items-center gap-2 ${T.text}`}>Cohort <Users size={20} className="text-[#5b7cf5]"/></h1>
+                <h1 className={`text-2xl font-black flex items-center gap-2 ${T.text}`}>Cohort <Users size={20} className="text-[#5b7cf5]" /></h1>
                 <div className="text-[11px] font-semibold text-gray-400 mt-1">Stay accountable with your group.</div>
               </div>
               <button onClick={() => { setHistoryDate(getYesterday()); loadHistoryDate(getYesterday()); setShowHistory(true); }} className={`p-2.5 rounded-2xl border ${T.border + ' text-gray-400 ' + T.bgCard} shadow-sm`}>
@@ -1998,24 +1998,24 @@ function VersaAppMain() {
           {activeTab === 'profile' && (
             <>
               <div className="flex items-center gap-3">
-                 {currentUser.photoURL ? <img src={currentUser.photoURL} className="w-12 h-12 rounded-full object-cover shadow-sm bg-gray-200" referrerPolicy="no-referrer" /> : <div className="w-12 h-12 rounded-full bg-gray-200 flex items-center justify-center"><User size={24} className="text-gray-500" /></div>}
-                 <div>
-                   <h1 className={`text-xl font-black ${T.text}`}>{currentUser.username} {isRoomCreator && <span className="text-[10px] text-gray-500 font-medium">(You)</span>}</h1>
-                   <div className="text-xs font-semibold text-gray-500">Total Score: {myPts}</div>
-                 </div>
+                {currentUser.photoURL ? <img src={currentUser.photoURL} className="w-12 h-12 rounded-full object-cover shadow-sm bg-gray-200" referrerPolicy="no-referrer" /> : <div className="w-12 h-12 rounded-full bg-gray-200 flex items-center justify-center"><User size={24} className="text-gray-500" /></div>}
+                <div>
+                  <h1 className={`text-xl font-black ${T.text}`}>{currentUser.username} {isRoomCreator && <span className="text-[10px] text-gray-500 font-medium">(You)</span>}</h1>
+                  <div className="text-xs font-semibold text-gray-500">Total Score: {myPts}</div>
+                </div>
               </div>
               <div className="relative">
                 <button onClick={() => setShowSettingsMenu(!showSettingsMenu)} className={`p-2.5 rounded-2xl border ${T.border + ' text-gray-400 ' + T.bgCard} shadow-sm`}>
                   <Settings size={18} />
                 </button>
-                 {showSettingsMenu && <>
+                {showSettingsMenu && <>
                   <div className="fixed inset-0 z-40" onClick={(e) => { e.stopPropagation(); setShowSettingsMenu(false); }} />
                   <div className={`anim-slide-down absolute right-0 top-full mt-2 w-56 rounded-2xl border shadow-xl z-50 overflow-hidden ${T.bgCard} ${T.border}`}>
                     <div className="py-1">
                       <button onClick={(e) => { e.stopPropagation(); setShowAddHabit(true); setShowSettingsMenu(false); }} className={`w-full flex items-center gap-3 px-4 py-3 text-sm transition-all ${T.textMuted} ${T.bgCardHover}`}><Plus size={15} className="text-blue-400" />Add Habit</button>
                       <button onClick={(e) => { e.stopPropagation(); setShowAddCategory(true); setShowSettingsMenu(false); }} className={`w-full flex items-center gap-3 px-4 py-3 text-sm transition-all ${T.textMuted} ${T.bgCardHover}`}><Plus size={15} className="text-purple-400" />Add Category</button>
                       {habits.length > 0 && <button onClick={(e) => { e.stopPropagation(); setEditMode(!editMode); setShowSettingsMenu(false); }} className={`w-full flex items-center gap-3 px-4 py-3 text-sm transition-all ${editMode ? 'text-blue-400' : (T.textMuted + ' ' + T.bgCardHover)}`}><Edit3 size={15} className={editMode ? 'text-blue-400' : 'text-gray-500'} />{editMode ? 'Done Editing' : 'Edit Habits'}</button>}
-                      
+
                       {isRoomCreator && <button onClick={(e) => { e.stopPropagation(); setShowRoomSettings(true); setShowSettingsMenu(false); }} className={`w-full flex items-center gap-3 px-4 py-3 text-sm transition-all ${T.textMuted} ${T.bgCardHover}`}><Crown size={15} className="text-[#e8864a]" />Room Settings</button>}
                       <div className={`px-4 py-3 border-t ${T.border}`}>
                         <div className={`text-[9px] font-bold tracking-widest uppercase mb-2.5 ${T.textDim}`}>Theme</div>
@@ -2028,11 +2028,11 @@ function VersaAppMain() {
                             const accent = isSun ? '#ff7b29' : '#5b7cf5';
                             return (
                               <button key={t} onClick={(e) => { e.stopPropagation(); setAppTheme(t); }} className={`p-2 rounded-xl text-left transition-all ${isActive ? (isSun ? 'ring-2 ring-[#ff7b29] bg-[#ff7b29]/10' : 'ring-2 ring-[#5b7cf5] bg-[#5b7cf5]/10') : (darkMode ? 'hover:bg-[#1e3050]' : 'hover:bg-gray-100')}`}>
-                                <div className="rounded-lg mb-1.5 overflow-hidden" style={{backgroundColor: previewBg, height: 28}}>
+                                <div className="rounded-lg mb-1.5 overflow-hidden" style={{ backgroundColor: previewBg, height: 28 }}>
                                   <div className="flex items-end gap-[2px] p-1.5 h-full">
-                                    <div className="w-2 h-1.5 rounded-sm" style={{backgroundColor: accent, opacity: 0.5}}/>
-                                    <div className="w-2 h-2 rounded-sm" style={{backgroundColor: accent, opacity: 0.7}}/>
-                                    <div className="w-2 h-3 rounded-sm" style={{backgroundColor: accent}}/>
+                                    <div className="w-2 h-1.5 rounded-sm" style={{ backgroundColor: accent, opacity: 0.5 }} />
+                                    <div className="w-2 h-2 rounded-sm" style={{ backgroundColor: accent, opacity: 0.7 }} />
+                                    <div className="w-2 h-3 rounded-sm" style={{ backgroundColor: accent }} />
                                   </div>
                                 </div>
                                 <div className={`text-[9px] font-bold ${isActive ? (isSun ? 'text-[#ff7b29]' : 'text-[#5b7cf5]') : T.textDim}`}>{THEME_LABELS[t]}</div>
@@ -2061,7 +2061,7 @@ function VersaAppMain() {
               <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2 pointer-events-none hero-glow" />
               <div className={`font-bold tracking-widest uppercase text-[10px] mb-2 ${isSunset ? 'text-orange-100' : 'text-blue-100'}`}>WEEKLY POINTS</div>
               <div className="text-6xl font-black mb-1 anim-count">{getWeeklyPts(currentUser.id)}</div>
-              
+
               <div className="absolute right-6 top-1/2 -translate-y-1/2 flex flex-col items-end gap-2">
                 <div className="flex items-center gap-2 px-4 py-2 anim-slide-right bg-white/20 backdrop-blur-md rounded-full border border-white/20 text-xs font-bold shadow-sm">
                   <TrendingUp size={14} /> {streakMulti.multi}x Multiplier
@@ -2073,29 +2073,29 @@ function VersaAppMain() {
             {/* LIVE COHORT LEADERBOARD */}
             <div className="flex items-center justify-between mb-4">
               <h2 className={`text-lg font-black ${T.text}`}>Live Cohort Leaderboard</h2>
-              <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full border ${darkMode ? 'border-gray-700 bg-gray-800' : 'border-gray-200 bg-white'} shadow-sm text-[10px] text-gray-500 font-semibold`}><Clock size={12}/> Resets Sunday</div>
+              <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full border ${darkMode ? 'border-gray-700 bg-gray-800' : 'border-gray-200 bg-white'} shadow-sm text-[10px] text-gray-500 font-semibold`}><Clock size={12} /> Resets Sunday</div>
             </div>
-            
+
             <div className="space-y-3 anim-stagger">
-              {activeMembers.map(m => ({ ...m, weeklyPts: getWeeklyPts(m.id) })).sort((a,b) => b.weeklyPts - a.weeklyPts).map((member, i) => {
+              {activeMembers.map(m => ({ ...m, weeklyPts: getWeeklyPts(m.id) })).sort((a, b) => b.weeklyPts - a.weeklyPts).map((member, i) => {
                 const isMe = member.id === currentUser.id;
                 return (
                   <div key={member.id} className={`anim-fade-up relative flex items-center p-4 rounded-2xl border ${isMe ? (darkMode ? 'border-[#5b7cf5]/50 bg-[#5b7cf5]/10' : 'border-[#5b7cf5]/30 bg-white shadow-md shadow-blue-500/5') : (T.border + ' ' + T.bgCard + (darkMode ? '' : ' shadow-sm'))} transition-all`}>
                     {isMe && <div className={`absolute left-0 top-1/2 -translate-y-1/2 w-1 h-10 ${isSunset ? "bg-[#ff7b29]" : "bg-[#5b7cf5]"} rounded-r-full`} />}
-                    
+
                     <div className="w-8 flex justify-center text-sm font-black mr-2">
-                       {i === 0 ? <Crown size={18} className="text-amber-500" /> : <span className={T.textDim}>{i + 1}</span>}
+                      {i === 0 ? <Crown size={18} className="text-amber-500" /> : <span className={T.textDim}>{i + 1}</span>}
                     </div>
-                    
-                    {member.photoURL ? <img src={member.photoURL} className="w-10 h-10 rounded-full object-cover mr-4" /> : <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center mr-4"><User size={16} className="text-gray-400"/></div>}
-                    
+
+                    {member.photoURL ? <img src={member.photoURL} className="w-10 h-10 rounded-full object-cover mr-4" /> : <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center mr-4"><User size={16} className="text-gray-400" /></div>}
+
                     <div className="flex-1">
                       <div className={`font-black text-sm ${T.text}`}>{member.username} {isMe && <span className="text-gray-500 font-medium">(You)</span>}</div>
                       <div className="flex items-center gap-2 mt-1">
-                        {member.weeklyPts > 0 && <span className="flex items-center gap-1 text-[10px] font-bold text-gray-400"><Flame size={10} className="text-amber-500"/>{member.weeklyPts} pts</span>}
+                        {member.weeklyPts > 0 && <span className="flex items-center gap-1 text-[10px] font-bold text-gray-400"><Flame size={10} className="text-amber-500" />{member.weeklyPts} pts</span>}
                       </div>
                     </div>
-                    
+
                     <div className="text-right">
                       <div className={`text-xl font-black ${isMe ? (isSunset ? 'text-[#ff7b29]' : 'text-[#5b7cf5]') : (T.text)}`}>{member.weeklyPts}</div>
                       <div className="text-[9px] font-bold tracking-widest text-gray-400 uppercase">PTS</div>
@@ -2112,73 +2112,73 @@ function VersaAppMain() {
         {/* ======================================= */}
         {activeTab === 'habits' && (
           <div className="tab-content">
-             {/* Daily Target Progress */}
-             <div className={`p-5 rounded-3xl border ${T.border} ${T.bgCard} ${darkMode ? '' : 'shadow-sm'} mb-8 anim-fade-up`}>
-               <div className="flex justify-between items-center mb-3">
-                 <span className={`text-sm font-bold ${T.text}`}>Daily Target</span>
-                 <span className={`text-sm font-black ${isSunset ? "text-[#ff7b29]" : "text-[#5b7cf5]"}`}>{Math.min(100, Math.round(dailyProg * 100))}%</span>
-               </div>
-               <div className={`h-3 w-full ${darkMode ? (isSunset ? 'bg-[#120a14]' : 'bg-[#0f1b2d]') : 'bg-gray-100'} rounded-full overflow-hidden mb-3`}>
-                 <div className={`h-full ${isSunset ? "bg-[#ff7b29]" : "bg-[#5b7cf5]"} rounded-full transition-all duration-1000 ease-out relative overflow-hidden`} style={{width: `${Math.min(100, dailyProg * 100)}%`}}><div className="progress-shimmer absolute inset-0 rounded-full"/></div>
-               </div>
-               <div className="text-[9px] font-bold tracking-widest text-gray-400 uppercase text-right">HIT 90% TO BANK A STREAK FREEZE</div>
-             </div>
-             
-             {/* Habits grouped by category */}
-             {allCatNames.map(cat => {
-               const catHabits = habits.filter(h => h.category === cat);
-               if (catHabits.length === 0 && !editMode) return null;
-               const ct = getCT(cat);
-               const catIcon = activeCategories.find(c => c.name === cat)?.icon || '⭐';
-               return (
-                 <div key={cat} className="mb-6 anim-fade-up">
-                   <div className="flex items-center gap-2 mb-3 px-1">
-                     <span className="text-sm">{catIcon}</span>
-                     <span className={`text-[10px] font-bold tracking-widest uppercase ${ct.txt}`}>{cat}</span>
-                     <span className={`text-[10px] ${T.textDim}`}>{catHabits.length}</span>
-                   </div>
-                   <div className="space-y-3 anim-stagger">
-                     {catHabits.map(h => {
-                       const cnt = getCount(h.id);
-                       const done = cnt > 0;
-                       const isNeg = h.points < 0;
-                       const maxed = !h.isRepeatable && cnt >= 1;
-                       const doneBorder = isNeg ? (darkMode ? 'border-rose-500/30 bg-rose-500/10' : 'border-rose-200 bg-rose-50/50') : (darkMode ? `${ct.bdr} ${ct.bgS}` : `${ct.bdr} bg-blue-50/30`);
-                       const defaultBorder = T.border + ' ' + T.bgCard + (darkMode ? '' : ' shadow-sm');
-                       return (
-                         <div key={h.id} className={`habit-card flex items-center p-4 rounded-2xl border ${done ? doneBorder : defaultBorder}`}>
-                           {editMode ? (
-                             <button onClick={() => deleteHabit(h.id)} className="w-6 h-6 rounded-full bg-red-500/20 text-red-400 flex items-center justify-center mr-4"><X size={12} strokeWidth={3}/></button>
-                           ) : isNeg ? (
-                             <button onClick={() => handleIncrement(h.id)} className={`w-6 h-6 rounded-full border-2 flex items-center justify-center mr-4 transition-all ${done ? 'bg-rose-500 border-rose-500 text-white' : (darkMode ? 'border-gray-600' : 'border-gray-300')}`}>
-                               {done ? <X size={12} strokeWidth={4}/> : null}
-                             </button>
-                           ) : (
-                             <button onClick={() => !maxed ? handleIncrement(h.id) : handleDecrement(h.id)} className={`w-6 h-6 rounded-full border-2 flex items-center justify-center mr-4 transition-all ${done ? (isSunset ? 'bg-[#ff7b29] border-[#ff7b29] text-white' : 'bg-[#5b7cf5] border-[#5b7cf5] text-white') : (darkMode ? 'border-gray-600' : 'border-gray-300')}`}>
-                               {done && <Check size={14} strokeWidth={4} />}
-                             </button>
-                           )}
-                           <div className="flex-1">
-                             <div className={`text-sm font-bold ${done ? (darkMode ? 'text-[#7a8ba8]' : 'text-gray-600') : (T.text)}`}>{h.name} {(h.isRepeatable || isNeg) && cnt > 0 && <span className={isNeg ? 'text-rose-400 ml-1' : `${ct.txt} ml-1`}>x{cnt}</span>}</div>
-                             <div className="flex items-center gap-2 mt-1.5">
-                               <span className={`px-2 py-0.5 rounded-full ${isNeg ? (darkMode ? 'bg-rose-500/20 text-rose-400' : 'bg-rose-50 text-rose-600') : (darkMode ? `${ct.bgS} ${ct.txt}` : `bg-blue-50 text-blue-600`)} text-[9px] font-bold tracking-widest uppercase`}>{isNeg ? '-' : '+'}{Math.abs(h.points)} pts</span>
-                               {h.unit && <span className={`text-[9px] ${T.textDim}`}>{h.unit}</span>}
-                             </div>
-                           </div>
-                           <div className="flex items-center gap-1.5">
-                             {cnt > 0 && !editMode && <button onClick={() => handleDecrement(h.id)} className={`w-6 h-6 rounded-full flex items-center justify-center opacity-30 hover:opacity-70 ${isNeg ? 'text-emerald-400' : 'text-gray-400'}`}><MinusIcon size={12}/></button>}
-                             {editMode && <button onClick={() => openEditHabit(h)} className={`text-[10px] px-2.5 py-1 rounded-lg font-bold ${darkMode ? 'text-blue-400 bg-blue-500/10' : 'text-blue-600 bg-blue-50'}`}>Edit</button>}
-                             {!editMode && !isNeg && <button onClick={() => openEditHabit(h)} className={darkMode ? 'text-gray-600' : 'text-gray-300'}><ChevronRight size={16} /></button>}
-                           </div>
-                         </div>
-                       );
-                     })}
-                   </div>
-                 </div>
-               );
-             })}
-             {habits.length === 0 && <div className="text-center py-12 text-sm text-gray-500">No habits added. Tap + to get started.</div>}
-             </div>
+            {/* Daily Target Progress */}
+            <div className={`p-5 rounded-3xl border ${T.border} ${T.bgCard} ${darkMode ? '' : 'shadow-sm'} mb-8 anim-fade-up`}>
+              <div className="flex justify-between items-center mb-3">
+                <span className={`text-sm font-bold ${T.text}`}>Daily Target</span>
+                <span className={`text-sm font-black ${isSunset ? "text-[#ff7b29]" : "text-[#5b7cf5]"}`}>{Math.min(100, Math.round(dailyProg * 100))}%</span>
+              </div>
+              <div className={`h-3 w-full ${darkMode ? (isSunset ? 'bg-[#120a14]' : 'bg-[#0f1b2d]') : 'bg-gray-100'} rounded-full overflow-hidden mb-3`}>
+                <div className={`h-full ${isSunset ? "bg-[#ff7b29]" : "bg-[#5b7cf5]"} rounded-full transition-all duration-1000 ease-out relative overflow-hidden`} style={{ width: `${Math.min(100, dailyProg * 100)}%` }}><div className="progress-shimmer absolute inset-0 rounded-full" /></div>
+              </div>
+              <div className="text-[9px] font-bold tracking-widest text-gray-400 uppercase text-right">HIT 90% TO BANK A STREAK FREEZE</div>
+            </div>
+
+            {/* Habits grouped by category */}
+            {allCatNames.map(cat => {
+              const catHabits = habits.filter(h => h.category === cat);
+              if (catHabits.length === 0 && !editMode) return null;
+              const ct = getCT(cat);
+              const catIcon = activeCategories.find(c => c.name === cat)?.icon || '⭐';
+              return (
+                <div key={cat} className="mb-6 anim-fade-up">
+                  <div className="flex items-center gap-2 mb-3 px-1">
+                    <span className="text-sm">{catIcon}</span>
+                    <span className={`text-[10px] font-bold tracking-widest uppercase ${ct.txt}`}>{cat}</span>
+                    <span className={`text-[10px] ${T.textDim}`}>{catHabits.length}</span>
+                  </div>
+                  <div className="space-y-3 anim-stagger">
+                    {catHabits.map(h => {
+                      const cnt = getCount(h.id);
+                      const done = cnt > 0;
+                      const isNeg = h.points < 0;
+                      const maxed = !h.isRepeatable && cnt >= 1;
+                      const doneBorder = isNeg ? (darkMode ? 'border-rose-500/30 bg-rose-500/10' : 'border-rose-200 bg-rose-50/50') : (darkMode ? `${ct.bdr} ${ct.bgS}` : `${ct.bdr} bg-blue-50/30`);
+                      const defaultBorder = T.border + ' ' + T.bgCard + (darkMode ? '' : ' shadow-sm');
+                      return (
+                        <div key={h.id} className={`habit-card flex items-center p-4 rounded-2xl border ${done ? doneBorder : defaultBorder}`}>
+                          {editMode ? (
+                            <button onClick={() => deleteHabit(h.id)} className="w-6 h-6 rounded-full bg-red-500/20 text-red-400 flex items-center justify-center mr-4"><X size={12} strokeWidth={3} /></button>
+                          ) : isNeg ? (
+                            <button onClick={() => handleIncrement(h.id)} className={`w-6 h-6 rounded-full border-2 flex items-center justify-center mr-4 transition-all ${done ? 'bg-rose-500 border-rose-500 text-white' : (darkMode ? 'border-gray-600' : 'border-gray-300')}`}>
+                              {done ? <X size={12} strokeWidth={4} /> : null}
+                            </button>
+                          ) : (
+                            <button onClick={() => !maxed ? handleIncrement(h.id) : handleDecrement(h.id)} className={`w-6 h-6 rounded-full border-2 flex items-center justify-center mr-4 transition-all ${done ? (isSunset ? 'bg-[#ff7b29] border-[#ff7b29] text-white' : 'bg-[#5b7cf5] border-[#5b7cf5] text-white') : (darkMode ? 'border-gray-600' : 'border-gray-300')}`}>
+                              {done && <Check size={14} strokeWidth={4} />}
+                            </button>
+                          )}
+                          <div className="flex-1">
+                            <div className={`text-sm font-bold ${done ? (darkMode ? 'text-[#7a8ba8]' : 'text-gray-600') : (T.text)}`}>{h.name} {(h.isRepeatable || isNeg) && cnt > 0 && <span className={isNeg ? 'text-rose-400 ml-1' : `${ct.txt} ml-1`}>x{cnt}</span>}</div>
+                            <div className="flex items-center gap-2 mt-1.5">
+                              <span className={`px-2 py-0.5 rounded-full ${isNeg ? (darkMode ? 'bg-rose-500/20 text-rose-400' : 'bg-rose-50 text-rose-600') : (darkMode ? `${ct.bgS} ${ct.txt}` : `bg-blue-50 text-blue-600`)} text-[9px] font-bold tracking-widest uppercase`}>{isNeg ? '-' : '+'}{Math.abs(h.points)} pts</span>
+                              {h.unit && <span className={`text-[9px] ${T.textDim}`}>{h.unit}</span>}
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-1.5">
+                            {cnt > 0 && !editMode && <button onClick={() => handleDecrement(h.id)} className={`w-6 h-6 rounded-full flex items-center justify-center opacity-30 hover:opacity-70 ${isNeg ? 'text-emerald-400' : 'text-gray-400'}`}><MinusIcon size={12} /></button>}
+                            {editMode && <button onClick={() => openEditHabit(h)} className={`text-[10px] px-2.5 py-1 rounded-lg font-bold ${darkMode ? 'text-blue-400 bg-blue-500/10' : 'text-blue-600 bg-blue-50'}`}>Edit</button>}
+                            {!editMode && !isNeg && <button onClick={() => openEditHabit(h)} className={darkMode ? 'text-gray-600' : 'text-gray-300'}><ChevronRight size={16} /></button>}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })}
+            {habits.length === 0 && <div className="text-center py-12 text-sm text-gray-500">No habits added. Tap + to get started.</div>}
+          </div>
         )}
 
         {/* ======================================= */}
@@ -2186,29 +2186,29 @@ function VersaAppMain() {
         {/* ======================================= */}
         {activeTab === 'cohort' && (
           <div className="tab-content anim-stagger space-y-4 relative">
-             {activityFeed.length === 0 ? <p className="text-center text-gray-400 py-10 text-sm">No activity yet</p> : activityFeed.map(a => {
-               const ts = a.ts ? new Date(a.ts) : null;
-               const timeAgo = ts ? (Math.floor((Date.now() - ts.getTime()) / 60000) < 60 ? Math.floor((Date.now() - ts.getTime()) / 60000) + 'M' : Math.floor((Date.now() - ts.getTime()) / 3600000) + 'H') + ' AGO' : '';
-               const reactions = a.reactions || {};
-               return (
-                 <div key={a.id} className={`p-4 rounded-3xl border ${T.border} ${T.bgCard} ${darkMode ? '' : 'shadow-sm'}`}>
-                    <div className="flex gap-3 mb-4">
-                       <div className={`w-10 h-10 rounded-full border ${darkMode ? 'border-[#223858] bg-[#0f1b2d]' : 'border-gray-100 bg-gray-50'} flex items-center justify-center text-lg shrink-0`}>
-                          {a.text.includes('streak') ? '🔥' : a.bonus === 'jackpot' ? '🎰' : a.text.includes('caved') ? '💀' : '⚡'}
-                       </div>
-                       <div className="flex-1 mt-0.5">
-                         <div className={`text-sm ${darkMode ? 'text-[#9aaec0]' : 'text-gray-600'}`}><span className={`font-black ${T.text}`}>{a.username}</span> {a.text}</div>
-                         <div className="text-[9px] font-bold tracking-widest text-gray-400 mt-1">{timeAgo}</div>
-                       </div>
+            {activityFeed.length === 0 ? <p className="text-center text-gray-400 py-10 text-sm">No activity yet</p> : activityFeed.map(a => {
+              const ts = a.ts ? new Date(a.ts) : null;
+              const timeAgo = ts ? (Math.floor((Date.now() - ts.getTime()) / 60000) < 60 ? Math.floor((Date.now() - ts.getTime()) / 60000) + 'M' : Math.floor((Date.now() - ts.getTime()) / 3600000) + 'H') + ' AGO' : '';
+              const reactions = a.reactions || {};
+              return (
+                <div key={a.id} className={`p-4 rounded-3xl border ${T.border} ${T.bgCard} ${darkMode ? '' : 'shadow-sm'}`}>
+                  <div className="flex gap-3 mb-4">
+                    <div className={`w-10 h-10 rounded-full border ${darkMode ? 'border-[#223858] bg-[#0f1b2d]' : 'border-gray-100 bg-gray-50'} flex items-center justify-center text-lg shrink-0`}>
+                      {a.text.includes('streak') ? '🔥' : a.bonus === 'jackpot' ? '🎰' : a.text.includes('caved') ? '💀' : '⚡'}
                     </div>
-                    <div className="flex items-center gap-2">
-                       <button onClick={() => reactToActivity(a.id, '🔥')} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full border ${darkMode ? 'border-[#223858] bg-[#0f1b2d] text-gray-400' : 'border-gray-200 bg-gray-50 text-gray-600'} hover:opacity-80 text-[10px] font-bold`}><Flame size={12} className="text-[#e8864a]"/> React</button>
-                       <button onClick={() => reactToActivity(a.id, '💀')} className={`px-3 py-1.5 rounded-full border ${darkMode ? 'border-[#223858] bg-[#0f1b2d]' : 'border-gray-200 bg-gray-50'} hover:opacity-80 text-xs`}>💀</button>
-                       <button onClick={() => reactToActivity(a.id, '👏')} className={`px-3 py-1.5 rounded-full border ${darkMode ? 'border-[#223858] bg-[#0f1b2d]' : 'border-gray-200 bg-gray-50'} hover:opacity-80 text-xs`}>👏</button>
+                    <div className="flex-1 mt-0.5">
+                      <div className={`text-sm ${darkMode ? 'text-[#9aaec0]' : 'text-gray-600'}`}><span className={`font-black ${T.text}`}>{a.username}</span> {a.text}</div>
+                      <div className="text-[9px] font-bold tracking-widest text-gray-400 mt-1">{timeAgo}</div>
                     </div>
-                 </div>
-               );
-             })}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button onClick={() => reactToActivity(a.id, '🔥')} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full border ${darkMode ? 'border-[#223858] bg-[#0f1b2d] text-gray-400' : 'border-gray-200 bg-gray-50 text-gray-600'} hover:opacity-80 text-[10px] font-bold`}><Flame size={12} className="text-[#e8864a]" /> React</button>
+                    <button onClick={() => reactToActivity(a.id, '💀')} className={`px-3 py-1.5 rounded-full border ${darkMode ? 'border-[#223858] bg-[#0f1b2d]' : 'border-gray-200 bg-gray-50'} hover:opacity-80 text-xs`}>💀</button>
+                    <button onClick={() => reactToActivity(a.id, '👏')} className={`px-3 py-1.5 rounded-full border ${darkMode ? 'border-[#223858] bg-[#0f1b2d]' : 'border-gray-200 bg-gray-50'} hover:opacity-80 text-xs`}>👏</button>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         )}
 
@@ -2217,31 +2217,31 @@ function VersaAppMain() {
         {/* ======================================= */}
         {activeTab === 'stakes' && (
           <div className="tab-content anim-stagger">
-             {roomMembers.length > 0 && (() => {
-               const sorted = [...activeMembers].map(m => { m.weeklyPts = getWeeklyPts(m.id); return m; }).sort((a,b) => a.weeklyPts - b.weeklyPts);
-               const lowest = sorted[0];
-               if (!lowest) return null;
-               return (
-                 <div className={`flex items-center gap-4 p-5 mb-16 rounded-2xl border ${darkMode ? 'border-red-900/50 bg-red-900/20' : 'border-red-200 bg-red-50'}`}>
-                    <div className={`w-12 h-12 rounded-full ${darkMode ? 'bg-[#182544] border-red-900/50' : 'bg-white border-red-200'} flex items-center justify-center text-red-500`}>
-                      <Target size={24} />
-                    </div>
-                    <div>
-                      <div className="text-sm font-black text-red-500 mb-0.5">At Risk: {lowest.username}</div>
-                      <div className={`text-xs font-semibold ${darkMode ? 'text-red-400' : 'text-red-500/80'}`}>Currently in last place with {lowest.weeklyPts} pts.</div>
-                    </div>
-                 </div>
-               );
-             })()}
+            {roomMembers.length > 0 && (() => {
+              const sorted = [...activeMembers].map(m => { m.weeklyPts = getWeeklyPts(m.id); return m; }).sort((a, b) => a.weeklyPts - b.weeklyPts);
+              const lowest = sorted[0];
+              if (!lowest) return null;
+              return (
+                <div className={`flex items-center gap-4 p-5 mb-16 rounded-2xl border ${darkMode ? 'border-red-900/50 bg-red-900/20' : 'border-red-200 bg-red-50'}`}>
+                  <div className={`w-12 h-12 rounded-full ${darkMode ? 'bg-[#182544] border-red-900/50' : 'bg-white border-red-200'} flex items-center justify-center text-red-500`}>
+                    <Target size={24} />
+                  </div>
+                  <div>
+                    <div className="text-sm font-black text-red-500 mb-0.5">At Risk: {lowest.username}</div>
+                    <div className={`text-xs font-semibold ${darkMode ? 'text-red-400' : 'text-red-500/80'}`}>Currently in last place with {lowest.weeklyPts} pts.</div>
+                  </div>
+                </div>
+              );
+            })()}
 
-             <div className="flex flex-col items-center justify-center pb-12">
-               <Target size={200} className={`${darkMode ? 'text-[#223858]' : 'text-gray-100'} mb-8`} strokeWidth={1} />
-               {(!roomStakes || roomStakes.type === 'wheel') && (
-                 <button onClick={() => setShowPunishmentWheel(true)} className="px-8 py-4 bg-[#5b7cf5] hover:bg-blue-600 text-white rounded-full font-black tracking-widest uppercase text-xs shadow-lg shadow-blue-500/30 transition-all flex items-center gap-2 active:scale-95">
-                   Draw Consequence <ChevronRight size={16} />
-                 </button>
-               )}
-             </div>
+            <div className="flex flex-col items-center justify-center pb-12">
+              <Target size={200} className={`${darkMode ? 'text-[#223858]' : 'text-gray-100'} mb-8`} strokeWidth={1} />
+              {(!roomStakes || roomStakes.type === 'wheel') && (
+                <button onClick={() => setShowPunishmentWheel(true)} className="px-8 py-4 bg-[#5b7cf5] hover:bg-blue-600 text-white rounded-full font-black tracking-widest uppercase text-xs shadow-lg shadow-blue-500/30 transition-all flex items-center gap-2 active:scale-95">
+                  Draw Consequence <ChevronRight size={16} />
+                </button>
+              )}
+            </div>
           </div>
         )}
 
@@ -2250,105 +2250,105 @@ function VersaAppMain() {
         {/* ======================================= */}
         {activeTab === 'profile' && (
           <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 space-y-4">
-             <div className="grid grid-cols-2 gap-4 mb-4 anim-stagger">
-               <div className={`p-4 rounded-3xl border ${T.border} ${T.bgCard} ${darkMode ? '' : 'shadow-sm'}`}>
-                 <div className="text-[10px] font-bold tracking-widest text-[#9aaec0] uppercase mb-2">Trophies</div>
-                 <div className="flex items-end justify-between">
-                   <div className={`text-4xl font-black ${T.text}`}>{archivedStakes.filter(st => st.winner_id === currentUser.id).length}</div>
-                   <Trophy size={28} className="text-amber-400 opacity-50" strokeWidth={1.5}/>
-                 </div>
-               </div>
-               <div className={`p-4 rounded-3xl border ${T.border} ${T.bgCard} ${darkMode ? '' : 'shadow-sm'}`}>
-                 <div className="text-[10px] font-bold tracking-widest text-[#9aaec0] uppercase mb-2">Penalties</div>
-                 <div className="flex items-end justify-between">
-                   <div className={`text-4xl font-black ${T.text}`}>{archivedStakes.filter(st => st.loser_id === currentUser.id).length}</div>
-                   <div className="w-7 h-7 rounded-full border border-red-400 text-red-400 flex items-center justify-center opacity-50 font-bold">!</div>
-                 </div>
-               </div>
-               <div className={`anim-fade-up p-4 rounded-3xl border ${darkMode ? 'border-[#5b7cf5]/30 bg-[#5b7cf5]/10' : 'border-blue-100 bg-blue-50/50 shadow-sm'}`}>
-                 <div className="text-[10px] font-bold tracking-widest text-[#5b7cf5] uppercase mb-2">Top Streak</div>
-                 <div className="flex items-end justify-between">
-                   <div className={`text-4xl font-black ${darkMode ? 'text-blue-300' : 'text-blue-900'}`}>{streakData.streak}</div>
-                   <TrendingUp size={28} className="text-[#5b7cf5] opacity-50" strokeWidth={1.5}/>
-                 </div>
-               </div>
-               <div className={`anim-fade-up p-4 rounded-3xl border ${darkMode ? 'border-cyan-900/50 bg-cyan-900/20' : 'border-cyan-100 bg-cyan-50/50 shadow-sm'}`}>
-                 <div className="text-[10px] font-bold tracking-widest text-cyan-500 uppercase mb-2">Freezes</div>
-                 <div className="flex items-end justify-between">
-                   <div className={`text-4xl font-black ${darkMode ? 'text-cyan-300' : 'text-cyan-900'}`}>{streakFreeze}</div>
-                   <TrendingUp size={28} className="text-cyan-400 opacity-50" strokeWidth={1.5}/>
-                 </div>
-               </div>
-             </div>
-             
-             <div className={`p-5 rounded-3xl border ${T.border} ${T.bgCard} ${darkMode ? '' : 'shadow-sm'}`}>
-               <div className="flex justify-between items-center mb-4">
-                 <div className="text-[10px] font-bold tracking-widest text-[#9aaec0] uppercase">Consistency</div>
-                 <div className={`px-2 py-1 rounded ${darkMode ? (isSunset ? 'bg-[#120a14]' : 'bg-[#0f1b2d]') : 'bg-gray-100'} text-[10px] font-bold ${darkMode ? 'text-gray-400' : 'text-gray-400'}`}>Last 90 Days</div>
-               </div>
-               <button onClick={loadHeatMap} className={`w-full flex items-center justify-center gap-2 py-6 border-2 border-dashed ${darkMode ? (isSunset ? 'border-[#3d2640] text-gray-500 hover:text-[#ff7b29] hover:bg-[#ff7b29]/5' : 'border-[#223858] text-gray-500 hover:text-[#5b7cf5] hover:bg-[#5b7cf5]/5') : 'border-gray-200 text-gray-400 hover:text-blue-600 hover:bg-gray-50'} rounded-xl transition-all font-bold`}>
-                 <BarChart3 size={20} /> View Heatmap
-               </button>
-             </div>
+            <div className="grid grid-cols-2 gap-4 mb-4 anim-stagger">
+              <div className={`p-4 rounded-3xl border ${T.border} ${T.bgCard} ${darkMode ? '' : 'shadow-sm'}`}>
+                <div className="text-[10px] font-bold tracking-widest text-[#9aaec0] uppercase mb-2">Trophies</div>
+                <div className="flex items-end justify-between">
+                  <div className={`text-4xl font-black ${T.text}`}>{archivedStakes.filter(st => st.winner_id === currentUser.id).length}</div>
+                  <Trophy size={28} className="text-amber-400 opacity-50" strokeWidth={1.5} />
+                </div>
+              </div>
+              <div className={`p-4 rounded-3xl border ${T.border} ${T.bgCard} ${darkMode ? '' : 'shadow-sm'}`}>
+                <div className="text-[10px] font-bold tracking-widest text-[#9aaec0] uppercase mb-2">Penalties</div>
+                <div className="flex items-end justify-between">
+                  <div className={`text-4xl font-black ${T.text}`}>{archivedStakes.filter(st => st.loser_id === currentUser.id).length}</div>
+                  <div className="w-7 h-7 rounded-full border border-red-400 text-red-400 flex items-center justify-center opacity-50 font-bold">!</div>
+                </div>
+              </div>
+              <div className={`anim-fade-up p-4 rounded-3xl border ${darkMode ? 'border-[#5b7cf5]/30 bg-[#5b7cf5]/10' : 'border-blue-100 bg-blue-50/50 shadow-sm'}`}>
+                <div className="text-[10px] font-bold tracking-widest text-[#5b7cf5] uppercase mb-2">Top Streak</div>
+                <div className="flex items-end justify-between">
+                  <div className={`text-4xl font-black ${darkMode ? 'text-blue-300' : 'text-blue-900'}`}>{streakData.streak}</div>
+                  <TrendingUp size={28} className="text-[#5b7cf5] opacity-50" strokeWidth={1.5} />
+                </div>
+              </div>
+              <div className={`anim-fade-up p-4 rounded-3xl border ${darkMode ? 'border-cyan-900/50 bg-cyan-900/20' : 'border-cyan-100 bg-cyan-50/50 shadow-sm'}`}>
+                <div className="text-[10px] font-bold tracking-widest text-cyan-500 uppercase mb-2">Freezes</div>
+                <div className="flex items-end justify-between">
+                  <div className={`text-4xl font-black ${darkMode ? 'text-cyan-300' : 'text-cyan-900'}`}>{streakFreeze}</div>
+                  <TrendingUp size={28} className="text-cyan-400 opacity-50" strokeWidth={1.5} />
+                </div>
+              </div>
+            </div>
 
-             {/* Theme Picker */}
-             <div className={`p-5 rounded-3xl border ${T.border} ${T.bgCard} ${darkMode ? '' : 'shadow-sm'} mt-4`}>
-               <div className="text-[10px] font-bold tracking-widest text-[#9aaec0] uppercase mb-3">Appearance</div>
-               <div className="grid grid-cols-2 gap-2">
-                 {THEMES.map(t => {
-                   const isActive = theme === t;
-                   const isSun = t.includes('sunset');
-                   const isDk = t.includes('dark');
-                   const previewBg = isDk ? (isSun ? '#1a1018' : '#0f1b2d') : (isSun ? '#fdf6f0' : '#f0f4f8');
-                   const previewAccent = isSun ? '#ff7b29' : '#5b7cf5';
-                   return (
-                     <button key={t} onClick={() => setAppTheme(t)} className={`relative p-3 rounded-2xl border-2 transition-all active:scale-[0.97] ${isActive ? (isSun ? 'border-[#ff7b29] shadow-lg shadow-[#ff7b29]/20' : 'border-[#5b7cf5] shadow-lg shadow-[#5b7cf5]/20') : (darkMode ? 'border-[#223858] hover:border-[#334868]' : 'border-gray-200 hover:border-gray-300')}`}>
-                       {/* Mini preview */}
-                       <div className="rounded-xl overflow-hidden mb-2" style={{ backgroundColor: previewBg, height: 40 }}>
-                         <div className="flex items-end gap-1 p-2 h-full">
-                           <div className="w-3 h-2 rounded-sm" style={{ backgroundColor: previewAccent, opacity: 0.8 }}/>
-                           <div className="w-3 h-3 rounded-sm" style={{ backgroundColor: previewAccent, opacity: 0.6 }}/>
-                           <div className="w-3 h-4 rounded-sm" style={{ backgroundColor: previewAccent }}/>
-                         </div>
-                       </div>
-                       <div className={`text-[10px] font-bold ${isActive ? (isSun ? 'text-[#ff7b29]' : 'text-[#5b7cf5]') : T.textMuted}`}>{THEME_LABELS[t]}</div>
-                       {isActive && <div className={`absolute top-1.5 right-1.5 w-4 h-4 rounded-full flex items-center justify-center text-white text-[8px] ${isSun ? 'bg-[#ff7b29]' : 'bg-[#5b7cf5]'}`}>✓</div>}
-                     </button>
-                   );
-                 })}
-               </div>
-             </div>
+            <div className={`p-5 rounded-3xl border ${T.border} ${T.bgCard} ${darkMode ? '' : 'shadow-sm'}`}>
+              <div className="flex justify-between items-center mb-4">
+                <div className="text-[10px] font-bold tracking-widest text-[#9aaec0] uppercase">Consistency</div>
+                <div className={`px-2 py-1 rounded ${darkMode ? (isSunset ? 'bg-[#120a14]' : 'bg-[#0f1b2d]') : 'bg-gray-100'} text-[10px] font-bold ${darkMode ? 'text-gray-400' : 'text-gray-400'}`}>Last 90 Days</div>
+              </div>
+              <button onClick={loadHeatMap} className={`w-full flex items-center justify-center gap-2 py-6 border-2 border-dashed ${darkMode ? (isSunset ? 'border-[#3d2640] text-gray-500 hover:text-[#ff7b29] hover:bg-[#ff7b29]/5' : 'border-[#223858] text-gray-500 hover:text-[#5b7cf5] hover:bg-[#5b7cf5]/5') : 'border-gray-200 text-gray-400 hover:text-blue-600 hover:bg-gray-50'} rounded-xl transition-all font-bold`}>
+                <BarChart3 size={20} /> View Heatmap
+              </button>
+            </div>
 
-             {/* Quick Actions */}
-             <div className="space-y-2 anim-fade-up">
-               <button onClick={() => setShowInviteModal(true)} className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-2xl border transition-all active:scale-[0.98] ${T.border} ${T.bgCard} ${T.textMuted} ${T.bgCardHover}`}><UserPlus size={16} className={isSunset ? "text-[#ff7b29]" : "text-blue-400"}/><span className="text-sm font-medium">Invite to Room</span></button>
-               {lastWeekData && <button onClick={() => setShowWeeklyRecap(true)} className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-2xl border transition-all active:scale-[0.98] ${T.border} ${T.bgCard} ${T.textMuted} ${T.bgCardHover}`}><BarChart3 size={16} className="text-purple-400"/><span className="text-sm font-medium">Weekly Recap</span></button>}
-               <button onClick={() => setShowHelp(true)} className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-2xl border transition-all active:scale-[0.98] ${T.border} ${T.bgCard} ${T.textMuted} ${T.bgCardHover}`}><HelpCircle size={16} className="text-gray-400"/><span className="text-sm font-medium">How Versa Works</span></button>
-               <button onClick={() => supabase.auth.signOut()} className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-2xl border transition-all active:scale-[0.98] ${T.border} ${T.bgCard} hover:bg-red-500/5 text-red-400`}><LogOut size={16}/><span className="text-sm font-medium">Sign Out</span></button>
-             </div>
+            {/* Theme Picker */}
+            <div className={`p-5 rounded-3xl border ${T.border} ${T.bgCard} ${darkMode ? '' : 'shadow-sm'} mt-4`}>
+              <div className="text-[10px] font-bold tracking-widest text-[#9aaec0] uppercase mb-3">Appearance</div>
+              <div className="grid grid-cols-2 gap-2">
+                {THEMES.map(t => {
+                  const isActive = theme === t;
+                  const isSun = t.includes('sunset');
+                  const isDk = t.includes('dark');
+                  const previewBg = isDk ? (isSun ? '#1a1018' : '#0f1b2d') : (isSun ? '#fdf6f0' : '#f0f4f8');
+                  const previewAccent = isSun ? '#ff7b29' : '#5b7cf5';
+                  return (
+                    <button key={t} onClick={() => setAppTheme(t)} className={`relative p-3 rounded-2xl border-2 transition-all active:scale-[0.97] ${isActive ? (isSun ? 'border-[#ff7b29] shadow-lg shadow-[#ff7b29]/20' : 'border-[#5b7cf5] shadow-lg shadow-[#5b7cf5]/20') : (darkMode ? 'border-[#223858] hover:border-[#334868]' : 'border-gray-200 hover:border-gray-300')}`}>
+                      {/* Mini preview */}
+                      <div className="rounded-xl overflow-hidden mb-2" style={{ backgroundColor: previewBg, height: 40 }}>
+                        <div className="flex items-end gap-1 p-2 h-full">
+                          <div className="w-3 h-2 rounded-sm" style={{ backgroundColor: previewAccent, opacity: 0.8 }} />
+                          <div className="w-3 h-3 rounded-sm" style={{ backgroundColor: previewAccent, opacity: 0.6 }} />
+                          <div className="w-3 h-4 rounded-sm" style={{ backgroundColor: previewAccent }} />
+                        </div>
+                      </div>
+                      <div className={`text-[10px] font-bold ${isActive ? (isSun ? 'text-[#ff7b29]' : 'text-[#5b7cf5]') : T.textMuted}`}>{THEME_LABELS[t]}</div>
+                      {isActive && <div className={`absolute top-1.5 right-1.5 w-4 h-4 rounded-full flex items-center justify-center text-white text-[8px] ${isSun ? 'bg-[#ff7b29]' : 'bg-[#5b7cf5]'}`}>✓</div>}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Quick Actions */}
+            <div className="space-y-2 anim-fade-up">
+              <button onClick={() => setShowInviteModal(true)} className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-2xl border transition-all active:scale-[0.98] ${T.border} ${T.bgCard} ${T.textMuted} ${T.bgCardHover}`}><UserPlus size={16} className={isSunset ? "text-[#ff7b29]" : "text-blue-400"} /><span className="text-sm font-medium">Invite to Room</span></button>
+              {lastWeekData && <button onClick={() => setShowWeeklyRecap(true)} className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-2xl border transition-all active:scale-[0.98] ${T.border} ${T.bgCard} ${T.textMuted} ${T.bgCardHover}`}><BarChart3 size={16} className="text-purple-400" /><span className="text-sm font-medium">Weekly Recap</span></button>}
+              <button onClick={() => setShowHelp(true)} className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-2xl border transition-all active:scale-[0.98] ${T.border} ${T.bgCard} ${T.textMuted} ${T.bgCardHover}`}><HelpCircle size={16} className="text-gray-400" /><span className="text-sm font-medium">How Versa Works</span></button>
+              <button onClick={() => supabase.auth.signOut()} className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-2xl border transition-all active:scale-[0.98] ${T.border} ${T.bgCard} hover:bg-red-500/5 text-red-400`}><LogOut size={16} /><span className="text-sm font-medium">Sign Out</span></button>
+            </div>
           </div>
         )}
       </div>
 
       {/* ═══ BOTTOM NAVIGATION TABS ═══ */}
-      <div className={`bottom-nav fixed bottom-0 w-full z-50 border-t ${T.bgCard} ${T.border}`} style={{ paddingBottom: 'env(safe-area-inset-bottom, 20px)' }}>
-         <div className="max-w-xl mx-auto flex items-center justify-between px-6 py-3">
-           {[ 
-             { id: 'overview', icon: <Home size={22} className="mb-1" strokeWidth={2.5}/>, label: 'OVERVIEW' },
-             { id: 'habits', icon: <CheckSquare size={22} className="mb-1" strokeWidth={2.5}/>, label: 'HABITS' },
-             { id: 'cohort', icon: <Users size={22} className="mb-1" strokeWidth={2.5}/>, label: 'COHORT' },
-             { id: 'stakes', icon: <Target size={22} className="mb-1" strokeWidth={2.5}/>, label: 'STAKES' },
-             { id: 'profile', icon: <User size={22} className="mb-1" strokeWidth={2.5}/>, label: 'PROFILE' }
-           ].map(tab => (
-             <button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`flex flex-col items-center justify-center w-16 btn-bounce transition-all ${activeTab === tab.id ? (T.accentTxt + ' scale-110') : (T.textMuted + ' hover:' + T.text)}`}>
-               {tab.icon}
-               <span className="text-[8px] font-black tracking-widest">{tab.label}</span>
-             </button>
-           ))}
-         </div>
+      <div className={`bottom-nav fixed bottom-0 left-0 right-0 z-[999] border-t pointer-events-auto shadow-[0_-10px_40px_rgba(0,0,0,0.1)] ${T.bgCard} ${T.border}`} style={{ paddingBottom: 'max(env(safe-area-inset-bottom), 16px)' }}>
+        <div className="max-w-xl mx-auto flex items-center justify-between px-6 py-2 pb-1 relative">
+          {[
+            { id: 'overview', icon: <Home size={22} className="mb-1" strokeWidth={2.5} />, label: 'OVERVIEW' },
+            { id: 'habits', icon: <CheckSquare size={22} className="mb-1" strokeWidth={2.5} />, label: 'HABITS' },
+            { id: 'cohort', icon: <Users size={22} className="mb-1" strokeWidth={2.5} />, label: 'COHORT' },
+            { id: 'stakes', icon: <Target size={22} className="mb-1" strokeWidth={2.5} />, label: 'STAKES' },
+            { id: 'profile', icon: <User size={22} className="mb-1" strokeWidth={2.5} />, label: 'PROFILE' }
+          ].map(tab => (
+            <button key={tab.id} onClick={(e) => { e.preventDefault(); setActiveTab(tab.id); }} onTouchStart={() => { }} className={`flex flex-col items-center justify-center w-16 h-14 touch-manipulation cursor-pointer select-none transition-all ${activeTab === tab.id ? (T.accentTxt + ' scale-110') : (T.textMuted + ' hover:' + T.text)}`}>
+              {tab.icon}
+              <span className="text-[8px] font-black tracking-widest mt-0.5">{tab.label}</span>
+            </button>
+          ))}
+        </div>
       </div>
       <div className="h-20" /> {/* Spacer */}
-      
+
       {/* ═══ MODALS ═══ */}{/* ═══ MODALS ═══ */}
 
       {/* Add Habit */}
@@ -2455,7 +2455,7 @@ function VersaAppMain() {
             <div className="p-4 bg-gradient-to-r from-red-500/10 via-pink-500/10 to-purple-500/10 border border-red-500/15 rounded-xl mb-4">
               <div className="flex items-center gap-2 mb-2"><span className={'text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider ' + (roomStakes.type === 'buyout' ? 'bg-[#ff7b29]/20 text-[#ff7b29]' : roomStakes.type === 'dare' ? 'bg-pink-500/20 text-pink-400' : roomStakes.type === 'service' ? 'bg-cyan-500/20 text-cyan-400' : roomStakes.type === 'wheel' ? 'bg-[#5b7cf5]/20 text-[#5b7cf5]' : 'bg-purple-500/20 text-purple-400')}>{roomStakes.type}</span><span className="text-[10px] text-gray-600 uppercase tracking-wider">{roomStakes.duration}</span></div>
               {roomStakes.type === 'wheel' ? (
-                 <div className="text-white text-sm font-medium">Custom Punishment Wheel with {(() => { try { return JSON.parse(roomStakes.description).length; } catch { return 0; }})()} options</div>
+                <div className="text-white text-sm font-medium">Custom Punishment Wheel with {(() => { try { return JSON.parse(roomStakes.description).length; } catch { return 0; } })()} options</div>
               ) : (
                 <p className="text-white font-medium">{roomStakes.description}</p>
               )}
@@ -2466,8 +2466,8 @@ function VersaAppMain() {
         ) : (
           <div>
             <div className="flex gap-1 mb-4 p-1 rounded-xl bg-black/20 shrink-0">
-               <button onClick={() => setStakeMode('fixed')} className={`flex-1 py-1.5 text-[10px] font-bold rounded-lg transition-all tracking-wider uppercase ${stakeMode === 'fixed' ? 'bg-[#d06b4a] text-white shadow-sm' : (T.textMuted + ' hover:text-white')}`}>Fixed Stake</button>
-               <button onClick={() => setStakeMode('wheel')} className={`flex-1 py-1.5 text-[10px] font-bold rounded-lg transition-all tracking-wider uppercase ${stakeMode === 'wheel' ? 'bg-[#d06b4a] text-white shadow-sm' : (T.textMuted + ' hover:text-white')}`}>Spin the Wheel</button>
+              <button onClick={() => setStakeMode('fixed')} className={`flex-1 py-1.5 text-[10px] font-bold rounded-lg transition-all tracking-wider uppercase ${stakeMode === 'fixed' ? 'bg-[#d06b4a] text-white shadow-sm' : (T.textMuted + ' hover:text-white')}`}>Fixed Stake</button>
+              <button onClick={() => setStakeMode('wheel')} className={`flex-1 py-1.5 text-[10px] font-bold rounded-lg transition-all tracking-wider uppercase ${stakeMode === 'wheel' ? 'bg-[#d06b4a] text-white shadow-sm' : (T.textMuted + ' hover:text-white')}`}>Spin the Wheel</button>
             </div>
 
             {stakeMode === 'fixed' ? (
@@ -2490,8 +2490,8 @@ function VersaAppMain() {
                   {wheelOptions.length === 0 && <div className="text-xs text-gray-500 text-center py-4">No options added</div>}
                 </div>
                 <div className="flex gap-2">
-                  <input type="text" placeholder="Add a wheel consequence..." value={newWheelOption} onChange={e => setNewWheelOption(e.target.value)} onKeyDown={e => { if(e.key === 'Enter' && newWheelOption.trim()) { setWheelOptions([...wheelOptions, newWheelOption.trim()]); setNewWheelOption(''); } }} className={inputCls} maxLength={40} />
-                  <button onClick={() => { if(newWheelOption.trim()) { setWheelOptions([...wheelOptions, newWheelOption.trim()]); setNewWheelOption(''); } }} className={`px-4 bg-[#264060] text-blue-400 rounded-xl font-bold flex shrink-0 items-center justify-center hover:bg-[#2a4a70]`}><Plus size={18} /></button>
+                  <input type="text" placeholder="Add a wheel consequence..." value={newWheelOption} onChange={e => setNewWheelOption(e.target.value)} onKeyDown={e => { if (e.key === 'Enter' && newWheelOption.trim()) { setWheelOptions([...wheelOptions, newWheelOption.trim()]); setNewWheelOption(''); } }} className={inputCls} maxLength={40} />
+                  <button onClick={() => { if (newWheelOption.trim()) { setWheelOptions([...wheelOptions, newWheelOption.trim()]); setNewWheelOption(''); } }} className={`px-4 bg-[#264060] text-blue-400 rounded-xl font-bold flex shrink-0 items-center justify-center hover:bg-[#2a4a70]`}><Plus size={18} /></button>
                 </div>
               </div>
             )}
@@ -2769,80 +2769,81 @@ function VersaAppMain() {
         {lastWeekData && lastWeekData.scores.length > 1 && (() => {
           let currWheelOpts = [...PUNISHMENTS.slice(0, 8)];
           if (roomStakes?.type === 'wheel') {
-            try { currWheelOpts = JSON.parse(roomStakes.description); } catch {}
+            try { currWheelOpts = JSON.parse(roomStakes.description); } catch { }
           } else {
             const lastArchived = [...archivedStakes].reverse().find(s => s.type === 'wheel');
-            if (lastArchived) { try { currWheelOpts = JSON.parse(lastArchived.description); } catch {} }
+            if (lastArchived) { try { currWheelOpts = JSON.parse(lastArchived.description); } catch { } }
           }
           if (currWheelOpts.length === 0) currWheelOpts = [...PUNISHMENTS.slice(0, 8)];
 
           return (
-          <div className="text-center">
-            <div className="mb-4">
-              <p className={`text-sm ${T.textMuted}`}>Loser this week:</p>
-              <div className="flex items-center justify-center gap-2 mt-2">
-                <Avatar user={lastWeekData.scores[lastWeekData.scores.length - 1].member} size={32} className="bg-red-500/20 text-red-400" />
-                <span className="text-lg font-bold text-red-400">{lastWeekData.scores[lastWeekData.scores.length - 1].member.username}</span>
+            <div className="text-center">
+              <div className="mb-4">
+                <p className={`text-sm ${T.textMuted}`}>Loser this week:</p>
+                <div className="flex items-center justify-center gap-2 mt-2">
+                  <Avatar user={lastWeekData.scores[lastWeekData.scores.length - 1].member} size={32} className="bg-red-500/20 text-red-400" />
+                  <span className="text-lg font-bold text-red-400">{lastWeekData.scores[lastWeekData.scores.length - 1].member.username}</span>
+                </div>
+                <p className={`text-xs ${T.textDim} mt-1`}>{lastWeekData.scores[lastWeekData.scores.length - 1].pts} pts</p>
               </div>
-              <p className={`text-xs ${T.textDim} mt-1`}>{lastWeekData.scores[lastWeekData.scores.length - 1].pts} pts</p>
+
+              {/* Wheel display */}
+              <div className="relative mx-auto mb-6" style={{ width: 280, height: 280 }}>
+                <div className={`w-full h-full rounded-full border-4 border-[#2a4060] overflow-hidden relative`} style={{ transform: `rotate(${wheelSpinning ? 3600 + Math.random() * 360 : 0}deg)`, transition: wheelSpinning ? 'transform 4s cubic-bezier(0.17,0.67,0.12,0.99)' : 'none' }}>
+                  {currWheelOpts.map((p, i) => {
+                    const angle = (360 / currWheelOpts.length) * i;
+                    const skewAngle = currWheelOpts.length > 2 ? (90 - 360 / currWheelOpts.length) : 0;
+                    const colors = ['#3b82f6', '#ef4444', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899', '#06b6d4', '#f97316', '#6366f1', '#14b8a6', '#e11d48', '#a855f7'];
+                    return <div key={i} className="absolute font-bold text-white uppercase text-center break-words px-4 leading-[1.1] drop-shadow-md" style={{
+                      width: '50%', height: '50%',
+                      transformOrigin: '100% 100%',
+                      transform: `rotate(${angle}deg) skewY(${Math.max(0, skewAngle)}deg)`,
+                      left: 0, top: 0,
+                      background: colors[i % colors.length],
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      fontSize: currWheelOpts.length > 6 ? 6 : 8
+                    }}>
+                      <div style={{ transform: `skewY(-${Math.max(0, skewAngle)}deg) rotate(${360 / currWheelOpts.length / 2}deg) translateY(-25px)` }}>{p}</div>
+                    </div>;
+                  })}
+                </div>
+                {/* Pointer */}
+                <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-2 w-0 h-0 border-l-[10px] border-r-[10px] border-t-[16px] border-l-transparent border-r-transparent border-t-white z-10 drop-shadow-lg" />
+              </div>
+
+              {/* Result */}
+              {wheelResult && (
+                <div className="mb-4 p-4 bg-gradient-to-r from-red-500/10 to-pink-500/10 border border-red-500/20 rounded-xl animate-bounce">
+                  <p className="text-lg font-black text-white">{wheelResult}</p>
+                  <p className={`text-xs ${T.textDim} mt-1`}>{lastWeekData.scores[lastWeekData.scores.length - 1].member.username} has to do this!</p>
+                </div>
+              )}
+
+              {/* Spin button */}
+              {!wheelResult ? (
+                <button onClick={() => {
+                  if (wheelSpinning) return;
+                  setWheelSpinning(true);
+                  setTimeout(() => {
+                    const result = currWheelOpts[Math.floor(Math.random() * currWheelOpts.length)];
+                    setWheelResult(result);
+                    setWheelSpinning(false);
+                  }, 4200);
+                }} disabled={wheelSpinning} className="w-full px-6 py-3 bg-[#d06b4a] text-white rounded-xl text-sm font-bold active:scale-[0.98] disabled:opacity-60 transition-all">
+                  {wheelSpinning ? 'Spinning...' : 'Spin the Wheel'}
+                </button>
+              ) : (
+                <div className="flex gap-2">
+                  <button onClick={() => { setWheelResult(null); }} className="flex-1 px-4 py-3 border border-[#2a4060] text-gray-400 rounded-xl text-sm font-medium hover:bg-[#1e2e50]">Spin Again</button>
+                  <button onClick={async () => {
+                    const text = `🎰 Versa Punishment Wheel\n\n${lastWeekData.scores[lastWeekData.scores.length - 1].member.username} lost and has to:\n${wheelResult}\n\nJoin us: ${window.location.origin}?join=${currentRoom?.code}`;
+                    if (navigator.share) { try { await navigator.share({ title: 'Vers Punishment', text }); } catch { } } else { navigator.clipboard.writeText(text); setCopied(true); setTimeout(() => setCopied(false), 2000); }
+                  }} className="flex-1 px-4 py-3 bg-[#5b7cf5] text-white rounded-xl text-sm font-bold active:scale-[0.98]">{copied ? 'Copied!' : 'Share'}</button>
+                </div>
+              )}
             </div>
-
-            {/* Wheel display */}
-            <div className="relative mx-auto mb-6" style={{ width: 280, height: 280 }}>
-              <div className={`w-full h-full rounded-full border-4 border-[#2a4060] overflow-hidden relative`} style={{ transform: `rotate(${wheelSpinning ? 3600 + Math.random() * 360 : 0}deg)`, transition: wheelSpinning ? 'transform 4s cubic-bezier(0.17,0.67,0.12,0.99)' : 'none' }}>
-                {currWheelOpts.map((p, i) => {
-                  const angle = (360 / currWheelOpts.length) * i;
-                  const skewAngle = currWheelOpts.length > 2 ? (90 - 360 / currWheelOpts.length) : 0;
-                  const colors = ['#3b82f6', '#ef4444', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899', '#06b6d4', '#f97316', '#6366f1', '#14b8a6', '#e11d48', '#a855f7'];
-                  return <div key={i} className="absolute font-bold text-white uppercase text-center break-words px-4 leading-[1.1] drop-shadow-md" style={{
-                    width: '50%', height: '50%',
-                    transformOrigin: '100% 100%',
-                    transform: `rotate(${angle}deg) skewY(${Math.max(0, skewAngle)}deg)`,
-                    left: 0, top: 0,
-                    background: colors[i % colors.length],
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    fontSize: currWheelOpts.length > 6 ? 6 : 8
-                  }}>
-                     <div style={{ transform: `skewY(-${Math.max(0, skewAngle)}deg) rotate(${360/currWheelOpts.length / 2}deg) translateY(-25px)` }}>{p}</div>
-                  </div>;
-                })}
-              </div>
-              {/* Pointer */}
-              <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-2 w-0 h-0 border-l-[10px] border-r-[10px] border-t-[16px] border-l-transparent border-r-transparent border-t-white z-10 drop-shadow-lg" />
-            </div>
-
-            {/* Result */}
-            {wheelResult && (
-              <div className="mb-4 p-4 bg-gradient-to-r from-red-500/10 to-pink-500/10 border border-red-500/20 rounded-xl animate-bounce">
-                <p className="text-lg font-black text-white">{wheelResult}</p>
-                <p className={`text-xs ${T.textDim} mt-1`}>{lastWeekData.scores[lastWeekData.scores.length - 1].member.username} has to do this!</p>
-              </div>
-            )}
-
-            {/* Spin button */}
-            {!wheelResult ? (
-              <button onClick={() => {
-                if (wheelSpinning) return;
-                setWheelSpinning(true);
-                setTimeout(() => {
-                  const result = currWheelOpts[Math.floor(Math.random() * currWheelOpts.length)];
-                  setWheelResult(result);
-                  setWheelSpinning(false);
-                }, 4200);
-              }} disabled={wheelSpinning} className="w-full px-6 py-3 bg-[#d06b4a] text-white rounded-xl text-sm font-bold active:scale-[0.98] disabled:opacity-60 transition-all">
-                {wheelSpinning ? 'Spinning...' : 'Spin the Wheel'}
-              </button>
-            ) : (
-              <div className="flex gap-2">
-                <button onClick={() => { setWheelResult(null); }} className="flex-1 px-4 py-3 border border-[#2a4060] text-gray-400 rounded-xl text-sm font-medium hover:bg-[#1e2e50]">Spin Again</button>
-                <button onClick={async () => {
-                  const text = `🎰 Versa Punishment Wheel\n\n${lastWeekData.scores[lastWeekData.scores.length - 1].member.username} lost and has to:\n${wheelResult}\n\nJoin us: ${window.location.origin}?join=${currentRoom?.code}`;
-                  if (navigator.share) { try { await navigator.share({ title: 'Vers Punishment', text }); } catch { } } else { navigator.clipboard.writeText(text); setCopied(true); setTimeout(() => setCopied(false), 2000); }
-                }} className="flex-1 px-4 py-3 bg-[#5b7cf5] text-white rounded-xl text-sm font-bold active:scale-[0.98]">{copied ? 'Copied!' : 'Share'}</button>
-              </div>
-            )}
-          </div>
-        )})()}
+          )
+        })()}
       </Modal>
 
       {/* Weekly Story Cards */}
@@ -2961,7 +2962,7 @@ function VersaAppMain() {
         <ModalHeader title="Activity" onClose={() => setShowHeatMap(false)} icon={<Calendar size={18} className="text-emerald-400" />} dark={darkMode} />
         {(() => {
           const today = new Date();
-          
+
           let rangeDays = 30;
           if (heatMapRange === '7d') rangeDays = 7;
           if (heatMapRange === '90d') rangeDays = 90;
@@ -2994,9 +2995,9 @@ function VersaAppMain() {
           const pathStart = `M ${getX(0)} ${getY(points[0])}`;
           let lines = '';
           for (let i = 1; i < points.length; i++) {
-             lines += ` L ${getX(i)} ${getY(points[i])}`;
+            lines += ` L ${getX(i)} ${getY(points[i])}`;
           }
-          
+
           const strokePath = pathStart + lines;
           // Filling down to the literal Y=0 line
           const fillPath = `${strokePath} L ${getX(points.length - 1)} ${getY(0)} L ${getX(0)} ${getY(0)} Z`;
@@ -3012,7 +3013,7 @@ function VersaAppMain() {
             <div>
               {/* Range Toggle */}
               <div className={`flex gap-1 mb-5 p-1 rounded-xl ${darkMode ? 'bg-[#151d30]' : 'bg-gray-100'}`}>
-                {[{id: '7d', l: '1 Week'}, {id: '30d', l: '1 Month'}, {id: '90d', l: '3 Months'}, {id: '1y', l: '1 Year'}].map(r => (
+                {[{ id: '7d', l: '1 Week' }, { id: '30d', l: '1 Month' }, { id: '90d', l: '3 Months' }, { id: '1y', l: '1 Year' }].map(r => (
                   <button key={r.id} onClick={() => setHeatMapRange(r.id)} className={`flex-1 py-1.5 text-[10px] font-bold rounded-lg transition-all tracking-wider uppercase ${heatMapRange === r.id ? (isSunset ? (darkMode ? 'bg-[#ff7b29]/20 text-[#ff7b29]' : 'bg-orange-100 text-orange-900') : (darkMode ? 'bg-[#223858] text-white' : 'bg-white shadow-sm text-blue-600')) : (darkMode ? 'text-gray-500 hover:text-gray-400' : 'text-gray-400 hover:text-gray-600')}`}>{r.l}</button>
                 ))}
               </div>
@@ -3038,15 +3039,15 @@ function VersaAppMain() {
                   {/* Data Paths */}
                   <path d={fillPath} fill="url(#heatGradient)" />
                   <path d={strokePath} fill="none" stroke={accentStr} strokeWidth="2.5" strokeLinejoin="round" strokeLinecap="round" />
-                  
+
                   {/* Active Point Highlight (Today) */}
                   <circle cx={getX(points.length - 1)} cy={getY(points[points.length - 1])} r="3.5" fill={darkMode ? "#1c1c1e" : "#ffffff"} stroke={accentStr} strokeWidth="2" />
                 </svg>
-                
+
                 {/* Min / Max Date Labels */}
                 <div className={`flex justify-between px-2 mt-1 text-[9px] font-medium ${T.textDim}`}>
-                   <span>{new Date(chartDates[0]).toLocaleDateString(undefined, {month: 'short', day: 'numeric'})}</span>
-                   <span>Today</span>
+                  <span>{new Date(chartDates[0]).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}</span>
+                  <span>Today</span>
                 </div>
               </div>
 
@@ -3286,19 +3287,19 @@ function VersaAppMain() {
               <div className="text-[10px] uppercase tracking-wider text-[#d4a04a] mb-1 font-bold">{roomStakes.type} &middot; {roomStakes.duration}</div>
               <div className="text-sm font-medium">"{roomStakes.description}"</div>
             </div>
-            
+
             <div className="space-y-4">
               <div>
                 <label className={`block text-[10px] uppercase tracking-wider font-bold mb-2 ${T.textDim}`}>🏆 Who Won the Stake?</label>
-                <select value={settleStakeData.winnerId} onChange={e => setSettleStakeData(prev => ({...prev, winnerId: e.target.value}))} className={`w-full p-3 rounded-xl border appearance-none outline-none text-sm ${darkMode ? 'bg-[#182544] border-[#223858] text-white' : 'bg-gray-50 border-gray-200 text-gray-900'}`}>
+                <select value={settleStakeData.winnerId} onChange={e => setSettleStakeData(prev => ({ ...prev, winnerId: e.target.value }))} className={`w-full p-3 rounded-xl border appearance-none outline-none text-sm ${darkMode ? 'bg-[#182544] border-[#223858] text-white' : 'bg-gray-50 border-gray-200 text-gray-900'}`}>
                   <option value="" disabled>Select Winner...</option>
                   {roomMembers.map(m => <option key={m.id} value={m.id}>{m.username}</option>)}
                 </select>
               </div>
-              
+
               <div>
                 <label className={`block text-[10px] uppercase tracking-wider font-bold mb-2 ${T.textDim}`}>💀 Who Lost & Mentions the Hall of Shame?</label>
-                <select value={settleStakeData.loserId} onChange={e => setSettleStakeData(prev => ({...prev, loserId: e.target.value}))} className={`w-full p-3 rounded-xl border appearance-none outline-none text-sm ${darkMode ? 'bg-[#182544] border-[#223858] text-white' : 'bg-gray-50 border-gray-200 text-gray-900'}`}>
+                <select value={settleStakeData.loserId} onChange={e => setSettleStakeData(prev => ({ ...prev, loserId: e.target.value }))} className={`w-full p-3 rounded-xl border appearance-none outline-none text-sm ${darkMode ? 'bg-[#182544] border-[#223858] text-white' : 'bg-gray-50 border-gray-200 text-gray-900'}`}>
                   <option value="" disabled>Select Loser...</option>
                   {roomMembers.map(m => <option key={m.id} value={m.id}>{m.username}</option>)}
                 </select>
