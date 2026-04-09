@@ -2331,7 +2331,7 @@ function VersaAppMain() {
       </div>
 
       {/* ═══ BOTTOM NAVIGATION TABS ═══ */}
-      <div className={`bottom-nav fixed bottom-0 w-full z-50 border-t ${T.bgCard} ${T.border} pb-safe`}>
+      <div className={`bottom-nav fixed bottom-0 w-full z-50 border-t ${T.bgCard} ${T.border}`} style={{ paddingBottom: 'env(safe-area-inset-bottom, 20px)' }}>
          <div className="max-w-xl mx-auto flex items-center justify-between px-6 py-3">
            {[ 
              { id: 'overview', icon: <Home size={22} className="mb-1" strokeWidth={2.5}/>, label: 'OVERVIEW' },
