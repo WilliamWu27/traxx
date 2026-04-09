@@ -182,6 +182,13 @@ function VersaAppMain() {
   const [showPunishmentWheel, setShowPunishmentWheel] = useState(false);
   const [wheelSpinning, setWheelSpinning] = useState(false);
   const [wheelResult, setWheelResult] = useState(null);
+  const [customWheelItems, setCustomWheelItems] = useState(() => {
+    try { const s = localStorage.getItem('versa-wheel'); return s ? JSON.parse(s) : null; } catch { return null; }
+  });
+  const [showEditWheel, setShowEditWheel] = useState(false);
+  const [newWheelItem, setNewWheelItem] = useState('');
+  const wheelItems = customWheelItems || PUNISHMENTS;
+  const saveWheelItems = (items) => { setCustomWheelItems(items); try { localStorage.setItem('versa-wheel', JSON.stringify(items)); } catch {} };
   const [devMode, setDevMode] = useState(() => {
     try { return localStorage.getItem('versa-devmode') === 'true'; } catch { return false; }
   });
@@ -2256,12 +2263,41 @@ function VersaAppMain() {
                </button>
              </div>
 
+             {/* Theme Picker - inline */}
+             <div className={`p-5 rounded-3xl border ${T.border} ${T.bgCard} ${darkMode ? '' : 'shadow-sm'} anim-fade-up`}>
+               <div className={`text-[10px] font-bold tracking-widest uppercase mb-3 ${T.textDim}`}>Appearance</div>
+               <div className="grid grid-cols-4 gap-2">
+                 {THEMES.map(t => {
+                   const isActive = theme === t;
+                   const isSun = t.includes('sunset');
+                   const isDk = t.includes('dark');
+                   const previewBg = isDk ? (isSun ? '#1a1018' : '#0f1b2d') : (isSun ? '#fdf6f0' : '#f0f4f8');
+                   const accent = isSun ? '#e8864a' : '#5b7cf5';
+                   const label = isDk ? (isSun ? '🌅' : '🌙') : (isSun ? '🌇' : '☀️');
+                   const subLabel = isDk ? 'Dark' : 'Light';
+                   const typeLabel = isSun ? 'Sunset' : 'Navy';
+                   return (
+                     <button key={t} onClick={() => setAppTheme(t)} className={`relative p-2 rounded-xl border-2 transition-all active:scale-[0.93] ${isActive ? (isSun ? 'border-[#e8864a] bg-[#e8864a]/10 shadow-md shadow-[#e8864a]/15' : 'border-[#5b7cf5] bg-[#5b7cf5]/10 shadow-md shadow-[#5b7cf5]/15') : (darkMode ? 'border-transparent hover:border-[#334868]' : 'border-transparent hover:border-gray-300')}`}>
+                       <div className="rounded-lg overflow-hidden mb-1.5" style={{ backgroundColor: previewBg, height: 32 }}>
+                         <div className="flex items-end gap-[2px] p-1.5 h-full">
+                           <div className="w-2 h-1.5 rounded-sm" style={{backgroundColor: accent, opacity: 0.5}}/>
+                           <div className="w-2 h-2.5 rounded-sm" style={{backgroundColor: accent, opacity: 0.7}}/>
+                           <div className="w-2 h-3.5 rounded-sm" style={{backgroundColor: accent}}/>
+                         </div>
+                       </div>
+                       <div className="text-center">
+                         <div className="text-sm">{label}</div>
+                         <div className={`text-[8px] font-bold tracking-wider ${isActive ? (isSun ? 'text-[#e8864a]' : 'text-[#5b7cf5]') : T.textDim}`}>{typeLabel}</div>
+                       </div>
+                       {isActive && <div className={`absolute -top-1 -right-1 w-4 h-4 rounded-full flex items-center justify-center text-white text-[8px] font-bold ${isSun ? 'bg-[#e8864a]' : 'bg-[#5b7cf5]'} shadow-sm`}>✓</div>}
+                     </button>
+                   );
+                 })}
+               </div>
+             </div>
+
              {/* Quick Actions */}
              <div className="space-y-2 anim-stagger">
-               <button onClick={() => setShowThemePicker(true)} className={`w-full flex items-center justify-between px-4 py-3.5 rounded-2xl border transition-all active:scale-[0.98] ${T.border} ${T.bgCard} ${T.textMuted} ${T.bgCardHover}`}>
-                 <div className="flex items-center gap-3">{darkMode ? <Moon size={16} className={isSunset ? "text-[#e8864a]" : "text-[#5b7cf5]"}/> : <Sun size={16} className={isSunset ? "text-[#e8864a]" : "text-[#5b7cf5]"}/>}<span className="text-sm font-medium">Theme</span></div>
-                 <span className={`text-[10px] font-bold ${isSunset ? 'text-[#e8864a]' : 'text-[#5b7cf5]'}`}>{THEME_LABELS[theme]}</span>
-               </button>
                <button onClick={() => setShowInviteModal(true)} className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-2xl border transition-all active:scale-[0.98] ${T.border} ${T.bgCard} ${T.textMuted} ${T.bgCardHover}`}><UserPlus size={16} className={isSunset ? "text-[#e8864a]" : "text-blue-400"}/><span className="text-sm font-medium">Invite to Room</span></button>
                <button onClick={() => setShowProfile(true)} className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-2xl border transition-all active:scale-[0.98] ${T.border} ${T.bgCard} ${T.textMuted} ${T.bgCardHover}`}><User size={16} className="text-purple-400"/><span className="text-sm font-medium">Full Profile</span></button>
                {lastWeekData && <button onClick={() => setShowWeeklyRecap(true)} className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-2xl border transition-all active:scale-[0.98] ${T.border} ${T.bgCard} ${T.textMuted} ${T.bgCardHover}`}><BarChart3 size={16} className="text-purple-400"/><span className="text-sm font-medium">Weekly Recap</span></button>}
@@ -2676,67 +2712,97 @@ function VersaAppMain() {
       </Modal>
 
       {/* Punishment Wheel */}
-      <Modal show={showPunishmentWheel} onClose={() => { setShowPunishmentWheel(false); setWheelResult(null); setWheelSpinning(false); }} wide dark={darkMode}>
-        <ModalHeader title="🎰 Punishment Wheel" onClose={() => { setShowPunishmentWheel(false); setWheelResult(null); setWheelSpinning(false); }} dark={darkMode} />
-        {lastWeekData && lastWeekData.scores.length > 1 && (
-          <div className="text-center">
-            <div className="mb-4">
-              <p className={`text-sm ${T.textMuted}`}>Loser this week:</p>
-              <div className="flex items-center justify-center gap-2 mt-2">
-                <Avatar user={lastWeekData.scores[lastWeekData.scores.length - 1].member} size={32} className="bg-red-500/20 text-red-400" />
-                <span className="text-lg font-bold text-red-400">{lastWeekData.scores[lastWeekData.scores.length - 1].member.username}</span>
-              </div>
-              <p className={`text-xs ${T.textDim} mt-1`}>{lastWeekData.scores[lastWeekData.scores.length - 1].pts} pts</p>
+      <Modal show={showPunishmentWheel} onClose={() => { setShowPunishmentWheel(false); setWheelResult(null); setWheelSpinning(false); setShowEditWheel(false); }} wide dark={darkMode}>
+        <ModalHeader title={showEditWheel ? "Edit Wheel" : "🎰 Consequence Wheel"} onClose={() => { setShowPunishmentWheel(false); setWheelResult(null); setWheelSpinning(false); setShowEditWheel(false); }} dark={darkMode} />
+
+        {showEditWheel ? (
+          <div>
+            <p className={`text-xs ${T.textDim} mb-4`}>Add or remove consequences. These are saved on your device.</p>
+            <div className="space-y-2 mb-4 max-h-64 overflow-y-auto">
+              {wheelItems.map((item, i) => (
+                <div key={i} className={`flex items-center justify-between p-3 rounded-xl border ${T.border} ${T.bgCard}`}>
+                  <span className={`text-sm ${T.text}`}>{item}</span>
+                  <button onClick={() => { const next = wheelItems.filter((_, j) => j !== i); saveWheelItems(next.length > 0 ? next : null); }} className="text-red-400 text-xs font-bold hover:text-red-300 px-2">✕</button>
+                </div>
+              ))}
             </div>
+            <div className="flex gap-2 mb-4">
+              <input type="text" placeholder="Add a consequence..." value={newWheelItem} onChange={e => setNewWheelItem(e.target.value)} className={inputCls} maxLength={50} onKeyDown={e => { if (e.key === 'Enter' && newWheelItem.trim()) { saveWheelItems([...wheelItems, newWheelItem.trim()]); setNewWheelItem(''); }}}/>
+              <button onClick={() => { if (newWheelItem.trim()) { saveWheelItems([...wheelItems, newWheelItem.trim()]); setNewWheelItem(''); }}} disabled={!newWheelItem.trim()} className={`px-4 rounded-xl text-sm font-bold text-white active:scale-[0.97] disabled:opacity-40 ${isSunset ? 'bg-[#e8864a]' : 'bg-[#5b7cf5]'}`}>Add</button>
+            </div>
+            <div className="flex gap-2">
+              <button onClick={() => { saveWheelItems(null); }} className={`flex-1 py-2.5 rounded-xl text-xs font-medium ${T.border} border ${T.textDim}`}>Reset to Defaults</button>
+              <button onClick={() => setShowEditWheel(false)} className={`flex-1 py-2.5 rounded-xl text-xs font-bold text-white ${isSunset ? 'bg-[#e8864a]' : 'bg-[#5b7cf5]'}`}>Done</button>
+            </div>
+          </div>
+        ) : (
+          <div>
+            {lastWeekData && lastWeekData.scores.length > 1 && (
+              <div className="text-center mb-4">
+                <p className={`text-sm ${T.textMuted}`}>Loser this week:</p>
+                <div className="flex items-center justify-center gap-2 mt-2">
+                  <Avatar user={lastWeekData.scores[lastWeekData.scores.length - 1].member} size={32} className="bg-red-500/20 text-red-400" />
+                  <span className="text-lg font-bold text-red-400">{lastWeekData.scores[lastWeekData.scores.length - 1].member.username}</span>
+                </div>
+              </div>
+            )}
 
             {/* Wheel display */}
-            <div className="relative mx-auto mb-6" style={{ width: 280, height: 280 }}>
-              <div className={`w-full h-full rounded-full border-4 border-[#2a4060] overflow-hidden relative`} style={{ transform: `rotate(${wheelSpinning ? 3600 + Math.random() * 360 : 0}deg)`, transition: wheelSpinning ? 'transform 4s cubic-bezier(0.17,0.67,0.12,0.99)' : 'none' }}>
-                {PUNISHMENTS.map((p, i) => {
-                  const angle = (360 / PUNISHMENTS.length) * i;
+            <div className="relative mx-auto mb-6" style={{ width: 260, height: 260 }}>
+              <div className="w-full h-full rounded-full border-4 border-[#2a4060] overflow-hidden relative" style={{ transform: `rotate(${wheelSpinning ? 3600 + Math.random() * 360 : 0}deg)`, transition: wheelSpinning ? 'transform 4s cubic-bezier(0.17,0.67,0.12,0.99)' : 'none' }}>
+                {wheelItems.map((p, i) => {
                   const colors = ['#3b82f6', '#ef4444', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899', '#06b6d4', '#f97316', '#6366f1', '#14b8a6', '#e11d48', '#a855f7'];
-                  return <div key={i} className="absolute text-[7px] font-bold text-white" style={{
+                  return <div key={i} className="absolute" style={{
                     width: '50%', height: '50%',
                     transformOrigin: '100% 100%',
-                    transform: `rotate(${angle}deg) skewY(${90 - 360 / PUNISHMENTS.length}deg)`,
+                    transform: `rotate(${(360 / wheelItems.length) * i}deg) skewY(${90 - 360 / wheelItems.length}deg)`,
                     left: 0, top: 0,
                     background: colors[i % colors.length],
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
                   }} />;
                 })}
               </div>
-              {/* Pointer */}
               <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-2 w-0 h-0 border-l-[10px] border-r-[10px] border-t-[16px] border-l-transparent border-r-transparent border-t-white z-10" />
+            </div>
+
+            {/* Items list */}
+            <div className={`mb-4 p-3 rounded-xl ${T.bgCard} border ${T.border} max-h-24 overflow-y-auto`}>
+              <div className="flex flex-wrap gap-1.5">{wheelItems.map((item, i) => (
+                <span key={i} className={`text-[9px] px-2 py-1 rounded-full font-medium ${T.border} border ${T.textDim}`}>{item.replace(/^.+? /, '')}</span>
+              ))}</div>
             </div>
 
             {/* Result */}
             {wheelResult && (
-              <div className="mb-4 p-4 bg-gradient-to-r from-red-500/10 to-pink-500/10 border border-red-500/20 rounded-xl animate-bounce">
-                <p className="text-lg font-black text-white">{wheelResult}</p>
-                <p className={`text-xs ${T.textDim} mt-1`}>{lastWeekData.scores[lastWeekData.scores.length - 1].member.username} has to do this!</p>
+              <div className="mb-4 p-4 bg-gradient-to-r from-red-500/10 to-pink-500/10 border border-red-500/20 rounded-xl anim-pop-in">
+                <p className={`text-lg font-black ${T.text}`}>{wheelResult}</p>
+                {lastWeekData && lastWeekData.scores.length > 1 && <p className={`text-xs ${T.textDim} mt-1`}>{lastWeekData.scores[lastWeekData.scores.length - 1].member.username} has to do this!</p>}
               </div>
             )}
 
-            {/* Spin button */}
+            {/* Actions */}
             {!wheelResult ? (
-              <button onClick={() => {
-                if (wheelSpinning) return;
-                setWheelSpinning(true);
-                setTimeout(() => {
-                  const result = PUNISHMENTS[Math.floor(Math.random() * PUNISHMENTS.length)];
-                  setWheelResult(result);
-                  setWheelSpinning(false);
-                }, 4200);
-              }} disabled={wheelSpinning} className="w-full px-6 py-3 bg-[#d06b4a] text-white rounded-xl text-sm font-bold active:scale-[0.98] disabled:opacity-60">
-                {wheelSpinning ? 'Spinning...' : 'Spin the Wheel'}
-              </button>
+              <div className="space-y-2">
+                <button onClick={() => {
+                  if (wheelSpinning) return;
+                  setWheelSpinning(true);
+                  setTimeout(() => {
+                    const result = wheelItems[Math.floor(Math.random() * wheelItems.length)];
+                    setWheelResult(result);
+                    setWheelSpinning(false);
+                  }, 4200);
+                }} disabled={wheelSpinning} className="w-full px-6 py-3 bg-[#d06b4a] text-white rounded-xl text-sm font-bold active:scale-[0.98] disabled:opacity-60">
+                  {wheelSpinning ? 'Spinning...' : 'Spin the Wheel'}
+                </button>
+                <button onClick={() => setShowEditWheel(true)} className={`w-full px-4 py-2.5 border ${T.border} ${T.textDim} rounded-xl text-xs font-medium ${T.bgCardHover}`}>✏️ Customize Wheel</button>
+              </div>
             ) : (
               <div className="flex gap-2">
-                <button onClick={() => { setWheelResult(null); }} className="flex-1 px-4 py-3 border border-[#2a4060] text-gray-400 rounded-xl text-sm font-medium hover:bg-[#1e2e50]">Spin Again</button>
+                <button onClick={() => setWheelResult(null)} className={`flex-1 px-4 py-3 border ${T.border} ${T.textMuted} rounded-xl text-sm font-medium ${T.bgCardHover}`}>Spin Again</button>
                 <button onClick={async () => {
-                  const text = `🎰 Versa Punishment Wheel\n\n${lastWeekData.scores[lastWeekData.scores.length - 1].member.username} lost and has to:\n${wheelResult}\n\nJoin us: ${window.location.origin}?join=${currentRoom?.code}`;
-                  if (navigator.share) { try { await navigator.share({ title: 'Vers Punishment', text }); } catch { } } else { navigator.clipboard.writeText(text); setCopied(true); setTimeout(() => setCopied(false), 2000); }
-                }} className="flex-1 px-4 py-3 bg-[#5b7cf5] text-white rounded-xl text-sm font-bold active:scale-[0.98]">{copied ? 'Copied!' : 'Share'}</button>
+                  const loser = lastWeekData?.scores?.[lastWeekData.scores.length - 1]?.member?.username || 'The loser';
+                  const text = `🎰 Versa Consequence Wheel\n\n${loser} has to:\n${wheelResult}\n\nJoin us: ${window.location.origin}?join=${currentRoom?.code}`;
+                  if (navigator.share) { try { await navigator.share({ title: 'Versa Consequence', text }); } catch {} } else { navigator.clipboard.writeText(text); setCopied(true); setTimeout(() => setCopied(false), 2000); }
+                }} className={`flex-1 px-4 py-3 text-white rounded-xl text-sm font-bold active:scale-[0.98] ${isSunset ? 'bg-[#e8864a]' : 'bg-[#5b7cf5]'}`}>{copied ? 'Copied!' : 'Share'}</button>
               </div>
             )}
           </div>
