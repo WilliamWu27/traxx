@@ -1162,7 +1162,13 @@ function VersaAppMain() {
     } catch { }
   };
 
-  const REACTION_EMOJIS = ['🔥', '💀', '👏', '😤'];
+  const DEFAULT_REACTION_EMOJIS = ['🔥', '💀', '👏', '😤'];
+  const [reactionEmojis, setReactionEmojis] = useState(() => {
+    try { const stored = localStorage.getItem('versa-reaction-emojis'); return stored ? JSON.parse(stored) : DEFAULT_REACTION_EMOJIS; } catch { return DEFAULT_REACTION_EMOJIS; }
+  });
+  const [showEmojiEditor, setShowEmojiEditor] = useState(false);
+  const [emojiDraft, setEmojiDraft] = useState('');
+  const saveReactionEmojis = (emojis) => { setReactionEmojis(emojis); try { localStorage.setItem('versa-reaction-emojis', JSON.stringify(emojis)); } catch {} };
   const reactToActivity = async (activityId, emoji) => {
     if (!currentUser) return;
     // Optimistic update
@@ -1994,9 +2000,14 @@ function VersaAppMain() {
                 <h1 className={`text-2xl font-black flex items-center gap-2 ${T.text}`}>Cohort <Users size={20} className="text-[#5b7cf5]" /></h1>
                 <div className="text-[11px] font-semibold text-gray-400 mt-1">Stay accountable with your group.</div>
               </div>
-              <button onClick={() => { setHistoryDate(getYesterday()); loadHistoryDate(getYesterday()); setShowHistory(true); }} className={`p-2.5 rounded-2xl border ${T.border + ' text-gray-400 ' + T.bgCard} shadow-sm`}>
-                <Calendar size={18} />
-              </button>
+              <div className="flex items-center gap-2">
+                <button onClick={() => setShowEmojiEditor(!showEmojiEditor)} className={`p-2.5 rounded-2xl border ${showEmojiEditor ? (darkMode ? 'border-blue-500/50 bg-blue-500/10 text-blue-400' : 'border-blue-300 bg-blue-50 text-blue-600') : (T.border + ' text-gray-400 ' + T.bgCard)} shadow-sm`} title="Customize reactions">
+                  <span className="text-sm">😀</span>
+                </button>
+                <button onClick={() => { setHistoryDate(getYesterday()); loadHistoryDate(getYesterday()); setShowHistory(true); }} className={`p-2.5 rounded-2xl border ${T.border + ' text-gray-400 ' + T.bgCard} shadow-sm`}>
+                  <Calendar size={18} />
+                </button>
+              </div>
             </>
           )}
           {activeTab === 'stakes' && (
@@ -2199,6 +2210,28 @@ function VersaAppMain() {
         {/* ======================================= */}
         {activeTab === 'cohort' && (
           <div className="tab-content anim-stagger space-y-4 relative">
+            {/* Emoji customizer */}
+            {showEmojiEditor && (
+              <div className={`p-4 rounded-3xl border ${T.border} ${T.bgCard} ${darkMode ? '' : 'shadow-sm'} anim-slide-down`}>
+                <div className="flex items-center justify-between mb-3">
+                  <div className={`text-xs font-black uppercase tracking-widest ${T.textDim}`}>Customize Reactions</div>
+                  <button onClick={() => setShowEmojiEditor(false)} className={`text-xs font-bold ${T.textMuted} hover:${T.text}`}><X size={16} /></button>
+                </div>
+                <div className="flex flex-wrap gap-2 mb-3">
+                  {reactionEmojis.map((em, i) => (
+                    <div key={i} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full border ${darkMode ? 'border-[#223858] bg-[#0f1b2d]' : 'border-gray-200 bg-gray-50'}`}>
+                      <span className="text-lg">{em}</span>
+                      <button onClick={() => saveReactionEmojis(reactionEmojis.filter((_, idx) => idx !== i))} className="text-gray-500 hover:text-red-400"><X size={12} /></button>
+                    </div>
+                  ))}
+                </div>
+                <div className="flex gap-2">
+                  <input type="text" placeholder="Paste an emoji..." value={emojiDraft} onChange={e => setEmojiDraft(e.target.value)} onKeyDown={e => { if (e.key === 'Enter' && emojiDraft.trim()) { saveReactionEmojis([...reactionEmojis, emojiDraft.trim()]); setEmojiDraft(''); } }} className={inputCls} maxLength={4} style={{ flex: 1 }} />
+                  <button onClick={() => { if (emojiDraft.trim()) { saveReactionEmojis([...reactionEmojis, emojiDraft.trim()]); setEmojiDraft(''); } }} className={`px-4 rounded-xl font-bold text-sm ${darkMode ? 'bg-[#264060] text-blue-400 hover:bg-[#2a4a70]' : 'bg-blue-50 text-blue-600 hover:bg-blue-100'}`}><Plus size={18} /></button>
+                </div>
+                {reactionEmojis.length === 0 && <button onClick={() => saveReactionEmojis(DEFAULT_REACTION_EMOJIS)} className={`mt-2 w-full text-center text-xs font-bold ${T.textMuted} hover:underline`}>Reset to defaults</button>}
+              </div>
+            )}
             {activityFeed.length === 0 ? <p className="text-center text-gray-400 py-10 text-sm">No activity yet</p> : activityFeed.map(a => {
               const ts = a.ts ? new Date(a.ts) : null;
               const timeAgo = ts ? (Math.floor((Date.now() - ts.getTime()) / 60000) < 60 ? Math.floor((Date.now() - ts.getTime()) / 60000) + 'M' : Math.floor((Date.now() - ts.getTime()) / 3600000) + 'H') + ' AGO' : '';
@@ -2215,7 +2248,7 @@ function VersaAppMain() {
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
-                    {['🔥', '💀', '👏'].map(emoji => {
+                    {reactionEmojis.map(emoji => {
                       const rxValues = Object.values(reactions);
                       const count = rxValues.filter(r => r === emoji).length;
                       const myReaction = reactions[currentUser.id] === emoji;
