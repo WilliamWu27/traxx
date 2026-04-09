@@ -2334,8 +2334,8 @@ function VersaAppMain() {
       </div>
 
       {/* ═══ BOTTOM NAVIGATION TABS ═══ */}
-      <div className={`shrink-0 w-full bottom-nav z-[999] border-t shadow-[0_-10px_40px_rgba(0,0,0,0.1)] ${T.bgCard} ${T.border}`} style={{ paddingBottom: 'max(env(safe-area-inset-bottom), 16px)' }}>
-        <div className="max-w-xl mx-auto flex items-center justify-between px-6 py-2 pb-1 relative">
+      <div className={`shrink-0 w-full bottom-nav z-[999] border-t shadow-[0_-10px_40px_rgba(0,0,0,0.1)] ${T.bgCard} ${T.border}`}>
+        <div className="max-w-xl mx-auto flex items-center justify-between px-6 pt-2 pb-6 relative">
           {[
             { id: 'overview', icon: <Home size={22} className="mb-1" strokeWidth={2.5} />, label: 'OVERVIEW' },
             { id: 'habits', icon: <CheckSquare size={22} className="mb-1" strokeWidth={2.5} />, label: 'HABITS' },
@@ -2343,7 +2343,12 @@ function VersaAppMain() {
             { id: 'stakes', icon: <Target size={22} className="mb-1" strokeWidth={2.5} />, label: 'STAKES' },
             { id: 'profile', icon: <User size={22} className="mb-1" strokeWidth={2.5} />, label: 'PROFILE' }
           ].map(tab => (
-            <button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`flex flex-col items-center justify-center w-16 h-14 touch-manipulation cursor-pointer select-none transition-all ${activeTab === tab.id ? (T.accentTxt + ' scale-110') : (T.textMuted + ' hover:' + T.text)}`}>
+            <button key={tab.id} onClick={(e) => { 
+               e.preventDefault(); 
+               setActiveTab(tab.id); 
+               const scroller = document.getElementById('scroll-wrapper');
+               if (scroller) scroller.scrollTop = 0;
+            }} className={`flex flex-col items-center justify-center w-16 h-14 touch-manipulation cursor-pointer select-none transition-all ${activeTab === tab.id ? (T.accentTxt + ' scale-110') : (T.textMuted + ' hover:' + T.text)}`}>
               {tab.icon}
               <span className="text-[8px] font-black tracking-widest mt-0.5">{tab.label}</span>
             </button>
