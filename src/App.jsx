@@ -2217,32 +2217,131 @@ function VersaAppMain() {
         {/* TAB 4: STAKES */}
         {/* ======================================= */}
         {activeTab === 'stakes' && (
-          <div className="tab-content anim-stagger">
+          <div className="tab-content pb-10">
+            {/* ── Horizontal Distance Leaderboard ── */}
             {roomMembers.length > 0 && (() => {
-              const sorted = [...activeMembers].map(m => { m.weeklyPts = getWeeklyPts(m.id); return m; }).sort((a, b) => a.weeklyPts - b.weeklyPts);
-              const lowest = sorted[0];
-              if (!lowest) return null;
+              const ranked = [...activeMembers].map(m => ({ ...m, weeklyPts: getWeeklyPts(m.id) })).sort((a, b) => b.weeklyPts - a.weeklyPts);
+              const topPts = ranked[0]?.weeklyPts || 1;
+              const lastIdx = ranked.length - 1;
+
+              const now = new Date();
+              const sunday = new Date();
+              sunday.setDate(now.getDate() + ((7 - now.getDay()) % 7));
+              if (now.getDay() === 0 && now.getHours() > 0) sunday.setDate(now.getDate() + 7);
+              sunday.setHours(23, 59, 59, 999);
+              const hrsLeft = Math.max(0, Math.floor((sunday - now) / 3600000));
+              const dLeft = Math.floor(hrsLeft / 24);
+              const timeLeftStr = dLeft > 0 ? `${dLeft}d ${hrsLeft % 24}h` : `${hrsLeft}h`;
+
               return (
-                <div className={`flex items-center gap-4 p-5 mb-16 rounded-2xl border ${darkMode ? 'border-red-900/50 bg-red-900/20' : 'border-red-200 bg-red-50'}`}>
-                  <div className={`w-12 h-12 rounded-full ${darkMode ? 'bg-[#182544] border-red-900/50' : 'bg-white border-red-200'} flex items-center justify-center text-red-500`}>
-                    <Target size={24} />
+                <div className={`p-5 rounded-3xl border ${T.border} ${T.bgCard} ${darkMode ? '' : 'shadow-sm'} mb-8 anim-fade-up`}>
+                  <div className="flex items-center justify-between mb-5">
+                    <div>
+                      <div className={`text-sm font-black ${T.text}`}>Point Race</div>
+                      <div className={`text-[10px] font-bold tracking-widest uppercase ${T.textDim} mt-0.5`}>Who's at risk?</div>
+                    </div>
+                    <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full border ${darkMode ? 'border-gray-700 bg-gray-800' : 'border-gray-200 bg-white'} shadow-sm`}>
+                      <Clock size={12} className="text-gray-500" />
+                      <span className="text-[10px] text-gray-500 font-bold tracking-wide">{timeLeftStr}</span>
+                    </div>
                   </div>
-                  <div>
-                    <div className="text-sm font-black text-red-500 mb-0.5">At Risk: {lowest.username}</div>
-                    <div className={`text-xs font-semibold ${darkMode ? 'text-red-400' : 'text-red-500/80'}`}>Currently in last place with {lowest.weeklyPts} pts.</div>
+                  <div className="space-y-3">
+                    {ranked.map((m, i) => {
+                      const pct = topPts > 0 ? Math.max(8, Math.round((m.weeklyPts / topPts) * 100)) : 8;
+                      const isLast = i === lastIdx && ranked.length > 1;
+                      const isMe = m.id === currentUser.id;
+                      const barColor = isLast
+                        ? 'bg-gradient-to-r from-red-500 to-red-400'
+                        : i === 0
+                          ? (isSunset ? 'bg-gradient-to-r from-[#ff7b29] to-[#e8864a]' : 'bg-gradient-to-r from-[#5b7cf5] to-indigo-500')
+                          : (darkMode ? 'bg-gradient-to-r from-[#334868] to-[#223858]' : 'bg-gradient-to-r from-gray-300 to-gray-200');
+                      return (
+                        <div key={m.id} className="anim-fade-up" style={{ animationDelay: `${i * 60}ms` }}>
+                          <div className="flex items-center justify-between mb-1.5">
+                            <div className="flex items-center gap-2">
+                              <span className={`text-[10px] font-black w-4 text-center ${isLast ? 'text-red-500' : (i === 0 ? (isSunset ? 'text-[#ff7b29]' : 'text-[#5b7cf5]') : T.textDim)}`}>{i + 1}</span>
+                              <span className={`text-sm font-bold ${isLast ? 'text-red-500' : (isMe ? T.text : T.textDim)}`}>{m.username}{isMe ? ' (you)' : ''}</span>
+                              {isLast && <span className="text-[9px] font-black tracking-widest uppercase text-red-500/80 ml-1">AT RISK</span>}
+                            </div>
+                            <span className={`text-xs font-black tabular-nums ${isLast ? 'text-red-500' : (i === 0 ? (isSunset ? 'text-[#ff7b29]' : 'text-[#5b7cf5]') : T.textMuted)}`}>{m.weeklyPts} pts</span>
+                          </div>
+                          <div className={`w-full h-3 rounded-full overflow-hidden ${darkMode ? 'bg-[#0f1b2d]' : 'bg-gray-100'}`}>
+                            <div
+                              className={`h-full rounded-full transition-all duration-1000 ease-out ${barColor} relative overflow-hidden`}
+                              style={{ width: `${pct}%` }}
+                            >
+                              {i === 0 && <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent" style={{ animation: 'shimmer 2s infinite' }} />}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
               );
             })()}
 
-            <div className="flex flex-col items-center justify-center pb-12">
-              <Target size={200} className={`${darkMode ? 'text-[#223858]' : 'text-gray-100'} mb-8`} strokeWidth={1} />
-              {(!roomStakes || roomStakes.type === 'wheel') && (
-                <button onClick={() => setShowPunishmentWheel(true)} className="px-8 py-4 bg-[#5b7cf5] hover:bg-blue-600 text-white rounded-full font-black tracking-widest uppercase text-xs shadow-lg shadow-blue-500/30 transition-all flex items-center gap-2 active:scale-95">
-                  Draw Consequence <ChevronRight size={16} />
-                </button>
+            {/* ── Massive Target Icon ── */}
+            <div className="flex flex-col items-center justify-center py-8 anim-fade-up" style={{ animationDelay: '150ms' }}>
+              <button
+                onClick={() => setShowStakes(true)}
+                className="group relative w-44 h-44 flex items-center justify-center rounded-full transition-all duration-300 active:scale-90 hover:scale-105 cursor-pointer"
+                style={{ filter: `drop-shadow(0 0 30px ${isSunset ? 'rgba(255,123,41,0.15)' : 'rgba(91,124,245,0.15)'})` }}
+              >
+                {/* Outer ring pulse */}
+                <div className={`absolute inset-0 rounded-full border-2 ${isSunset ? 'border-[#ff7b29]/20' : 'border-[#5b7cf5]/20'} group-hover:scale-110 transition-transform duration-500`} />
+                <div className={`absolute inset-2 rounded-full border ${isSunset ? 'border-[#ff7b29]/10' : 'border-[#5b7cf5]/10'} group-hover:scale-105 transition-transform duration-700`} />
+                <Target size={100} className={`${isSunset ? 'text-[#ff7b29]' : 'text-[#5b7cf5]'} transition-all duration-300 group-hover:opacity-90`} strokeWidth={1} />
+                {/* Center dot glow */}
+                <div className={`absolute w-4 h-4 rounded-full ${isSunset ? 'bg-[#ff7b29]' : 'bg-[#5b7cf5]'} opacity-60 group-hover:opacity-100 transition-opacity`} style={{ animation: 'pulseGlow 2s ease-in-out infinite' }} />
+              </button>
+              <div className={`mt-5 text-[10px] font-black tracking-[0.2em] uppercase ${T.textDim}`}>
+                Tap to set or spin stakes
+              </div>
+              {roomStakes && (
+                <div className={`mt-3 px-4 py-2 rounded-full border text-xs font-bold ${darkMode ? 'border-[#223858] bg-[#182544] text-gray-400' : 'border-gray-200 bg-gray-50 text-gray-600'}`}>
+                  {roomStakes.type === 'wheel' ? '🎰 Wheel' : '⚖️ Fixed'}: {(() => { try { return roomStakes.type === 'wheel' ? `${JSON.parse(roomStakes.description).length} options` : `"${roomStakes.description.substring(0, 30)}${roomStakes.description.length > 30 ? '...' : ''}"`; } catch { return roomStakes.description?.substring(0, 30) || 'Custom'; } })()}
+                </div>
               )}
             </div>
+
+            {/* ── Graveyard / History Feed ── */}
+            <div className="anim-fade-up" style={{ animationDelay: '200ms' }}>
+              <div className="flex items-center justify-between mb-4 px-1">
+                <h2 className={`text-sm font-black uppercase tracking-widest ${T.textDim}`}>The Graveyard</h2>
+                <div className={`text-[10px] uppercase font-bold tracking-widest ${T.textMuted}`}><span className="opacity-60">History</span></div>
+              </div>
+              
+              {archivedStakes.length === 0 ? (
+                <div className={`text-center py-10 rounded-3xl border-2 border-dashed ${darkMode ? 'border-[#223858] text-gray-600' : 'border-gray-200 text-gray-400'} text-sm font-bold`}>Nobody has suffered... yet.</div>
+              ) : (
+                <div className="space-y-3">
+                  {[...archivedStakes].reverse().map(st => {
+                    const lsr = roomMembers.find(m => m.id === st.loser_id)?.username || 'Someone';
+                    const isMe = st.loser_id === currentUser.id;
+                    const bdr = isMe ? (darkMode ? 'border-red-500/30' : 'border-red-300') : T.border;
+                    const bgC = isMe ? (darkMode ? 'bg-red-500/10' : 'bg-red-50') : T.bgCard;
+                    return (
+                      <div key={st.id} className={`p-4 rounded-3xl border ${bdr} ${bgC} ${darkMode ? '' : 'shadow-sm'}`}>
+                        <div className="flex items-start gap-4">
+                          <div className={`w-10 h-10 mt-1 rounded-full flex items-center justify-center text-xl shrink-0 border ${isMe ? 'border-red-500/50 bg-red-500/20 text-red-500 shadow-inner' : (darkMode ? 'border-[#223858] bg-[#0f1b2d] text-gray-400' : 'border-gray-200 bg-white shadow-sm text-gray-500')}`}>
+                            {st.type === 'wheel' ? '🎰' : '⚖️'}
+                          </div>
+                          <div className="flex-1">
+                            <div className="flex justify-between items-start mb-1">
+                              <div className={`text-sm font-black ${isMe ? 'text-red-500' : T.text}`}>{lsr} <span className={T.textDim}>failed.</span></div>
+                              <div className={`text-[9px] font-bold tracking-widest uppercase ${T.textMuted}`}>{st.type}</div>
+                            </div>
+                            <div className={`text-sm leading-relaxed font-medium ${isMe ? (darkMode ? 'text-red-300' : 'text-red-800') : T.textDim}`}>"{st.description}"</div>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
           </div>
         )}
 
@@ -2334,7 +2433,7 @@ function VersaAppMain() {
 
       {/* ═══ BOTTOM NAVIGATION TABS ═══ */}
       <div className={`fixed bottom-0 left-0 right-0 w-full bottom-nav z-[999] border-t shadow-[0_-10px_40px_rgba(0,0,0,0.1)] ${T.bgCard} ${T.border}`}>
-        <div className="max-w-xl mx-auto flex items-center justify-between px-6 pt-2 pb-8 relative">
+        <div className="max-w-xl mx-auto flex items-center justify-between px-6 py-3 relative">
           {[
             { id: 'overview', icon: <Home size={22} className="mb-1" strokeWidth={2.5} />, label: 'OVERVIEW' },
             { id: 'habits', icon: <CheckSquare size={22} className="mb-1" strokeWidth={2.5} />, label: 'HABITS' },
