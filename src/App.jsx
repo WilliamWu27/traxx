@@ -186,6 +186,7 @@ function VersaAppMain() {
     try { return localStorage.getItem('versa-devmode') === 'true'; } catch { return false; }
   });
   const [showSettingsMenu, setShowSettingsMenu] = useState(false);
+  const [showThemePicker, setShowThemePicker] = useState(false);
   const logoTapRef = useRef({ count: 0, timer: null });
   const toggleDevMode = () => { const next = !devMode; setDevMode(next); try { localStorage.setItem('versa-devmode', next ? 'true' : 'false'); } catch { } };
   const [showHistory, setShowHistory] = useState(false);
@@ -2001,30 +2002,11 @@ function VersaAppMain() {
                       {habits.length > 0 && <button onClick={(e) => { e.stopPropagation(); setEditMode(!editMode); setShowSettingsMenu(false); }} className={`w-full flex items-center gap-3 px-4 py-3 text-sm transition-all ${editMode ? 'text-blue-400' : (T.textMuted + ' ' + T.bgCardHover)}`}><Edit3 size={15} className={editMode ? 'text-blue-400' : 'text-gray-500'} />{editMode ? 'Done Editing' : 'Edit Habits'}</button>}
                       
                       {isRoomCreator && <button onClick={(e) => { e.stopPropagation(); setShowRoomSettings(true); setShowSettingsMenu(false); }} className={`w-full flex items-center gap-3 px-4 py-3 text-sm transition-all ${T.textMuted} ${T.bgCardHover}`}><Crown size={15} className="text-[#e8864a]" />Room Settings</button>}
-                      <div className={`px-4 py-3 border-t ${T.border}`}>
-                        <div className={`text-[9px] font-bold tracking-widest uppercase mb-2.5 ${T.textDim}`}>Theme</div>
-                        <div className="grid grid-cols-2 gap-2">
-                          {THEMES.map(t => {
-                            const isSun = t.includes('sunset');
-                            const isDk = t.includes('dark');
-                            const isActive = theme === t;
-                            const previewBg = isDk ? (isSun ? '#1a1018' : '#0f1b2d') : (isSun ? '#fdf6f0' : '#f0f4f8');
-                            const accent = isSun ? '#e8864a' : '#5b7cf5';
-                            return (
-                              <button key={t} onClick={(e) => { e.stopPropagation(); setAppTheme(t); }} className={`p-2 rounded-xl text-left transition-all ${isActive ? (isSun ? 'ring-2 ring-[#e8864a] bg-[#e8864a]/10' : 'ring-2 ring-[#5b7cf5] bg-[#5b7cf5]/10') : (darkMode ? 'hover:bg-[#1e3050]' : 'hover:bg-gray-100')}`}>
-                                <div className="rounded-lg mb-1.5 overflow-hidden" style={{backgroundColor: previewBg, height: 28}}>
-                                  <div className="flex items-end gap-[2px] p-1.5 h-full">
-                                    <div className="w-2 h-1.5 rounded-sm" style={{backgroundColor: accent, opacity: 0.5}}/>
-                                    <div className="w-2 h-2 rounded-sm" style={{backgroundColor: accent, opacity: 0.7}}/>
-                                    <div className="w-2 h-3 rounded-sm" style={{backgroundColor: accent}}/>
-                                  </div>
-                                </div>
-                                <div className={`text-[9px] font-bold ${isActive ? (isSun ? 'text-[#e8864a]' : 'text-[#5b7cf5]') : T.textDim}`}>{THEME_LABELS[t]}</div>
-                              </button>
-                            );
-                          })}
-                        </div>
-                      </div>
+                      <div className={`mx-3 my-1 border-t ${T.border}`}/>
+                      <button onClick={(e) => { e.stopPropagation(); setShowThemePicker(true); setShowSettingsMenu(false); }} className={`w-full flex items-center justify-between px-4 py-3 text-sm transition-all ${T.textMuted} ${T.bgCardHover}`}>
+                        <div className="flex items-center gap-3">{darkMode ? <Moon size={15} className={isSunset ? "text-[#e8864a]" : "text-[#5b7cf5]"}/> : <Sun size={15} className={isSunset ? "text-[#e8864a]" : "text-[#5b7cf5]"}/>}Theme</div>
+                        <span className={`text-[10px] font-bold ${isSunset ? 'text-[#e8864a]' : 'text-[#5b7cf5]'}`}>{THEME_LABELS[theme]}</span>
+                      </button>
                     </div>
                   </div>
                 </>}
@@ -2274,37 +2256,14 @@ function VersaAppMain() {
                </button>
              </div>
 
-             {/* Theme Picker */}
-             <div className={`p-5 rounded-3xl border ${T.border} ${T.bgCard} ${darkMode ? '' : 'shadow-sm'} mt-4`}>
-               <div className="text-[10px] font-bold tracking-widest text-[#9aaec0] uppercase mb-3">Appearance</div>
-               <div className="grid grid-cols-2 gap-2">
-                 {THEMES.map(t => {
-                   const isActive = theme === t;
-                   const isSun = t.includes('sunset');
-                   const isDk = t.includes('dark');
-                   const previewBg = isDk ? (isSun ? '#1a1018' : '#0f1b2d') : (isSun ? '#fdf6f0' : '#f0f4f8');
-                   const previewAccent = isSun ? '#e8864a' : '#5b7cf5';
-                   return (
-                     <button key={t} onClick={() => setAppTheme(t)} className={`relative p-3 rounded-2xl border-2 transition-all active:scale-[0.97] ${isActive ? (isSun ? 'border-[#e8864a] shadow-lg shadow-[#e8864a]/20' : 'border-[#5b7cf5] shadow-lg shadow-[#5b7cf5]/20') : (darkMode ? 'border-[#223858] hover:border-[#334868]' : 'border-gray-200 hover:border-gray-300')}`}>
-                       {/* Mini preview */}
-                       <div className="rounded-xl overflow-hidden mb-2" style={{ backgroundColor: previewBg, height: 40 }}>
-                         <div className="flex items-end gap-1 p-2 h-full">
-                           <div className="w-3 h-2 rounded-sm" style={{ backgroundColor: previewAccent, opacity: 0.8 }}/>
-                           <div className="w-3 h-3 rounded-sm" style={{ backgroundColor: previewAccent, opacity: 0.6 }}/>
-                           <div className="w-3 h-4 rounded-sm" style={{ backgroundColor: previewAccent }}/>
-                         </div>
-                       </div>
-                       <div className={`text-[10px] font-bold ${isActive ? (isSun ? 'text-[#e8864a]' : 'text-[#5b7cf5]') : T.textMuted}`}>{THEME_LABELS[t]}</div>
-                       {isActive && <div className={`absolute top-1.5 right-1.5 w-4 h-4 rounded-full flex items-center justify-center text-white text-[8px] ${isSun ? 'bg-[#e8864a]' : 'bg-[#5b7cf5]'}`}>✓</div>}
-                     </button>
-                   );
-                 })}
-               </div>
-             </div>
-
              {/* Quick Actions */}
-             <div className="space-y-2 anim-fade-up">
+             <div className="space-y-2 anim-stagger">
+               <button onClick={() => setShowThemePicker(true)} className={`w-full flex items-center justify-between px-4 py-3.5 rounded-2xl border transition-all active:scale-[0.98] ${T.border} ${T.bgCard} ${T.textMuted} ${T.bgCardHover}`}>
+                 <div className="flex items-center gap-3">{darkMode ? <Moon size={16} className={isSunset ? "text-[#e8864a]" : "text-[#5b7cf5]"}/> : <Sun size={16} className={isSunset ? "text-[#e8864a]" : "text-[#5b7cf5]"}/>}<span className="text-sm font-medium">Theme</span></div>
+                 <span className={`text-[10px] font-bold ${isSunset ? 'text-[#e8864a]' : 'text-[#5b7cf5]'}`}>{THEME_LABELS[theme]}</span>
+               </button>
                <button onClick={() => setShowInviteModal(true)} className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-2xl border transition-all active:scale-[0.98] ${T.border} ${T.bgCard} ${T.textMuted} ${T.bgCardHover}`}><UserPlus size={16} className={isSunset ? "text-[#e8864a]" : "text-blue-400"}/><span className="text-sm font-medium">Invite to Room</span></button>
+               <button onClick={() => setShowProfile(true)} className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-2xl border transition-all active:scale-[0.98] ${T.border} ${T.bgCard} ${T.textMuted} ${T.bgCardHover}`}><User size={16} className="text-purple-400"/><span className="text-sm font-medium">Full Profile</span></button>
                {lastWeekData && <button onClick={() => setShowWeeklyRecap(true)} className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-2xl border transition-all active:scale-[0.98] ${T.border} ${T.bgCard} ${T.textMuted} ${T.bgCardHover}`}><BarChart3 size={16} className="text-purple-400"/><span className="text-sm font-medium">Weekly Recap</span></button>}
                <button onClick={() => setShowHelp(true)} className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-2xl border transition-all active:scale-[0.98] ${T.border} ${T.bgCard} ${T.textMuted} ${T.bgCardHover}`}><HelpCircle size={16} className="text-gray-400"/><span className="text-sm font-medium">How Versa Works</span></button>
                <button onClick={() => supabase.auth.signOut()} className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-2xl border transition-all active:scale-[0.98] ${T.border} ${T.bgCard} hover:bg-red-500/5 text-red-400`}><LogOut size={16}/><span className="text-sm font-medium">Sign Out</span></button>
@@ -2893,6 +2852,50 @@ function VersaAppMain() {
             }} className="w-full mt-2 py-3 bg-[#9b6bc8] text-white rounded-xl text-sm font-bold active:scale-[0.98]">📸 Save as Image</button>
           </div>
         )}
+      </Modal>
+
+      {/* Theme Picker */}
+      <Modal show={showThemePicker} onClose={() => setShowThemePicker(false)} dark={darkMode}>
+        <ModalHeader title="Choose Theme" onClose={() => setShowThemePicker(false)} icon={darkMode ? <Moon size={18} className={isSunset ? "text-[#e8864a]" : "text-[#5b7cf5]"}/> : <Sun size={18} className={isSunset ? "text-[#e8864a]" : "text-[#5b7cf5]"}/>} dark={darkMode}/>
+        <div className="grid grid-cols-2 gap-3">
+          {THEMES.map(t => {
+            const isActive = theme === t;
+            const isSun = t.includes('sunset');
+            const isDk = t.includes('dark');
+            const previewBg = isDk ? (isSun ? '#1a1018' : '#0f1b2d') : (isSun ? '#fdf6f0' : '#f0f4f8');
+            const previewCard = isDk ? (isSun ? '#2a1a28' : '#182544') : (isSun ? '#ffffff' : '#ffffff');
+            const previewBorder = isDk ? (isSun ? '#3d2640' : '#223858') : (isSun ? '#f0ddd0' : '#dce4ee');
+            const accent = isSun ? '#e8864a' : '#5b7cf5';
+            return (
+              <button key={t} onClick={() => { setAppTheme(t); setShowThemePicker(false); }} className={`relative p-3 rounded-2xl border-2 transition-all active:scale-[0.95] ${isActive ? (isSun ? 'border-[#e8864a] shadow-lg shadow-[#e8864a]/20' : 'border-[#5b7cf5] shadow-lg shadow-[#5b7cf5]/20') : (darkMode ? 'border-[#223858] hover:border-[#334868]' : 'border-gray-200 hover:border-gray-300')}`}>
+                {/* Preview mockup */}
+                <div className="rounded-xl overflow-hidden mb-2.5 border" style={{ backgroundColor: previewBg, borderColor: previewBorder, height: 72 }}>
+                  <div className="px-2 pt-2">
+                    {/* Mini header bar */}
+                    <div className="flex items-center justify-between mb-1.5">
+                      <div className="w-8 h-1.5 rounded-full" style={{ backgroundColor: accent }}/>
+                      <div className="w-3 h-3 rounded-full" style={{ backgroundColor: previewBorder }}/>
+                    </div>
+                    {/* Mini hero */}
+                    <div className="rounded-md p-1.5 mb-1" style={{ background: isSun ? 'linear-gradient(135deg, #e8864a, #c44a6a)' : 'linear-gradient(135deg, #5b7cf5, #4338ca)' }}>
+                      <div className="w-6 h-1.5 rounded-full bg-white/40 mb-0.5"/>
+                      <div className="w-10 h-2.5 rounded-full bg-white/70"/>
+                    </div>
+                    {/* Mini cards */}
+                    <div className="flex gap-1">
+                      <div className="flex-1 h-3 rounded" style={{ backgroundColor: previewCard, border: `1px solid ${previewBorder}` }}/>
+                      <div className="flex-1 h-3 rounded" style={{ backgroundColor: previewCard, border: `1px solid ${previewBorder}` }}/>
+                    </div>
+                  </div>
+                </div>
+                <div className="flex items-center justify-between">
+                  <div className={`text-xs font-bold ${isActive ? (isSun ? 'text-[#e8864a]' : 'text-[#5b7cf5]') : T.textMuted}`}>{THEME_LABELS[t]}</div>
+                  {isActive && <div className={`w-5 h-5 rounded-full flex items-center justify-center text-white text-[10px] font-bold ${isSun ? 'bg-[#e8864a]' : 'bg-[#5b7cf5]'}`}>✓</div>}
+                </div>
+              </button>
+            );
+          })}
+        </div>
       </Modal>
 
       {/* Heat Map Calendar */}
