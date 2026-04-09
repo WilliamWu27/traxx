@@ -1165,6 +1165,18 @@ function VersaAppMain() {
   const REACTION_EMOJIS = ['🔥', '💀', '👏', '😤'];
   const reactToActivity = async (activityId, emoji) => {
     if (!currentUser) return;
+    // Optimistic update
+    setActivityFeed(prev => prev.map(a => {
+      if (a.id !== activityId) return a;
+      const reactions = { ...(a.reactions || {}) };
+      if (reactions[currentUser.id] === emoji) {
+        delete reactions[currentUser.id];
+      } else {
+        reactions[currentUser.id] = emoji;
+      }
+      return { ...a, reactions };
+    }));
+    // Persist
     try {
       const { data } = await supabase.from('activity').select('reactions').eq('id', activityId).maybeSingle();
       if (!data) return;
@@ -2203,9 +2215,16 @@ function VersaAppMain() {
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
-                    <button onClick={() => reactToActivity(a.id, '🔥')} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full border ${darkMode ? 'border-[#223858] bg-[#0f1b2d] text-gray-400' : 'border-gray-200 bg-gray-50 text-gray-600'} hover:opacity-80 text-[10px] font-bold`}><Flame size={12} className="text-[#e8864a]" /> React</button>
-                    <button onClick={() => reactToActivity(a.id, '💀')} className={`px-3 py-1.5 rounded-full border ${darkMode ? 'border-[#223858] bg-[#0f1b2d]' : 'border-gray-200 bg-gray-50'} hover:opacity-80 text-xs`}>💀</button>
-                    <button onClick={() => reactToActivity(a.id, '👏')} className={`px-3 py-1.5 rounded-full border ${darkMode ? 'border-[#223858] bg-[#0f1b2d]' : 'border-gray-200 bg-gray-50'} hover:opacity-80 text-xs`}>👏</button>
+                    {['🔥', '💀', '👏'].map(emoji => {
+                      const rxValues = Object.values(reactions);
+                      const count = rxValues.filter(r => r === emoji).length;
+                      const myReaction = reactions[currentUser.id] === emoji;
+                      return (
+                        <button key={emoji} onClick={() => reactToActivity(a.id, emoji)} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-xs font-bold transition-all active:scale-95 ${myReaction ? (isSunset ? 'border-[#ff7b29]/50 bg-[#ff7b29]/15 text-[#ff7b29]' : 'border-[#5b7cf5]/50 bg-[#5b7cf5]/15 text-[#5b7cf5]') : (darkMode ? 'border-[#223858] bg-[#0f1b2d] text-gray-400 hover:bg-[#182544]' : 'border-gray-200 bg-gray-50 text-gray-600 hover:bg-gray-100')}`}>
+                          <span>{emoji}</span>{count > 0 && <span className="tabular-nums">{count}</span>}
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
               );
