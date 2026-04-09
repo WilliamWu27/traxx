@@ -1827,7 +1827,7 @@ function VersaAppMain() {
   ];
 
   return (
-    <div className={`min-h-screen ${T.bg} ${T.text} transition-all duration-500`}>
+    <div className={`h-[100dvh] w-full overflow-hidden flex flex-col ${T.bg} ${T.text} transition-all duration-500`}>
       <style>{`
         @keyframes fadeUp { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
@@ -1947,7 +1947,7 @@ function VersaAppMain() {
         </div>
       )}
       {/* ═══ HEADER ═══ */}
-      <div className={`${T.headerBg} border-b ${T.border} sticky top-0 z-40 shadow-sm`}>
+      <div className={`shrink-0 relative ${T.headerBg} border-b ${T.border} z-40 shadow-sm`}>
         <div className="max-w-xl mx-auto px-5 py-4 flex items-center justify-between">
           {activeTab === 'overview' && (
             <>
@@ -2050,7 +2050,8 @@ function VersaAppMain() {
         </div>
       </div>
 
-      <div className="max-w-xl mx-auto px-5 pt-6 pb-32">
+      <div className="flex-1 overflow-y-auto w-full relative" id="scroll-wrapper">
+        <div className="max-w-xl mx-auto px-5 pt-6 pb-12">
         {/* ======================================= */}
         {/* TAB 1: OVERVIEW */}
         {/* ======================================= */}
@@ -2328,10 +2329,12 @@ function VersaAppMain() {
             </div>
           </div>
         )}
+          </div>
+        </div>
       </div>
 
       {/* ═══ BOTTOM NAVIGATION TABS ═══ */}
-      <div className={`bottom-nav fixed bottom-0 left-0 right-0 z-[999] border-t pointer-events-auto shadow-[0_-10px_40px_rgba(0,0,0,0.1)] ${T.bgCard} ${T.border}`} style={{ paddingBottom: 'max(env(safe-area-inset-bottom), 16px)' }}>
+      <div className={`shrink-0 w-full bottom-nav z-[999] border-t shadow-[0_-10px_40px_rgba(0,0,0,0.1)] ${T.bgCard} ${T.border}`} style={{ paddingBottom: 'max(env(safe-area-inset-bottom), 16px)' }}>
         <div className="max-w-xl mx-auto flex items-center justify-between px-6 py-2 pb-1 relative">
           {[
             { id: 'overview', icon: <Home size={22} className="mb-1" strokeWidth={2.5} />, label: 'OVERVIEW' },
@@ -2340,14 +2343,13 @@ function VersaAppMain() {
             { id: 'stakes', icon: <Target size={22} className="mb-1" strokeWidth={2.5} />, label: 'STAKES' },
             { id: 'profile', icon: <User size={22} className="mb-1" strokeWidth={2.5} />, label: 'PROFILE' }
           ].map(tab => (
-            <button key={tab.id} onClick={(e) => { e.preventDefault(); setActiveTab(tab.id); }} onTouchStart={() => { }} className={`flex flex-col items-center justify-center w-16 h-14 touch-manipulation cursor-pointer select-none transition-all ${activeTab === tab.id ? (T.accentTxt + ' scale-110') : (T.textMuted + ' hover:' + T.text)}`}>
+            <button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`flex flex-col items-center justify-center w-16 h-14 touch-manipulation cursor-pointer select-none transition-all ${activeTab === tab.id ? (T.accentTxt + ' scale-110') : (T.textMuted + ' hover:' + T.text)}`}>
               {tab.icon}
               <span className="text-[8px] font-black tracking-widest mt-0.5">{tab.label}</span>
             </button>
           ))}
         </div>
       </div>
-      <div className="h-20" /> {/* Spacer */}
 
       {/* ═══ MODALS ═══ */}{/* ═══ MODALS ═══ */}
 
