@@ -1416,7 +1416,7 @@ function VersaAppMain() {
     },
   };
   const T = THEME_DEFS[theme] || THEME_DEFS['navy-dark'];
-  const inputCls = `w-full px-4 py-3 ${T.bgInput} border ${T.borderInput} rounded-xl focus:outline-none focus:border-[#4a90e8]/50 ${T.text} placeholder-[#4a6080] text-sm transition-all`;
+  const inputCls = `w-full px-4 py-3 ${T.bgInput} border ${T.borderInput} rounded-xl focus:outline-none focus:border-[${T.accent}]/50 ${T.text} placeholder-[#4a6080] text-sm transition-all`;
   const btnPrimary = "w-full py-3.5 rounded-xl text-sm font-bold tracking-wide transition-all disabled:opacity-50 active:scale-[0.98]";
 
   // ─── NOTIFICATIONS STATE ───
@@ -1988,20 +1988,20 @@ function VersaAppMain() {
                 <div className="text-[11px] font-semibold text-gray-400 mt-1">Consistency builds momentum.</div>
               </div>
               <div className="flex items-center gap-2">
-                {streakMulti.multi > 1 && <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full border ${darkMode ? 'bg-blue-500/10 border-blue-500/20 text-blue-300' : 'bg-blue-50 border-blue-200 text-blue-600'} text-xs font-bold shadow-sm`}><TrendingUp size={14} />{streakMulti.label}</div>}
-                {habits.length > 0 && <button onClick={() => setEditMode(!editMode)} className={`p-2.5 rounded-2xl border shadow-sm ${editMode ? (darkMode ? 'border-blue-500/50 bg-blue-500/10 text-blue-400' : 'border-blue-300 bg-blue-50 text-blue-600') : (darkMode ? 'border-[#223858] text-gray-400 bg-[#182544]' : 'border-gray-200 text-gray-500 bg-white')}`}><Edit3 size={16} /></button>}
-                <button onClick={() => setShowAddHabit(true)} className={`p-2.5 rounded-2xl border shadow-sm ${darkMode ? 'border-[#223858] text-blue-400 bg-[#182544]' : 'border-gray-200 text-blue-600 bg-white'}`}><Plus size={18} /></button>
+                {streakMulti.multi > 1 && <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full border ${darkMode ? (isSunset ? 'bg-[#ff7b29]/10 border-[#ff7b29]/20 text-[#e8864a]' : 'bg-blue-500/10 border-blue-500/20 text-blue-300') : (isSunset ? 'bg-orange-50 border-orange-200 text-orange-600' : 'bg-blue-50 border-blue-200 text-blue-600')} text-xs font-bold shadow-sm`}><TrendingUp size={14} />{streakMulti.label}</div>}
+                {habits.length > 0 && <button onClick={() => setEditMode(!editMode)} className={`p-2.5 rounded-2xl border shadow-sm ${editMode ? (darkMode ? (isSunset ? 'border-[#ff7b29]/50 bg-[#ff7b29]/10 text-[#ff7b29]' : 'border-blue-500/50 bg-blue-500/10 text-blue-400') : (isSunset ? 'border-orange-300 bg-orange-50 text-orange-600' : 'border-blue-300 bg-blue-50 text-blue-600')) : (darkMode ? (isSunset ? 'border-[#323236] text-gray-400 bg-[#1c1c1e]' : 'border-[#223858] text-gray-400 bg-[#182544]') : 'border-gray-200 text-gray-500 bg-white')}`}><Edit3 size={16} /></button>}
+                <button onClick={() => setShowAddHabit(true)} className={`p-2.5 rounded-2xl border shadow-sm ${darkMode ? (isSunset ? 'border-[#323236] text-[#ff7b29] bg-[#1c1c1e]' : 'border-[#223858] text-blue-400 bg-[#182544]') : (isSunset ? 'border-gray-200 text-orange-600 bg-white' : 'border-gray-200 text-blue-600 bg-white')}`}><Plus size={18} /></button>
               </div>
             </>
           )}
           {activeTab === 'cohort' && (
             <>
               <div>
-                <h1 className={`text-2xl font-black flex items-center gap-2 ${T.text}`}>Cohort <Users size={20} className="text-[#5b7cf5]" /></h1>
+                <h1 className={`text-2xl font-black flex items-center gap-2 ${T.text}`}>Cohort <Users size={20} className={isSunset ? 'text-[#ff7b29]' : 'text-[#5b7cf5]'} /></h1>
                 <div className="text-[11px] font-semibold text-gray-400 mt-1">Stay accountable with your group.</div>
               </div>
               <div className="flex items-center gap-2">
-                <button onClick={() => setShowEmojiEditor(!showEmojiEditor)} className={`p-2.5 rounded-2xl border ${showEmojiEditor ? (darkMode ? 'border-blue-500/50 bg-blue-500/10 text-blue-400' : 'border-blue-300 bg-blue-50 text-blue-600') : (T.border + ' text-gray-400 ' + T.bgCard)} shadow-sm`} title="Customize reactions">
+                <button onClick={() => setShowEmojiEditor(!showEmojiEditor)} className={`p-2.5 rounded-2xl border ${showEmojiEditor ? (darkMode ? (isSunset ? 'border-[#ff7b29]/50 bg-[#ff7b29]/10 text-[#ff7b29]' : 'border-blue-500/50 bg-blue-500/10 text-blue-400') : (isSunset ? 'border-orange-300 bg-orange-50 text-orange-600' : 'border-blue-300 bg-blue-50 text-blue-600')) : (T.border + ' text-gray-400 ' + T.bgCard)} shadow-sm`} title="Customize reactions">
                   <span className="text-sm">😀</span>
                 </button>
                 <button onClick={() => { setHistoryDate(getYesterday()); loadHistoryDate(getYesterday()); setShowHistory(true); }} className={`p-2.5 rounded-2xl border ${T.border + ' text-gray-400 ' + T.bgCard} shadow-sm`}>
@@ -2035,9 +2035,9 @@ function VersaAppMain() {
                   <div className="fixed inset-0 z-40" onClick={(e) => { e.stopPropagation(); setShowSettingsMenu(false); }} />
                   <div className={`anim-slide-down absolute right-0 top-full mt-2 w-56 rounded-2xl border shadow-xl z-50 overflow-hidden ${T.bgCard} ${T.border}`}>
                     <div className="py-1">
-                      <button onClick={(e) => { e.stopPropagation(); setShowAddHabit(true); setShowSettingsMenu(false); }} className={`w-full flex items-center gap-3 px-4 py-3 text-sm transition-all ${T.textMuted} ${T.bgCardHover}`}><Plus size={15} className="text-blue-400" />Add Habit</button>
+                      <button onClick={(e) => { e.stopPropagation(); setShowAddHabit(true); setShowSettingsMenu(false); }} className={`w-full flex items-center gap-3 px-4 py-3 text-sm transition-all ${T.textMuted} ${T.bgCardHover}`}><Plus size={15} className={isSunset ? 'text-[#ff7b29]' : 'text-blue-400'} />Add Habit</button>
                       <button onClick={(e) => { e.stopPropagation(); setShowAddCategory(true); setShowSettingsMenu(false); }} className={`w-full flex items-center gap-3 px-4 py-3 text-sm transition-all ${T.textMuted} ${T.bgCardHover}`}><Plus size={15} className="text-purple-400" />Add Category</button>
-                      {habits.length > 0 && <button onClick={(e) => { e.stopPropagation(); setEditMode(!editMode); setShowSettingsMenu(false); }} className={`w-full flex items-center gap-3 px-4 py-3 text-sm transition-all ${editMode ? 'text-blue-400' : (T.textMuted + ' ' + T.bgCardHover)}`}><Edit3 size={15} className={editMode ? 'text-blue-400' : 'text-gray-500'} />{editMode ? 'Done Editing' : 'Edit Habits'}</button>}
+                      {habits.length > 0 && <button onClick={(e) => { e.stopPropagation(); setEditMode(!editMode); setShowSettingsMenu(false); }} className={`w-full flex items-center gap-3 px-4 py-3 text-sm transition-all ${editMode ? (isSunset ? 'text-[#ff7b29]' : 'text-blue-400') : (T.textMuted + ' ' + T.bgCardHover)}`}><Edit3 size={15} className={editMode ? (isSunset ? 'text-[#ff7b29]' : 'text-blue-400') : 'text-gray-500'} />{editMode ? 'Done Editing' : 'Edit Habits'}</button>}
 
                       {isRoomCreator && <button onClick={(e) => { e.stopPropagation(); setShowRoomSettings(true); setShowSettingsMenu(false); }} className={`w-full flex items-center gap-3 px-4 py-3 text-sm transition-all ${T.textMuted} ${T.bgCardHover}`}><Crown size={15} className="text-[#e8864a]" />Room Settings</button>}
                       <div className={`px-4 py-3 border-t ${T.border}`}>
@@ -2090,7 +2090,7 @@ function VersaAppMain() {
                 <div className="flex items-center gap-2 px-4 py-2 anim-slide-right bg-white/20 backdrop-blur-md rounded-full border border-white/20 text-xs font-bold shadow-sm">
                   <TrendingUp size={14} /> {streakMulti.multi}x Multiplier
                 </div>
-                <div className="text-[10px] font-semibold text-blue-200">Consistency mode active</div>
+                <div className={`text-[10px] font-semibold ${isSunset ? 'text-orange-200' : 'text-blue-200'}`}>Consistency mode active</div>
               </div>
             </div>
 
@@ -2104,7 +2104,7 @@ function VersaAppMain() {
               {activeMembers.map(m => ({ ...m, weeklyPts: getWeeklyPts(m.id) })).sort((a, b) => b.weeklyPts - a.weeklyPts).map((member, i) => {
                 const isMe = member.id === currentUser.id;
                 return (
-                  <div key={member.id} className={`anim-fade-up relative flex items-center p-4 rounded-2xl border ${isMe ? (darkMode ? 'border-[#5b7cf5]/50 bg-[#5b7cf5]/10' : 'border-[#5b7cf5]/30 bg-white shadow-md shadow-blue-500/5') : (T.border + ' ' + T.bgCard + (darkMode ? '' : ' shadow-sm'))} transition-all`}>
+                  <div key={member.id} className={`anim-fade-up relative flex items-center p-4 rounded-2xl border ${isMe ? (darkMode ? (isSunset ? 'border-[#ff7b29]/50 bg-[#ff7b29]/10' : 'border-[#5b7cf5]/50 bg-[#5b7cf5]/10') : (isSunset ? 'border-[#ff7b29]/30 bg-white shadow-md shadow-orange-500/5' : 'border-[#5b7cf5]/30 bg-white shadow-md shadow-blue-500/5')) : (T.border + ' ' + T.bgCard + (darkMode ? '' : ' shadow-sm'))} transition-all`}>
                     {isMe && <div className={`absolute left-0 top-1/2 -translate-y-1/2 w-1 h-10 ${isSunset ? "bg-[#ff7b29]" : "bg-[#5b7cf5]"} rounded-r-full`} />}
 
                     <div className="w-8 flex justify-center text-sm font-black mr-2">
@@ -2167,7 +2167,7 @@ function VersaAppMain() {
                       const done = cnt > 0;
                       const isNeg = h.points < 0;
                       const maxed = !h.isRepeatable && cnt >= 1;
-                      const doneBorder = isNeg ? (darkMode ? 'border-rose-500/30 bg-rose-500/10' : 'border-rose-200 bg-rose-50/50') : (darkMode ? `${ct.bdr} ${ct.bgS}` : `${ct.bdr} bg-blue-50/30`);
+                      const doneBorder = isNeg ? (darkMode ? 'border-rose-500/30 bg-rose-500/10' : 'border-rose-200 bg-rose-50/50') : (darkMode ? `${ct.bdr} ${ct.bgS}` : (isSunset ? `${ct.bdr} bg-orange-50/30` : `${ct.bdr} bg-blue-50/30`));
                       const defaultBorder = T.border + ' ' + T.bgCard + (darkMode ? '' : ' shadow-sm');
                       return (
                         <div key={h.id} className={`habit-card flex items-center p-4 rounded-2xl border ${done ? doneBorder : defaultBorder}`}>
@@ -2185,13 +2185,13 @@ function VersaAppMain() {
                           <div className="flex-1">
                             <div className={`text-sm font-bold ${done ? (darkMode ? 'text-[#7a8ba8]' : 'text-gray-600') : (T.text)}`}>{h.name} {(h.isRepeatable || isNeg) && cnt > 0 && <span className={isNeg ? 'text-rose-400 ml-1' : `${ct.txt} ml-1`}>x{cnt}</span>}</div>
                             <div className="flex items-center gap-2 mt-1.5">
-                              <span className={`px-2 py-0.5 rounded-full ${isNeg ? (darkMode ? 'bg-rose-500/20 text-rose-400' : 'bg-rose-50 text-rose-600') : (darkMode ? `${ct.bgS} ${ct.txt}` : `bg-blue-50 text-blue-600`)} text-[9px] font-bold tracking-widest uppercase`}>{isNeg ? '-' : '+'}{Math.abs(h.points)} pts</span>
+                              <span className={`px-2 py-0.5 rounded-full ${isNeg ? (darkMode ? 'bg-rose-500/20 text-rose-400' : 'bg-rose-50 text-rose-600') : (darkMode ? `${ct.bgS} ${ct.txt}` : (isSunset ? 'bg-orange-50 text-orange-600' : 'bg-blue-50 text-blue-600'))} text-[9px] font-bold tracking-widest uppercase`}>{isNeg ? '-' : '+'}{Math.abs(h.points)} pts</span>
                               {h.unit && <span className={`text-[9px] ${T.textDim}`}>{h.unit}</span>}
                             </div>
                           </div>
                           <div className="flex items-center gap-1.5">
                             {cnt > 0 && !editMode && <button onClick={() => handleDecrement(h.id)} className={`w-6 h-6 rounded-full flex items-center justify-center opacity-30 hover:opacity-70 ${isNeg ? 'text-emerald-400' : 'text-gray-400'}`}><MinusIcon size={12} /></button>}
-                            {editMode && <button onClick={() => openEditHabit(h)} className={`text-[10px] px-2.5 py-1 rounded-lg font-bold ${darkMode ? 'text-blue-400 bg-blue-500/10' : 'text-blue-600 bg-blue-50'}`}>Edit</button>}
+                            {editMode && <button onClick={() => openEditHabit(h)} className={`text-[10px] px-2.5 py-1 rounded-lg font-bold ${darkMode ? (isSunset ? 'text-[#ff7b29] bg-[#ff7b29]/10' : 'text-blue-400 bg-blue-500/10') : (isSunset ? 'text-orange-600 bg-orange-50' : 'text-blue-600 bg-blue-50')}`}>Edit</button>}
                             {!editMode && !isNeg && <button onClick={() => openEditHabit(h)} className={darkMode ? 'text-gray-600' : 'text-gray-300'}><ChevronRight size={16} /></button>}
                           </div>
                         </div>
@@ -2227,7 +2227,7 @@ function VersaAppMain() {
                 </div>
                 <div className="flex gap-2">
                   <input type="text" placeholder="Paste an emoji..." value={emojiDraft} onChange={e => setEmojiDraft(e.target.value)} onKeyDown={e => { if (e.key === 'Enter' && emojiDraft.trim()) { saveReactionEmojis([...reactionEmojis, emojiDraft.trim()]); setEmojiDraft(''); } }} className={inputCls} maxLength={4} style={{ flex: 1 }} />
-                  <button onClick={() => { if (emojiDraft.trim()) { saveReactionEmojis([...reactionEmojis, emojiDraft.trim()]); setEmojiDraft(''); } }} className={`px-4 rounded-xl font-bold text-sm ${darkMode ? 'bg-[#264060] text-blue-400 hover:bg-[#2a4a70]' : 'bg-blue-50 text-blue-600 hover:bg-blue-100'}`}><Plus size={18} /></button>
+                  <button onClick={() => { if (emojiDraft.trim()) { saveReactionEmojis([...reactionEmojis, emojiDraft.trim()]); setEmojiDraft(''); } }} className={`px-4 rounded-xl font-bold text-sm ${darkMode ? (isSunset ? 'bg-[#2a2a2e] text-[#ff7b29] hover:bg-[#333336]' : 'bg-[#264060] text-blue-400 hover:bg-[#2a4a70]') : (isSunset ? 'bg-orange-50 text-orange-600 hover:bg-orange-100' : 'bg-blue-50 text-blue-600 hover:bg-blue-100')}`}><Plus size={18} /></button>
                 </div>
                 {reactionEmojis.length === 0 && <button onClick={() => saveReactionEmojis(DEFAULT_REACTION_EMOJIS)} className={`mt-2 w-full text-center text-xs font-bold ${T.textMuted} hover:underline`}>Reset to defaults</button>}
               </div>
@@ -2417,11 +2417,11 @@ function VersaAppMain() {
                   <div className="w-7 h-7 rounded-full border border-red-400 text-red-400 flex items-center justify-center opacity-50 font-bold">!</div>
                 </div>
               </div>
-              <div className={`anim-fade-up p-4 rounded-3xl border ${darkMode ? 'border-[#5b7cf5]/30 bg-[#5b7cf5]/10' : 'border-blue-100 bg-blue-50/50 shadow-sm'}`}>
-                <div className="text-[10px] font-bold tracking-widest text-[#5b7cf5] uppercase mb-2">Top Streak</div>
+              <div className={`anim-fade-up p-4 rounded-3xl border ${darkMode ? (isSunset ? 'border-[#ff7b29]/30 bg-[#ff7b29]/10' : 'border-[#5b7cf5]/30 bg-[#5b7cf5]/10') : (isSunset ? 'border-orange-100 bg-orange-50/50 shadow-sm' : 'border-blue-100 bg-blue-50/50 shadow-sm')}`}>
+                <div className={`text-[10px] font-bold tracking-widest uppercase mb-2 ${isSunset ? 'text-[#ff7b29]' : 'text-[#5b7cf5]'}`}>Top Streak</div>
                 <div className="flex items-end justify-between">
-                  <div className={`text-4xl font-black ${darkMode ? 'text-blue-300' : 'text-blue-900'}`}>{streakData.streak}</div>
-                  <TrendingUp size={28} className="text-[#5b7cf5] opacity-50" strokeWidth={1.5} />
+                  <div className={`text-4xl font-black ${darkMode ? (isSunset ? 'text-orange-300' : 'text-blue-300') : (isSunset ? 'text-orange-900' : 'text-blue-900')}`}>{streakData.streak}</div>
+                  <TrendingUp size={28} className={`opacity-50 ${isSunset ? 'text-[#ff7b29]' : 'text-[#5b7cf5]'}`} strokeWidth={1.5} />
                 </div>
               </div>
               <div className={`anim-fade-up p-4 rounded-3xl border ${darkMode ? 'border-cyan-900/50 bg-cyan-900/20' : 'border-cyan-100 bg-cyan-50/50 shadow-sm'}`}>
@@ -2438,7 +2438,7 @@ function VersaAppMain() {
                 <div className="text-[10px] font-bold tracking-widest text-[#9aaec0] uppercase">Consistency</div>
                 <div className={`px-2 py-1 rounded ${darkMode ? (isSunset ? 'bg-[#120a14]' : 'bg-[#0f1b2d]') : 'bg-gray-100'} text-[10px] font-bold ${darkMode ? 'text-gray-400' : 'text-gray-400'}`}>Last 90 Days</div>
               </div>
-              <button onClick={loadHeatMap} className={`w-full flex items-center justify-center gap-2 py-6 border-2 border-dashed ${darkMode ? (isSunset ? 'border-[#3d2640] text-gray-500 hover:text-[#ff7b29] hover:bg-[#ff7b29]/5' : 'border-[#223858] text-gray-500 hover:text-[#5b7cf5] hover:bg-[#5b7cf5]/5') : 'border-gray-200 text-gray-400 hover:text-blue-600 hover:bg-gray-50'} rounded-xl transition-all font-bold`}>
+              <button onClick={loadHeatMap} className={`w-full flex items-center justify-center gap-2 py-6 border-2 border-dashed ${darkMode ? (isSunset ? 'border-[#3d2640] text-gray-500 hover:text-[#ff7b29] hover:bg-[#ff7b29]/5' : 'border-[#223858] text-gray-500 hover:text-[#5b7cf5] hover:bg-[#5b7cf5]/5') : (isSunset ? 'border-gray-200 text-gray-400 hover:text-orange-600 hover:bg-orange-50' : 'border-gray-200 text-gray-400 hover:text-blue-600 hover:bg-gray-50')} rounded-xl transition-all font-bold`}>
                 <BarChart3 size={20} /> View Heatmap
               </button>
             </div>
@@ -2484,7 +2484,7 @@ function VersaAppMain() {
         </div>
 
       {/* ═══ BOTTOM NAVIGATION TABS ═══ */}
-      <div className={`fixed bottom-0 left-0 right-0 w-full bottom-nav z-[999] border-t shadow-[0_-10px_40px_rgba(0,0,0,0.1)] ${T.bgCard} ${T.border}`}>
+      <div className={`fixed bottom-0 left-0 right-0 w-full bottom-nav z-[999] border-t shadow-[0_-10px_40px_rgba(0,0,0,0.1)] ${T.bgCard} ${T.border} ${showWeeklyRecap ? 'pointer-events-none opacity-40' : ''}`}>
         <div className="max-w-xl mx-auto flex items-center justify-between px-6 py-3 relative">
           {[
             { id: 'overview', icon: <Home size={22} className="mb-1" strokeWidth={2.5} />, label: 'OVERVIEW' },
@@ -2495,6 +2495,7 @@ function VersaAppMain() {
           ].map(tab => (
             <button key={tab.id} onClick={(e) => { 
                e.preventDefault(); 
+               if (showWeeklyRecap) return;
                setActiveTab(tab.id); 
                window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
             }} className={`flex flex-col items-center justify-center w-16 h-14 touch-manipulation cursor-pointer select-none transition-all ${activeTab === tab.id ? (T.accentTxt + ' scale-110') : (T.textMuted + ' hover:' + T.text)}`}>
@@ -2904,14 +2905,13 @@ function VersaAppMain() {
                 </div>
               );
             })}</div>
-            {/* Share + Punishment */}
+            {/* Share */}
             <div className="flex gap-2">
               <button onClick={async () => {
                 const text = `🏆 Versa Weekly Recap\n${lastWeekData.dateRange}\n\n${lastWeekData.scores.map((s, i) => ((['🥇', '🥈', '🥉'][i] || `${i + 1}.`) + ' ' + s.member.username + ' — ' + s.pts + 'pts')).join('\n')}\n\nJoin us: ${window.location.origin}?join=${currentRoom?.code}`;
                 if (navigator.share) { try { await navigator.share({ title: 'Vers Weekly Recap', text }); } catch { } } else { navigator.clipboard.writeText(text); setCopied(true); setTimeout(() => setCopied(false), 2000); }
               }} className="flex-1 px-4 py-3 bg-[#5b7cf5] text-white rounded-xl text-sm font-bold flex items-center justify-center gap-2 active:scale-[0.98]"><Copy size={14} />{copied ? 'Copied!' : 'Share Recap'}</button>
               <button onClick={() => { setShowWeeklyRecap(false); setStoryCardIdx(0); setShowStoryCards(true); }} className="flex-1 px-4 py-3 bg-[#9b6bc8] text-white rounded-xl text-sm font-bold flex items-center justify-center gap-2 active:scale-[0.98]">📸 Story</button>
-              {lastWeekData.scores.length > 1 && <button onClick={() => { setShowWeeklyRecap(false); setShowPunishmentWheel(true); setWheelResult(null); }} className="flex-1 px-4 py-3 bg-[#d06b4a] text-white rounded-xl text-sm font-bold flex items-center justify-center gap-2 active:scale-[0.98]">🎰 Wheel</button>}
             </div>
           </div>
         ) : (
