@@ -1827,7 +1827,7 @@ function VersaAppMain() {
   ];
 
   return (
-    <div className={`h-[100dvh] w-full overflow-hidden flex flex-col ${T.bg} ${T.text} transition-all duration-500`}>
+    <div className={`fixed inset-0 overflow-hidden flex flex-col ${T.bg} ${T.text} transition-all duration-500`}>
       <style>{`
         @keyframes fadeUp { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
@@ -2335,7 +2335,7 @@ function VersaAppMain() {
 
       {/* ═══ BOTTOM NAVIGATION TABS ═══ */}
       <div className={`shrink-0 w-full bottom-nav z-[999] border-t shadow-[0_-10px_40px_rgba(0,0,0,0.1)] ${T.bgCard} ${T.border}`}>
-        <div className="max-w-xl mx-auto flex items-center justify-between px-6 pt-2 pb-6 relative">
+        <div className="max-w-xl mx-auto flex items-center justify-between px-6 pt-2 pb-8 relative">
           {[
             { id: 'overview', icon: <Home size={22} className="mb-1" strokeWidth={2.5} />, label: 'OVERVIEW' },
             { id: 'habits', icon: <CheckSquare size={22} className="mb-1" strokeWidth={2.5} />, label: 'HABITS' },
