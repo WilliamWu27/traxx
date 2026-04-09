@@ -236,7 +236,6 @@ function VersaAppMain() {
   const [roomCategories, setRoomCategories] = useState([]);
   const [showAddCategory, setShowAddCategory] = useState(false);
   const [newCatName, setNewCatName] = useState('');
-  const [newCatColor, setNewCatColor] = useState(0);
   const [newCatIcon, setNewCatIcon] = useState('⭐');
   const [maxedHabit, setMaxedHabit] = useState(null);
   const [activityFeed, setActivityFeed] = useState([]);
@@ -1084,22 +1083,23 @@ function VersaAppMain() {
   // ─── HABITS (CREATE, EDIT, DELETE) ───
   const addHabit = async () => {
     if (!newHabit.name.trim()) return;
+    const cat = newHabit.category.trim() || 'Study';
+    // Auto-create category if new
+    if (cat && !allCatNames.includes(cat)) {
+      const updated = [...activeCategories, { name: cat, icon: '⭐' }];
+      try { await supabase.from('room_categories').upsert({ room_id: currentRoom.id, categories: updated }); setRoomCategories(updated); } catch {}
+    }
     const hid = currentRoom.id + '_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8);
     const finalPoints = (parseInt(newHabit.points) || 10) * (newHabit.isNegative ? -1 : 1);
-    // Optimistic update
-    setHabits(prev => [...prev, { id: hid, name: newHabit.name.trim(), category: newHabit.category, points: finalPoints, isRepeatable: newHabit.isRepeatable, unit: newHabit.unit?.trim() || null, description: newHabit.description?.trim() || null, roomId: currentRoom.id, createdBy: currentUser.id }]);
-    setNewHabit({ name: '', category: 'Study', points: 10, isRepeatable: false, isNegative: false, unit: '', description: '' }); setShowAddHabit(false);
+    setHabits(prev => [...prev, { id: hid, name: newHabit.name.trim(), category: cat, points: finalPoints, isRepeatable: newHabit.isRepeatable, unit: newHabit.unit?.trim() || null, description: newHabit.description?.trim() || null, roomId: currentRoom.id, createdBy: currentUser.id }]);
+    setNewHabit({ name: '', category: cat, points: 10, isRepeatable: false, isNegative: false, unit: '', description: '' }); setShowAddHabit(false);
     try {
       await supabase.from('habits').insert({
-        id: hid, name: newHabit.name.trim(), category: newHabit.category, points: finalPoints,
+        id: hid, name: newHabit.name.trim(), category: cat, points: finalPoints,
         is_repeatable: newHabit.isRepeatable,
         unit: newHabit.unit?.trim() || null, description: newHabit.description?.trim() || null,
         room_id: currentRoom.id, created_by: currentUser.id
       });
-      if (myBoardIds) {
-        const boardDocId = currentUser.id + '_' + currentRoom.id;
-        await supabase.from('my_board').upsert({ id: boardDocId, habit_ids: [...myBoardIds, hid], user_id: currentUser.id, room_id: currentRoom.id });
-      }
     } catch { setError('Failed to add'); }
   };
   const saveEditHabit = async () => {
@@ -1335,9 +1335,9 @@ function VersaAppMain() {
   const getLeaderboard = () => activeMembers.map(m => ({ member: m, todayPts: getTodayPts(m.id), weeklyPts: getWeeklyPts(m.id), crystals: getTodayCrystals(m.id), weeklyCrystals: getWeeklyCrystals(m.id) })).sort((a, b) => leaderboardTab === 'today' ? b.todayPts - a.todayPts : b.weeklyPts - a.weeklyPts);
 
   const DEFAULT_CATEGORIES = [
-    { name: 'Study', colorIdx: 0, icon: '📚' },
-    { name: 'Health', colorIdx: 1, icon: '💪' },
-    { name: 'Focus', colorIdx: 2, icon: '🎯' },
+    { name: 'Study', icon: '📚' },
+    { name: 'Health', icon: '💪' },
+    { name: 'Focus', icon: '🎯' },
   ];
   const activeCategories = roomCategories.length > 0 ? roomCategories : DEFAULT_CATEGORIES;
   const allCatNames = activeCategories.map(c => c.name);
@@ -1355,7 +1355,7 @@ function VersaAppMain() {
 
   const addCategory = async () => {
     if (!newCatName.trim() || activeCategories.find(c => c.name.toLowerCase() === newCatName.trim().toLowerCase())) return;
-    const updated = [...activeCategories, { name: newCatName.trim(), colorIdx: newCatColor, icon: newCatIcon }];
+    const updated = [...activeCategories, { name: newCatName.trim(), icon: newCatIcon }];
     try {
       await supabase.from('room_categories').upsert({ room_id: currentRoom.id, categories: updated });
       setNewCatName(''); setNewCatColor(0); setNewCatIcon('⭐'); setShowAddCategory(false);
@@ -1394,20 +1394,20 @@ function VersaAppMain() {
       heroGrad: 'bg-gradient-to-br from-[#5b7cf5] to-indigo-700',
     },
     'sunset-dark': {
-      bg: 'bg-[#1a0a08]', bgCard: 'bg-[#2c1210]', bgCardHover: 'hover:bg-[#3a1a16]', bgInput: 'bg-[#2c1210]',
-      border: 'border-[#4a1e18]', borderInput: 'border-[#5a2820]', text: 'text-white', textMuted: 'text-[#d4907a]',
-      textDim: 'text-[#8a5040]', textFaint: 'text-[#4a1e18]', headerBg: 'bg-[#1a0a08]/95', modalBg: 'bg-[#220e0a]',
-      selectBg: 'bg-[#220e0a]', glowOrb: '/8', blurBg: 'backdrop-blur-xl', accent: '#ff4422', accentTxt: 'text-[#ff5533]', accentBg: 'bg-[#ff4422]',
-      cat: { bg: 'bg-[#ff5533]', bgS: 'bg-[#ff5533]/12', bgM: 'bg-[#ff5533]/22', bdr: 'border-[#ff5533]/35', txt: 'text-[#ff6644]', glow: 'shadow-[#ff4422]/25', neon: '#ff5533' },
-      heroGrad: 'bg-gradient-to-br from-[#ff4422] via-[#ff6a00] to-[#ffaa00]',
+      bg: 'bg-[#140a06]', bgCard: 'bg-[#281410]', bgCardHover: 'hover:bg-[#351c14]', bgInput: 'bg-[#281410]',
+      border: 'border-[#4a2010]', borderInput: 'border-[#5a2a18]', text: 'text-white', textMuted: 'text-[#e8a880]',
+      textDim: 'text-[#8a5030]', textFaint: 'text-[#4a2010]', headerBg: 'bg-[#140a06]/95', modalBg: 'bg-[#1c0e08]',
+      selectBg: 'bg-[#1c0e08]', glowOrb: '/8', blurBg: 'backdrop-blur-xl', accent: '#ff4422', accentTxt: 'text-[#ff6644]', accentBg: 'bg-gradient-to-r from-[#ff2200] via-[#ff6600] to-[#ffaa00]',
+      cat: { bg: 'bg-gradient-to-r from-[#ff4422] to-[#ff8800]', bgS: 'bg-[#ff5522]/12', bgM: 'bg-[#ff5522]/22', bdr: 'border-[#ff6633]/35', txt: 'text-[#ff8844]', glow: 'shadow-[#ff4422]/30', neon: '#ff5522' },
+      heroGrad: 'bg-gradient-to-br from-[#ff2200] via-[#ff6600] to-[#ffcc00]',
     },
     'sunset-light': {
-      bg: 'bg-[#fff8f2]', bgCard: 'bg-white', bgCardHover: 'hover:bg-[#fff0e6]', bgInput: 'bg-[#fff5ee]',
-      border: 'border-[#ffd8c0]', borderInput: 'border-[#ffcaaa]', text: 'text-[#3a1008]', textMuted: 'text-[#9a5a3a]',
-      textDim: 'text-[#d4a080]', textFaint: 'text-[#ffdcc8]', headerBg: 'bg-[#fff8f2]/95', modalBg: 'bg-white',
-      selectBg: 'bg-white', glowOrb: '/5', blurBg: 'backdrop-blur-xl', accent: '#e83a10', accentTxt: 'text-[#e83a10]', accentBg: 'bg-[#e83a10]',
-      cat: { bg: 'bg-[#e84420]', bgS: 'bg-[#e84420]/10', bgM: 'bg-[#e84420]/20', bdr: 'border-[#e84420]/30', txt: 'text-[#e83a10]', glow: 'shadow-[#e83a10]/20', neon: '#e83a10' },
-      heroGrad: 'bg-gradient-to-br from-[#e83a10] via-[#ff6a00] to-[#ffaa00]',
+      bg: 'bg-[#fff6ee]', bgCard: 'bg-white', bgCardHover: 'hover:bg-[#fff0e4]', bgInput: 'bg-[#fff4ea]',
+      border: 'border-[#ffd0aa]', borderInput: 'border-[#ffc090]', text: 'text-[#3a1208]', textMuted: 'text-[#aa5530]',
+      textDim: 'text-[#d49070]', textFaint: 'text-[#ffdcc0]', headerBg: 'bg-[#fff6ee]/95', modalBg: 'bg-white',
+      selectBg: 'bg-white', glowOrb: '/5', blurBg: 'backdrop-blur-xl', accent: '#e83300', accentTxt: 'text-[#e83300]', accentBg: 'bg-gradient-to-r from-[#e83300] via-[#ff6600] to-[#ffaa00]',
+      cat: { bg: 'bg-gradient-to-r from-[#e84420] to-[#ff8800]', bgS: 'bg-[#ff5522]/10', bgM: 'bg-[#ff5522]/18', bdr: 'border-[#ff6633]/30', txt: 'text-[#e84420]', glow: 'shadow-[#e83300]/20', neon: '#e84420' },
+      heroGrad: 'bg-gradient-to-br from-[#e83300] via-[#ff6600] to-[#ffcc00]',
     },
   };
   const T = THEME_DEFS[theme] || THEME_DEFS['navy-dark'];
@@ -2031,7 +2031,6 @@ function VersaAppMain() {
                   <div className={`anim-slide-down absolute right-0 top-full mt-2 w-56 rounded-2xl border shadow-xl z-50 overflow-hidden ${T.bgCard} ${T.border}`}>
                     <div className="py-1">
                       <button onClick={(e) => { e.stopPropagation(); setShowAddHabit(true); setShowSettingsMenu(false); }} className={`w-full flex items-center gap-3 px-4 py-3 text-sm transition-all ${T.textMuted} ${T.bgCardHover}`}><Plus size={15} className={isSunset ? T.accentTxt : 'text-blue-400'} />Add Habit</button>
-                      <button onClick={(e) => { e.stopPropagation(); setShowAddCategory(true); setShowSettingsMenu(false); }} className={`w-full flex items-center gap-3 px-4 py-3 text-sm transition-all ${T.textMuted} ${T.bgCardHover}`}><Plus size={15} className="text-purple-400" />Add Category</button>
                       {habits.length > 0 && <button onClick={(e) => { e.stopPropagation(); setEditMode(!editMode); setShowSettingsMenu(false); }} className={`w-full flex items-center gap-3 px-4 py-3 text-sm transition-all ${editMode ? (isSunset ? T.accentTxt : 'text-blue-400') : (T.textMuted + ' ' + T.bgCardHover)}`}><Edit3 size={15} className={editMode ? (isSunset ? T.accentTxt : 'text-blue-400') : 'text-gray-500'} />{editMode ? 'Done Editing' : 'Edit Habits'}</button>}
 
                       {isRoomCreator && <button onClick={(e) => { e.stopPropagation(); setShowRoomSettings(true); setShowSettingsMenu(false); }} className={`w-full flex items-center gap-3 px-4 py-3 text-sm transition-all ${T.textMuted} ${T.bgCardHover}`}><Crown size={15} className="text-[#e8864a]" />Room Settings</button>}
@@ -2511,40 +2510,59 @@ function VersaAppMain() {
       {/* Add Habit */}
       <Modal show={showAddHabit} onClose={() => setShowAddHabit(false)} dark={darkMode}>
         <ModalHeader title="Add Habit" onClose={() => setShowAddHabit(false)} dark={darkMode} />
-        <button onClick={loadDefaultHabits} disabled={loading} className="w-full mb-5 px-4 py-3 bg-[#7c82a8] text-white rounded-xl shadow-lg shadow-violet-500/20 text-sm font-bold active:scale-[0.98] disabled:opacity-50">{loading ? 'Loading...' : '⚡ Load Preset (9 habits)'}</button>
+        <button onClick={loadDefaultHabits} disabled={loading} className={`w-full mb-5 px-4 py-3 ${T.accentBg} text-white rounded-xl shadow-lg text-sm font-bold active:scale-[0.98] disabled:opacity-50`}>{loading ? 'Loading...' : '⚡ Load Preset (9 habits)'}</button>
         <div className="space-y-3">
           <input type="text" placeholder="Habit name" value={newHabit.name} onChange={e => setNewHabit({ ...newHabit, name: e.target.value })} className={inputCls} maxLength={30} />
           <div className="grid grid-cols-2 gap-3">
-            <select value={newHabit.category} onChange={e => setNewHabit({ ...newHabit, category: e.target.value })} className={inputCls}>{allCatNames.map(c => <option key={c} value={c} className={darkMode ? 'bg-[#122040]' : 'bg-white'}>{c}</option>)}</select>
+            <div>
+              <select value={newHabit.category} onChange={e => { if (e.target.value === '__new__') { setNewHabit({...newHabit, category: ''}); } else { setNewHabit({...newHabit, category: e.target.value}); }}} className={inputCls}>
+                {allCatNames.map(c => <option key={c} value={c} className={darkMode ? T.selectBg.replace('bg-','') : 'bg-white'}>{c}</option>)}
+                <option value="__new__">+ New Category</option>
+              </select>
+              {!allCatNames.includes(newHabit.category) && newHabit.category !== allCatNames[0] && (
+                <input type="text" placeholder="New category name" value={newHabit.category} onChange={e => setNewHabit({...newHabit, category: e.target.value})} className={inputCls + ' mt-2'} maxLength={20} autoFocus/>
+              )}
+            </div>
             <input type="number" placeholder="Points" value={newHabit.points} onChange={e => setNewHabit({ ...newHabit, points: e.target.value })} className={inputCls} />
           </div>
           <input type="text" placeholder="Time description (e.g. 30 min, per hour)" value={newHabit.unit} onChange={e => setNewHabit({ ...newHabit, unit: e.target.value })} className={inputCls} maxLength={20} />
           <input type="text" placeholder="Description (e.g. what counts?)" value={newHabit.description} onChange={e => setNewHabit({ ...newHabit, description: e.target.value })} className={inputCls} maxLength={60} />
           <div className="flex gap-4">
-            <label className="flex items-center gap-3 py-1 cursor-pointer"><input type="checkbox" checked={newHabit.isRepeatable} onChange={e => setNewHabit({ ...newHabit, isRepeatable: e.target.checked })} className="w-4 h-4 rounded accent-blue-500" /><span className="text-sm text-gray-400">Repeatable</span></label>
+            <label className="flex items-center gap-3 py-1 cursor-pointer"><input type="checkbox" checked={newHabit.isRepeatable} onChange={e => setNewHabit({ ...newHabit, isRepeatable: e.target.checked })} className="w-4 h-4 rounded accent-blue-500" /><span className={`text-sm ${T.textMuted}`}>Repeatable</span></label>
             <label className="flex items-center gap-3 py-1 cursor-pointer"><input type="checkbox" checked={newHabit.isNegative} onChange={e => setNewHabit({ ...newHabit, isNegative: e.target.checked })} className="w-4 h-4 rounded accent-red-500" /><span className="text-sm text-red-500">Vice (Subtracts)</span></label>
           </div>
           {error && <p className="text-red-400 text-xs text-center">{error}</p>}
-          <div className="flex gap-3 pt-2"><button onClick={() => setShowAddHabit(false)} className={`flex-1 px-4 py-3 border ${T.border} rounded-xl text-sm ${T.textMuted} hover:${T.bgCardHover}`}>Cancel</button><button onClick={addHabit} className="flex-1 px-4 py-3 bg-[#5b7cf5] text-white rounded-xl text-sm font-bold shadow-lg shadow-[#5b7cf5]/15 active:scale-[0.98]">Add</button></div>
+          <div className="flex gap-3 pt-2"><button onClick={() => setShowAddHabit(false)} className={`flex-1 px-4 py-3 border ${T.border} rounded-xl text-sm ${T.textMuted}`}>Cancel</button><button onClick={addHabit} className={`flex-1 px-4 py-3 ${T.accentBg} text-white rounded-xl text-sm font-bold shadow-lg active:scale-[0.98]`}>Add</button></div>
         </div>
       </Modal>
 
       {/* Edit Habit */}
       <Modal show={!!showEditHabit} onClose={() => setShowEditHabit(null)} dark={darkMode}>
-        <ModalHeader title="Edit Habit" onClose={() => setShowEditHabit(null)} icon={<Edit3 size={18} className="text-blue-400" />} dark={darkMode} />
+        <ModalHeader title="Edit Habit" onClose={() => setShowEditHabit(null)} icon={<Edit3 size={18} className={isSunset ? T.accentTxt : "text-blue-400"} />} dark={darkMode} />
         <div className="space-y-3">
           <input type="text" placeholder="Name" value={editHabitData.name || ''} onChange={e => setEditHabitData({ ...editHabitData, name: e.target.value })} className={inputCls} maxLength={30} />
           <div className="grid grid-cols-2 gap-3">
-            <select value={editHabitData.category || allCatNames[0]} onChange={e => setEditHabitData({ ...editHabitData, category: e.target.value })} className={inputCls}>{allCatNames.map(c => <option key={c} value={c} className={darkMode ? 'bg-[#122040]' : 'bg-white'}>{c}</option>)}</select>
+            <div>
+              <select value={allCatNames.includes(editHabitData.category) ? editHabitData.category : '__new__'} onChange={e => { if (e.target.value === '__new__') { setEditHabitData({...editHabitData, category: ''}); } else { setEditHabitData({...editHabitData, category: e.target.value}); }}} className={inputCls}>
+                {allCatNames.map(c => <option key={c} value={c} className={darkMode ? T.selectBg.replace('bg-','') : 'bg-white'}>{c}</option>)}
+                <option value="__new__">+ New Category</option>
+              </select>
+              {!allCatNames.includes(editHabitData.category) && editHabitData.category !== undefined && (
+                <input type="text" placeholder="New category name" value={editHabitData.category || ''} onChange={e => setEditHabitData({...editHabitData, category: e.target.value})} className={inputCls + ' mt-2'} maxLength={20}/>
+              )}
+            </div>
             <input type="number" placeholder="Points" value={editHabitData.points || ''} onChange={e => setEditHabitData({ ...editHabitData, points: e.target.value })} className={inputCls} />
           </div>
           <input type="text" placeholder="Time description (e.g. 30 min, per hour)" value={editHabitData.unit || ''} onChange={e => setEditHabitData({ ...editHabitData, unit: e.target.value })} className={inputCls} maxLength={20} />
           <input type="text" placeholder="Description (e.g. what counts?)" value={editHabitData.description || ''} onChange={e => setEditHabitData({ ...editHabitData, description: e.target.value })} className={inputCls} maxLength={60} />
           <div className="flex gap-4">
-            <label className="flex items-center gap-3 py-1 cursor-pointer"><input type="checkbox" checked={editHabitData.isRepeatable || false} onChange={e => setEditHabitData({ ...editHabitData, isRepeatable: e.target.checked })} className="w-4 h-4 rounded accent-blue-500" /><span className="text-sm text-gray-400">Repeatable</span></label>
+            <label className="flex items-center gap-3 py-1 cursor-pointer"><input type="checkbox" checked={editHabitData.isRepeatable || false} onChange={e => setEditHabitData({ ...editHabitData, isRepeatable: e.target.checked })} className="w-4 h-4 rounded accent-blue-500" /><span className={`text-sm ${T.textMuted}`}>Repeatable</span></label>
             <label className="flex items-center gap-3 py-1 cursor-pointer"><input type="checkbox" checked={editHabitData.isNegative || false} onChange={e => setEditHabitData({ ...editHabitData, isNegative: e.target.checked })} className="w-4 h-4 rounded accent-red-500" /><span className="text-sm text-red-500">Vice (Subtracts)</span></label>
           </div>
-          <div className="flex gap-3 pt-2"><button onClick={() => setShowEditHabit(null)} className={`flex-1 px-4 py-3 border ${T.border} rounded-xl text-sm ${T.textMuted} hover:${T.bgCardHover}`}>Cancel</button><button onClick={saveEditHabit} className="flex-1 px-4 py-3 bg-[#5b7cf5] text-white rounded-xl text-sm font-bold shadow-lg shadow-[#5b7cf5]/15 active:scale-[0.98]">Save</button></div>
+          <div className="flex gap-3 pt-2">
+            <button onClick={() => setShowEditHabit(null)} className={`flex-1 px-4 py-3 border ${T.border} rounded-xl text-sm ${T.textMuted}`}>Cancel</button>
+            <button onClick={saveEditHabit} className={`flex-1 px-4 py-3 ${T.accentBg} text-white rounded-xl text-sm font-bold shadow-lg active:scale-[0.98]`}>Save</button>
+          </div>
         </div>
       </Modal>
 
