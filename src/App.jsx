@@ -209,6 +209,9 @@ function VersaAppMain() {
   const [showSettleStake, setShowSettleStake] = useState(false);
   const [settleStakeData, setSettleStakeData] = useState({ winnerId: '', loserId: '' });
   const [newStake, setNewStake] = useState({ type: 'custom', description: '', duration: 'weekly' });
+  const [stakeMode, setStakeMode] = useState('fixed'); // 'fixed' | 'wheel'
+  const [wheelOptions, setWheelOptions] = useState([...PUNISHMENTS.slice(0, 5)]);
+  const [newWheelOption, setNewWheelOption] = useState('');
   const [newHabit, setNewHabit] = useState({ name: '', category: 'Study', points: 10, isRepeatable: false, unit: '', description: '', isNegative: false });
   const [historyDate, setHistoryDate] = useState(null);
   const [editHabitData, setEditHabitData] = useState({});
@@ -1028,12 +1031,23 @@ function VersaAppMain() {
 
   // ─── STAKES ───
   const saveStake = async () => {
-    if (!newStake.description.trim()) return;
+    let finalDesc = newStake.description.trim();
+    let finalType = newStake.type;
+
+    if (stakeMode === 'wheel') {
+      if (wheelOptions.length < 2) { setError('Add at least 2 wheel options'); return; }
+      finalDesc = JSON.stringify(wheelOptions);
+      finalType = 'wheel';
+    } else {
+      if (!finalDesc) { setError('Type a stake description'); return; }
+    }
+
     if (!currentRoom?.id || !currentUser?.id) { setError('No room selected'); return; }
     setLoading(true); setError('');
     try {
-      await supabase.from('stakes').upsert({ id: currentRoom.id, room_id: currentRoom.id, type: newStake.type, description: newStake.description.trim(), duration: newStake.duration, created_by: currentUser.id, active: true });
+      await supabase.from('stakes').upsert({ id: currentRoom.id, room_id: currentRoom.id, type: finalType, description: finalDesc, duration: newStake.duration, created_by: currentUser.id, active: true });
       setNewStake({ type: 'custom', description: '', duration: 'weekly' });
+      setStakeMode('fixed');
       setShowStakes(false);
     } catch (err) { console.error('Stakes error:', err); setError(err.message || 'Failed to save'); }
     finally { setLoading(false); }
@@ -2220,9 +2234,11 @@ function VersaAppMain() {
 
              <div className="flex flex-col items-center justify-center pb-12">
                <Target size={200} className={`${darkMode ? 'text-[#223858]' : 'text-gray-100'} mb-8`} strokeWidth={1} />
-               <button onClick={() => setShowPunishmentWheel(true)} className="px-8 py-4 bg-[#5b7cf5] hover:bg-blue-600 text-white rounded-full font-black tracking-widest uppercase text-xs shadow-lg shadow-blue-500/30 transition-all flex items-center gap-2 active:scale-95">
-                 Draw Consequence <ChevronRight size={16} />
-               </button>
+               {(!roomStakes || roomStakes.type === 'wheel') && (
+                 <button onClick={() => setShowPunishmentWheel(true)} className="px-8 py-4 bg-[#5b7cf5] hover:bg-blue-600 text-white rounded-full font-black tracking-widest uppercase text-xs shadow-lg shadow-blue-500/30 transition-all flex items-center gap-2 active:scale-95">
+                   Draw Consequence <ChevronRight size={16} />
+                 </button>
+               )}
              </div>
           </div>
         )}
@@ -2435,21 +2451,51 @@ function VersaAppMain() {
         {roomStakes ? (
           <div>
             <div className="p-4 bg-gradient-to-r from-red-500/10 via-pink-500/10 to-purple-500/10 border border-red-500/15 rounded-xl mb-4">
-              <div className="flex items-center gap-2 mb-2"><span className={'text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider ' + (roomStakes.type === 'buyout' ? 'bg-[#e8864a]/20 text-[#e8864a]' : roomStakes.type === 'dare' ? 'bg-pink-500/20 text-pink-400' : roomStakes.type === 'service' ? 'bg-cyan-500/20 text-cyan-400' : 'bg-purple-500/20 text-purple-400')}>{roomStakes.type}</span><span className="text-[10px] text-gray-600 uppercase tracking-wider">{roomStakes.duration}</span></div>
-              <p className="text-white font-medium">{roomStakes.description}</p>
+              <div className="flex items-center gap-2 mb-2"><span className={'text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider ' + (roomStakes.type === 'buyout' ? 'bg-[#ff7b29]/20 text-[#ff7b29]' : roomStakes.type === 'dare' ? 'bg-pink-500/20 text-pink-400' : roomStakes.type === 'service' ? 'bg-cyan-500/20 text-cyan-400' : roomStakes.type === 'wheel' ? 'bg-[#5b7cf5]/20 text-[#5b7cf5]' : 'bg-purple-500/20 text-purple-400')}>{roomStakes.type}</span><span className="text-[10px] text-gray-600 uppercase tracking-wider">{roomStakes.duration}</span></div>
+              {roomStakes.type === 'wheel' ? (
+                 <div className="text-white text-sm font-medium">Custom Punishment Wheel with {(() => { try { return JSON.parse(roomStakes.description).length; } catch { return 0; }})()} options</div>
+              ) : (
+                <p className="text-white font-medium">{roomStakes.description}</p>
+              )}
               <p className="text-[11px] text-gray-600 mt-2">Set by {activeMembers.find(m => m.id === roomStakes.createdBy)?.username || 'unknown'}</p>
             </div>
             {(isRoomCreator || roomStakes.createdBy === currentUser.id) && <button onClick={clearStake} className="w-full px-4 py-2.5 border border-red-500/20 text-red-400 rounded-xl hover:bg-red-500/10 text-sm transition-all">Remove Stake</button>}
           </div>
         ) : (
           <div>
-            <p className={`${T.textMuted} text-sm mb-4`}>Set what's on the line. The weekly loser pays up.</p>
-            <div className="grid grid-cols-2 gap-2 mb-4">{stakePresets.map(sp => (
-              <button key={sp.type} onClick={() => setNewStake({ ...newStake, type: sp.type, description: sp.ph.replace('e.g. ', '') })} className={'p-3 rounded-xl border text-left transition-all ' + (newStake.type === sp.type ? 'border-red-500/40 bg-red-500/10' : (T.border + ' ' + T.bgCard + ' ' + T.bgCardHover))}><div className={'text-xs font-bold mb-0.5 ' + (newStake.type === sp.type ? 'text-red-400' : 'text-gray-400')}>{sp.label}</div><div className="text-[10px] text-gray-600">{sp.desc}</div></button>
-            ))}</div>
-            <input type="text" placeholder={stakePresets.find(s => s.type === newStake.type)?.ph || 'Describe the stake...'} value={newStake.description} onChange={e => setNewStake({ ...newStake, description: e.target.value })} className={inputCls + ' mb-3'} maxLength={60} />
+            <div className="flex gap-1 mb-4 p-1 rounded-xl bg-black/20 shrink-0">
+               <button onClick={() => setStakeMode('fixed')} className={`flex-1 py-1.5 text-[10px] font-bold rounded-lg transition-all tracking-wider uppercase ${stakeMode === 'fixed' ? 'bg-[#d06b4a] text-white shadow-sm' : (T.textMuted + ' hover:text-white')}`}>Fixed Stake</button>
+               <button onClick={() => setStakeMode('wheel')} className={`flex-1 py-1.5 text-[10px] font-bold rounded-lg transition-all tracking-wider uppercase ${stakeMode === 'wheel' ? 'bg-[#d06b4a] text-white shadow-sm' : (T.textMuted + ' hover:text-white')}`}>Spin the Wheel</button>
+            </div>
+
+            {stakeMode === 'fixed' ? (
+              <div className="anim-fade-in">
+                <div className="grid grid-cols-2 gap-2 mb-4">{stakePresets.map(sp => (
+                  <button key={sp.type} onClick={() => setNewStake({ ...newStake, type: sp.type, description: sp.ph.replace('e.g. ', '') })} className={'p-3 rounded-xl border text-left transition-all ' + (newStake.type === sp.type ? 'border-red-500/40 bg-red-500/10' : (T.border + ' ' + T.bgCard + ' ' + T.bgCardHover))}><div className={'text-xs font-bold mb-0.5 ' + (newStake.type === sp.type ? 'text-red-400' : 'text-gray-400')}>{sp.label}</div><div className="text-[10px] text-gray-600">{sp.desc}</div></button>
+                ))}</div>
+                <input type="text" placeholder={stakePresets.find(s => s.type === newStake.type)?.ph || 'Describe the stake...'} value={newStake.description} onChange={e => setNewStake({ ...newStake, description: e.target.value })} className={inputCls + ' mb-3'} maxLength={60} />
+              </div>
+            ) : (
+              <div className="anim-fade-in mb-4">
+                <p className={`text-xs ${T.textMuted} mb-3`}>Add multiple consequences. The loser spins the wheel to see what they get.</p>
+                <div className="space-y-2 mb-4 max-h-[160px] overflow-y-auto pr-1">
+                  {wheelOptions.map((opt, i) => (
+                    <div key={i} className={`flex items-center justify-between p-2.5 rounded-xl border ${T.border} ${T.bgCard}`}>
+                      <span className="text-sm font-medium text-gray-300 truncate pr-2">{opt}</span>
+                      <button onClick={() => setWheelOptions(prev => prev.filter((_, idx) => idx !== i))} className="text-gray-500 hover:text-red-400 px-1"><X size={14} /></button>
+                    </div>
+                  ))}
+                  {wheelOptions.length === 0 && <div className="text-xs text-gray-500 text-center py-4">No options added</div>}
+                </div>
+                <div className="flex gap-2">
+                  <input type="text" placeholder="Add a wheel consequence..." value={newWheelOption} onChange={e => setNewWheelOption(e.target.value)} onKeyDown={e => { if(e.key === 'Enter' && newWheelOption.trim()) { setWheelOptions([...wheelOptions, newWheelOption.trim()]); setNewWheelOption(''); } }} className={inputCls} maxLength={40} />
+                  <button onClick={() => { if(newWheelOption.trim()) { setWheelOptions([...wheelOptions, newWheelOption.trim()]); setNewWheelOption(''); } }} className={`px-4 bg-[#264060] text-blue-400 rounded-xl font-bold flex shrink-0 items-center justify-center hover:bg-[#2a4a70]`}><Plus size={18} /></button>
+                </div>
+              </div>
+            )}
+
             <div className="flex gap-2 mb-4">{['weekly', 'monthly'].map(d => <button key={d} onClick={() => setNewStake({ ...newStake, duration: d })} className={'flex-1 py-2.5 text-xs font-bold rounded-xl transition-all uppercase tracking-wider ' + (newStake.duration === d ? (isSunset ? (darkMode ? 'bg-[#3d2640] text-white' : 'bg-orange-100 text-orange-900') : (darkMode ? 'bg-[#223858] text-white' : 'bg-gray-200 text-gray-900')) : (darkMode ? 'bg-[#182544] text-gray-600' : 'bg-gray-100 text-gray-400'))}>{d}</button>)}</div>
-            <button onClick={saveStake} disabled={!newStake.description.trim() || loading} className="w-full px-4 py-4 bg-[#d06b4a] text-white rounded-xl text-base font-bold shadow-lg shadow-red-500/20 active:scale-[0.98] disabled:opacity-30 transition-all">{loading ? 'Saving...' : !newStake.description.trim() ? 'Type a stake above' : '⚡ Set Stakes'}</button>
+            <button onClick={saveStake} disabled={loading} className="w-full px-4 py-4 bg-[#d06b4a] text-white rounded-xl text-base font-bold shadow-lg shadow-red-500/20 active:scale-[0.98] disabled:opacity-30 transition-all">{loading ? 'Saving...' : '⚡ Set Stakes'}</button>
             {error && <p className="text-red-400 text-xs text-center mt-2">{error}</p>}
           </div>
         )}
@@ -2718,7 +2764,17 @@ function VersaAppMain() {
       {/* Punishment Wheel */}
       <Modal show={showPunishmentWheel} onClose={() => { setShowPunishmentWheel(false); setWheelResult(null); setWheelSpinning(false); }} wide dark={darkMode}>
         <ModalHeader title="🎰 Punishment Wheel" onClose={() => { setShowPunishmentWheel(false); setWheelResult(null); setWheelSpinning(false); }} dark={darkMode} />
-        {lastWeekData && lastWeekData.scores.length > 1 && (
+        {lastWeekData && lastWeekData.scores.length > 1 && (() => {
+          let currWheelOpts = [...PUNISHMENTS.slice(0, 8)];
+          if (roomStakes?.type === 'wheel') {
+            try { currWheelOpts = JSON.parse(roomStakes.description); } catch {}
+          } else {
+            const lastArchived = [...archivedStakes].reverse().find(s => s.type === 'wheel');
+            if (lastArchived) { try { currWheelOpts = JSON.parse(lastArchived.description); } catch {} }
+          }
+          if (currWheelOpts.length === 0) currWheelOpts = [...PUNISHMENTS.slice(0, 8)];
+
+          return (
           <div className="text-center">
             <div className="mb-4">
               <p className={`text-sm ${T.textMuted}`}>Loser this week:</p>
@@ -2732,21 +2788,25 @@ function VersaAppMain() {
             {/* Wheel display */}
             <div className="relative mx-auto mb-6" style={{ width: 280, height: 280 }}>
               <div className={`w-full h-full rounded-full border-4 border-[#2a4060] overflow-hidden relative`} style={{ transform: `rotate(${wheelSpinning ? 3600 + Math.random() * 360 : 0}deg)`, transition: wheelSpinning ? 'transform 4s cubic-bezier(0.17,0.67,0.12,0.99)' : 'none' }}>
-                {PUNISHMENTS.map((p, i) => {
-                  const angle = (360 / PUNISHMENTS.length) * i;
+                {currWheelOpts.map((p, i) => {
+                  const angle = (360 / currWheelOpts.length) * i;
+                  const skewAngle = currWheelOpts.length > 2 ? (90 - 360 / currWheelOpts.length) : 0;
                   const colors = ['#3b82f6', '#ef4444', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899', '#06b6d4', '#f97316', '#6366f1', '#14b8a6', '#e11d48', '#a855f7'];
-                  return <div key={i} className="absolute text-[7px] font-bold text-white" style={{
+                  return <div key={i} className="absolute font-bold text-white uppercase text-center break-words px-4 leading-[1.1] drop-shadow-md" style={{
                     width: '50%', height: '50%',
                     transformOrigin: '100% 100%',
-                    transform: `rotate(${angle}deg) skewY(${90 - 360 / PUNISHMENTS.length}deg)`,
+                    transform: `rotate(${angle}deg) skewY(${Math.max(0, skewAngle)}deg)`,
                     left: 0, top: 0,
                     background: colors[i % colors.length],
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  }} />;
+                    fontSize: currWheelOpts.length > 6 ? 6 : 8
+                  }}>
+                     <div style={{ transform: `skewY(-${Math.max(0, skewAngle)}deg) rotate(${360/currWheelOpts.length / 2}deg) translateY(-25px)` }}>{p}</div>
+                  </div>;
                 })}
               </div>
               {/* Pointer */}
-              <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-2 w-0 h-0 border-l-[10px] border-r-[10px] border-t-[16px] border-l-transparent border-r-transparent border-t-white z-10" />
+              <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-2 w-0 h-0 border-l-[10px] border-r-[10px] border-t-[16px] border-l-transparent border-r-transparent border-t-white z-10 drop-shadow-lg" />
             </div>
 
             {/* Result */}
@@ -2763,11 +2823,11 @@ function VersaAppMain() {
                 if (wheelSpinning) return;
                 setWheelSpinning(true);
                 setTimeout(() => {
-                  const result = PUNISHMENTS[Math.floor(Math.random() * PUNISHMENTS.length)];
+                  const result = currWheelOpts[Math.floor(Math.random() * currWheelOpts.length)];
                   setWheelResult(result);
                   setWheelSpinning(false);
                 }, 4200);
-              }} disabled={wheelSpinning} className="w-full px-6 py-3 bg-[#d06b4a] text-white rounded-xl text-sm font-bold active:scale-[0.98] disabled:opacity-60">
+              }} disabled={wheelSpinning} className="w-full px-6 py-3 bg-[#d06b4a] text-white rounded-xl text-sm font-bold active:scale-[0.98] disabled:opacity-60 transition-all">
                 {wheelSpinning ? 'Spinning...' : 'Spin the Wheel'}
               </button>
             ) : (
@@ -2780,7 +2840,7 @@ function VersaAppMain() {
               </div>
             )}
           </div>
-        )}
+        )})()}
       </Modal>
 
       {/* Weekly Story Cards */}
@@ -2958,18 +3018,23 @@ function VersaAppMain() {
               {/* Chart SVG */}
               <div className="relative mb-6">
                 <svg viewBox={`0 0 ${SVG_W} ${SVG_H}`} className="w-full h-auto drop-shadow-xl overflow-visible">
-                  
+                  <defs>
+                    <linearGradient id="heatGradient" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor={accentStr} stopOpacity={0.35} />
+                      <stop offset="100%" stopColor={accentStr} stopOpacity={0.01} />
+                    </linearGradient>
+                  </defs>
+
                   {/* Grid Lines */}
                   {/* Goal Line */}
                   <line x1={M_LR} y1={yGoal} x2={SVG_W - M_LR} y2={yGoal} stroke={darkMode ? "rgba(255,255,255,0.2)" : "rgba(0,0,0,0.15)"} strokeWidth={1} strokeDasharray="4 4" />
                   <text x={M_LR} y={yGoal - 4} fontSize="8" fill={darkMode ? "#a1a1aa" : "#85858a"} fontWeight="bold">DAILY GOAL ({dailyTarget})</text>
 
                   {/* Zero Line */}
-                  <line x1={M_LR} y1={yZero} x2={SVG_W - M_LR} y2={yZero} stroke={darkMode ? "rgba(255,255,255,0.4)" : "rgba(0,0,0,0.3)"} strokeWidth={1} />
-                  <text x={SVG_W - M_LR} y={yZero - 4} fontSize="8" fill={darkMode ? "#a1a1aa" : "#85858a"} fontWeight="bold" textAnchor="end">BASELINE (0)</text>
+                  <line x1={M_LR} y1={yZero} x2={SVG_W - M_LR} y2={yZero} stroke={darkMode ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.1)"} strokeWidth={1} strokeDasharray="2 4" />
 
                   {/* Data Paths */}
-                  <path d={fillPath} fill={accentOp} />
+                  <path d={fillPath} fill="url(#heatGradient)" />
                   <path d={strokePath} fill="none" stroke={accentStr} strokeWidth="2.5" strokeLinejoin="round" strokeLinecap="round" />
                   
                   {/* Active Point Highlight (Today) */}
