@@ -2050,7 +2050,7 @@ function VersaAppMain() {
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto w-full relative" id="scroll-wrapper">
+      <div className="flex-1 overflow-y-scroll overflow-x-hidden w-full relative" id="scroll-wrapper">
         <div className="max-w-xl mx-auto px-5 pt-6 pb-12">
         {/* ======================================= */}
         {/* TAB 1: OVERVIEW */}
