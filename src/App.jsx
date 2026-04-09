@@ -2331,7 +2331,6 @@ function VersaAppMain() {
         )}
           </div>
         </div>
-      </div>
 
       {/* ═══ BOTTOM NAVIGATION TABS ═══ */}
       <div className={`fixed bottom-0 left-0 right-0 w-full bottom-nav z-[999] border-t shadow-[0_-10px_40px_rgba(0,0,0,0.1)] ${T.bgCard} ${T.border}`}>
