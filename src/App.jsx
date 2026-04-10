@@ -193,6 +193,7 @@ function VersaAppMain() {
   const [copied, setCopied] = useState(false);
   const [habits, setHabits] = useState([]);
   const [completions, setCompletions] = useState([]);
+  const savingRef = useRef(false);
   const [allCompletions, setAllCompletions] = useState([]);
   const [historyCompletions, setHistoryCompletions] = useState([]);
   const [roomMembers, setRoomMembers] = useState([]);
@@ -432,12 +433,13 @@ function VersaAppMain() {
     // Fetch today's completions
     const today = getToday();
     const fetchCompletions = async () => {
+      if (savingRef.current) return; // Don't overwrite optimistic updates while saving
       const { data, error } = await supabase.from('completions').select('*').eq('room_id', currentRoom.id).eq('date', today);
       if (error) { console.error('Fetch completions error:', error); return; }
-      if (data) setCompletions(data.map(c => ({ ...c, id: c.id, userId: c.user_id, habitId: c.habit_id, roomId: c.room_id, habitName: c.habit_name, habitCategory: c.habit_category, habitPoints: c.habit_points, bonusPoints: c.bonus_points, streakMultiplier: c.streak_multiplier })));
+      if (data && !savingRef.current) setCompletions(data.map(c => ({ ...c, id: c.id, userId: c.user_id, habitId: c.habit_id, roomId: c.room_id, habitName: c.habit_name, habitCategory: c.habit_category, habitPoints: c.habit_points, bonusPoints: c.bonus_points, streakMultiplier: c.streak_multiplier })));
     };
     fetchCompletions();
-    subs.push(supabase.channel('completions-today-' + currentRoom.id).on('postgres_changes', { event: '*', schema: 'public', table: 'completions' }, () => setTimeout(fetchCompletions, 300)).subscribe());
+    subs.push(supabase.channel('completions-today-' + currentRoom.id).on('postgres_changes', { event: '*', schema: 'public', table: 'completions', filter: 'room_id=eq.' + currentRoom.id }, () => setTimeout(fetchCompletions, 800)).subscribe());
 
     // Fetch weekly completions
     const ws = getWeekStart(), we = getWeekEnd();
@@ -447,7 +449,7 @@ function VersaAppMain() {
       if (data) setAllCompletions(data.map(c => ({ ...c, id: c.id, userId: c.user_id, habitId: c.habit_id, roomId: c.room_id, habitName: c.habit_name, habitCategory: c.habit_category, habitPoints: c.habit_points, bonusPoints: c.bonus_points })));
     };
     fetchWeekly();
-    subs.push(supabase.channel('completions-week-' + currentRoom.id).on('postgres_changes', { event: '*', schema: 'public', table: 'completions' }, () => setTimeout(fetchWeekly, 500)).subscribe());
+    subs.push(supabase.channel('completions-week-' + currentRoom.id).on('postgres_changes', { event: '*', schema: 'public', table: 'completions', filter: 'room_id=eq.' + currentRoom.id }, () => setTimeout(fetchWeekly, 1000)).subscribe());
 
     // Fetch members (users who have this room in their rooms array)
     const fetchMembers = async () => {
@@ -1206,15 +1208,17 @@ function VersaAppMain() {
     const bonus = rollBonus();
     const baseWithStreak = h.points * streakMulti.multi;
     const bonusAmt = bonus ? bonus.flat : 0;
-    const finalPts = baseWithStreak + bonusAmt;
+
+    // Lock to prevent realtime refetch from stomping optimistic update
+    savingRef.current = true;
 
     // Optimistic update — immediately update local state
+    const cid = currentUser.id + '_' + hid + '_' + t;
     if (ex) {
-      if (!h.isRepeatable && ex.count >= 1) return;
+      if (!h.isRepeatable && ex.count >= 1) { savingRef.current = false; return; }
       setCompletions(prev => prev.map(c => c.id === ex.id ? { ...c, count: c.count + 1, habitPoints: baseWithStreak, bonusPoints: (c.bonusPoints || 0) + bonusAmt } : c));
       if (!h.isRepeatable && ex.count + 1 >= 1) triggerMaxed();
     } else {
-      const cid = currentUser.id + '_' + hid + '_' + t;
       setCompletions(prev => [...prev, { id: cid, userId: currentUser.id, habitId: hid, roomId: currentRoom.id, date: t, count: 1, habitName: h.name, habitPoints: baseWithStreak, habitCategory: h.category, streakMultiplier: streakMulti.multi, bonusPoints: bonusAmt }]);
       if (max === 1) triggerMaxed();
     }
@@ -1222,21 +1226,23 @@ function VersaAppMain() {
     try {
       if (ex) {
         if (h.isRepeatable || ex.count < 1) {
-          await supabase.from('completions').update({
+          const { error } = await supabase.from('completions').update({
             count: ex.count + 1,
             habit_points: baseWithStreak,
-            ...(bonusAmt > 0 ? { bonus_points: (ex.bonusPoints || 0) + bonusAmt } : {}),
+            bonus_points: (ex.bonusPoints || 0) + bonusAmt,
             streak_multiplier: streakMulti.multi
           }).eq('id', ex.id);
+          if (error) throw error;
         }
       } else {
-        const cid = currentUser.id + '_' + hid + '_' + t;
-        await supabase.from('completions').insert({
+        // Use upsert to handle ID collisions from rapid taps
+        const { error } = await supabase.from('completions').upsert({
           id: cid, user_id: currentUser.id, habit_id: hid, room_id: currentRoom.id, date: t, count: 1,
           habit_name: h.name, habit_points: baseWithStreak, habit_category: h.category,
           streak_multiplier: streakMulti.multi,
-          ...(bonusAmt > 0 ? { bonus_points: bonusAmt } : {})
+          bonus_points: bonusAmt
         });
+        if (error) throw error;
       }
       // Show bonus notification
       if (bonus) {
@@ -1255,10 +1261,25 @@ function VersaAppMain() {
       } else if (newCount === 1 || Math.random() < 0.3) {
         postActivity(feedText, bonus);
       }
-    } catch (err) { console.error(err); }
+    } catch (err) {
+      console.error('Save completion error:', err);
+      // Revert optimistic update on failure
+      if (ex) {
+        setCompletions(prev => prev.map(c => c.id === ex.id ? { ...c, count: ex.count, bonusPoints: ex.bonusPoints } : c));
+      } else {
+        setCompletions(prev => prev.filter(c => c.id !== cid));
+      }
+    } finally {
+      // Release lock after a delay to let server sync
+      setTimeout(() => { savingRef.current = false; }, 1500);
+    }
   };
   const handleDecrement = async (hid) => {
     const ex = getExisting(hid); if (!ex) return;
+    savingRef.current = true;
+
+    const prevCount = ex.count;
+    const prevBonus = ex.bonusPoints;
 
     // Optimistic update
     if (ex.count > 1) {
@@ -1273,14 +1294,26 @@ function VersaAppMain() {
       if (ex.count > 1) {
         const newCount = ex.count - 1;
         const newBonus = ex.bonusPoints ? Math.round((ex.bonusPoints / ex.count) * newCount) : 0;
-        await supabase.from('completions').update({
+        const { error } = await supabase.from('completions').update({
           count: newCount,
-          ...(ex.bonusPoints ? { bonus_points: newBonus } : {})
+          bonus_points: newBonus
         }).eq('id', ex.id);
+        if (error) throw error;
       } else {
-        await supabase.from('completions').delete().eq('id', ex.id);
+        const { error } = await supabase.from('completions').delete().eq('id', ex.id);
+        if (error) throw error;
       }
-    } catch (err) { console.error(err); }
+    } catch (err) {
+      console.error('Decrement error:', err);
+      // Revert
+      setCompletions(prev => {
+        const exists = prev.find(c => c.id === ex.id);
+        if (exists) return prev.map(c => c.id === ex.id ? { ...c, count: prevCount, bonusPoints: prevBonus } : c);
+        return [...prev, ex];
+      });
+    } finally {
+      setTimeout(() => { savingRef.current = false; }, 1500);
+    }
   };
 
   // ─── HISTORY ───
