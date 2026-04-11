@@ -1249,65 +1249,58 @@ function VersaAppMain() {
       setTimeout(() => setMaxedHabit(null), 1500);
     }
 
-    // Save to DB with retry
-    let saved = false;
-    for (let attempt = 0; attempt < 2 && !saved; attempt++) {
-      try {
-        if (ex) {
-          const updateData = { count: newCount, habit_points: basePts };
-          if (bonusAmt > 0 || ex.bonusPoints > 0) updateData.bonus_points = (ex.bonusPoints || 0) + bonusAmt;
-          const { error } = await supabase.from('completions').update(updateData).eq('id', ex.id);
-          if (error) throw error;
-        } else {
-          // Try insert first, fall back to upsert if ID already exists
-          const insertData = {
-            id: cid, user_id: currentUser.id, habit_id: hid, room_id: currentRoom.id, date: t, count: 1,
-            habit_name: h.name, habit_points: basePts, habit_category: h.category,
-            streak_multiplier: 1,
-          };
-          if (bonusAmt > 0) insertData.bonus_points = bonusAmt;
-          const { error: insertErr } = await supabase.from('completions').insert(insertData);
-          if (insertErr) {
-            // ID collision — try upsert
-            const { error: upsertErr } = await supabase.from('completions').upsert(insertData);
-            if (upsertErr) throw upsertErr;
-          }
+    // Save to DB
+    try {
+      if (ex) {
+        if (h.isRepeatable || ex.count < 1) {
+          const { error } = await supabase.from('completions').update({
+            count: newCount,
+            habit_points: basePts,
+            ...(bonusAmt > 0 ? { bonus_points: (ex.bonusPoints || 0) + bonusAmt } : {}),
+            streak_multiplier: 1
+          }).eq('id', ex.id);
+          if (error) { console.error('VERSA UPDATE ERROR:', JSON.stringify(error)); throw error; }
         }
-        saved = true;
-      } catch (err) {
-        console.error('VERSA: save attempt', attempt + 1, 'failed:', err);
-        if (attempt === 1) {
-          // Final failure — revert optimistic update
-          if (ex) {
-            setCompletions(prev => prev.map(c => c.id === ex.id ? { ...c, count: ex.count, bonusPoints: ex.bonusPoints } : c));
-          } else {
-            setCompletions(prev => prev.filter(c => c.id !== cid));
-          }
-        }
-        await new Promise(r => setTimeout(r, 500)); // wait before retry
+      } else {
+        const payload = {
+          id: cid, user_id: currentUser.id, habit_id: hid, room_id: currentRoom.id, date: t, count: 1,
+          habit_name: h.name, habit_points: parseInt(basePts) || 10, habit_category: h.category,
+          streak_multiplier: 1,
+          ...(bonusAmt > 0 ? { bonus_points: bonusAmt } : {})
+        };
+        console.log('VERSA INSERT:', JSON.stringify(payload));
+        const { error } = await supabase.from('completions').upsert(payload);
+        if (error) { console.error('VERSA UPSERT ERROR:', JSON.stringify(error)); throw error; }
       }
-    }
 
-    // Release lock
-    unlockSaving();
-
-    if (!saved) return;
-
-    // Bonus notification
-    if (bonus) {
-      setBonusMsg(bonus);
-      setConfettiTrigger(v => v + 1);
-      setTimeout(() => setBonusMsg(null), 2500);
-    }
-    // Activity feed
-    const streakTag = streakData.streak >= 3 ? ` 🔥${streakData.streak}d` : '';
-    const feedText = bonus
-      ? `${h.name} (${basePts > 0 ? '+' : ''}${basePts} ${bonus.label})${streakTag}`
-      : `${h.name} (${basePts > 0 ? '+' : ''}${basePts})${streakTag}`;
-    if (!h.isRepeatable && newCount >= 1) {
-      postActivity(`Maxed out ${h.name}! 💎${streakTag}`, bonus);
-    } else if (newCount === 1 || Math.random() < 0.3) {
-      postActivity(feedText, bonus);
+      // Bonus notification
+      if (bonus) {
+        setBonusMsg(bonus);
+        setConfettiTrigger(v => v + 1);
+        setTimeout(() => setBonusMsg(null), 2500);
+      }
+      // Activity feed
+      const streakTag = streakData.streak >= 3 ? ` 🔥${streakData.streak}d` : '';
+      const feedText = bonus
+        ? `${h.name} (${basePts > 0 ? '+' : ''}${basePts} ${bonus.label})${streakTag}`
+        : `${h.name} (${basePts > 0 ? '+' : ''}${basePts})${streakTag}`;
+      if (!h.isRepeatable && newCount >= 1) {
+        postActivity(`Maxed out ${h.name}! 💎${streakTag}`, bonus);
+      } else if (newCount === 1 || Math.random() < 0.3) {
+        postActivity(feedText, bonus);
+      }
+    } catch (err) {
+      console.error('VERSA SAVE FAILED:', err);
+      setError('Save failed: ' + (err?.message || err?.details || JSON.stringify(err)));
+      setTimeout(() => setError(''), 5000);
+      // Revert optimistic update
+      if (ex) {
+        setCompletions(prev => prev.map(c => c.id === ex.id ? { ...c, count: ex.count, bonusPoints: ex.bonusPoints } : c));
+      } else {
+        setCompletions(prev => prev.filter(c => c.id !== cid));
+      }
+    } finally {
+      unlockSaving();
     }
   };
   const handleDecrement = async (hid) => {
