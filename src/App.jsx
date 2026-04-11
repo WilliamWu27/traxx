@@ -421,7 +421,19 @@ function VersaAppMain() {
     const fetchHabits = async () => {
       const { data, error } = await supabase.from('habits').select('*').eq('room_id', currentRoom.id);
       if (error) { console.error('Fetch habits error:', error); return; }
-      if (data) setHabits(data.map(h => ({ ...h, id: h.id, roomId: h.room_id, isRepeatable: !!h.is_repeatable, createdBy: h.created_by })));
+      if (data) {
+        const mapped = data.map(h => ({ ...h, id: h.id, roomId: h.room_id, isRepeatable: h.is_repeatable !== false, createdBy: h.created_by }));
+        setHabits(mapped);
+        // Fix NULL is_repeatable in DB — NULL means it was never set, default to true (repeatable)
+        const nullHabits = data.filter(h => h.is_repeatable === null || h.is_repeatable === undefined);
+        if (nullHabits.length > 0) {
+          nullHabits.forEach(h => {
+            supabase.from('habits').update({ is_repeatable: true }).eq('id', h.id).then(() => {});
+          });
+          // Also fix local state
+          setHabits(prev => prev.map(h => nullHabits.find(n => n.id === h.id) ? { ...h, isRepeatable: true } : h));
+        }
+      }
     };
     fetchHabits();
     subs.push(supabase.channel('habits-' + currentRoom.id).on('postgres_changes', { event: '*', schema: 'public', table: 'habits', filter: 'room_id=eq.' + currentRoom.id }, () => setTimeout(fetchHabits, 300)).subscribe());
@@ -2202,7 +2214,7 @@ function VersaAppMain() {
                               {done ? <X size={12} strokeWidth={4} /> : null}
                             </button>
                           ) : (
-                            <button onClick={() => !maxed ? handleIncrement(h.id) : handleDecrement(h.id)} className={`w-6 h-6 rounded-full border-2 flex items-center justify-center mr-4 transition-all ${done ? (isSunset ? 'bg-[#ff4422] border-[#ff4422] text-white' : 'bg-[#5b7cf5] border-[#5b7cf5] text-white') : (darkMode ? 'border-gray-600' : 'border-gray-300')}`}>
+                            <button onClick={() => handleIncrement(h.id)} className={`w-6 h-6 rounded-full border-2 flex items-center justify-center mr-4 transition-all ${done ? (isSunset ? 'bg-[#ff4422] border-[#ff4422] text-white' : 'bg-[#5b7cf5] border-[#5b7cf5] text-white') : (darkMode ? 'border-gray-600' : 'border-gray-300')}`}>
                               {done && <Check size={14} strokeWidth={4} />}
                             </button>
                           )}
