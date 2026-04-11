@@ -1222,7 +1222,8 @@ function VersaAppMain() {
   const handleIncrement = async (hid) => {
     const t = getToday();
     const h = habits.find(x => x.id === hid);
-    if (!h) { console.error('VERSA: habit not found', hid, habits.map(x => x.id)); return; }
+    if (!h) { console.error('VERSA: habit not found', hid); return; }
+    console.log('VERSA TAP:', h.name, 'id:', hid, 'repeatable:', h.isRepeatable, 'points:', h.points);
     
     // Non-repeatable guard
     const ex = getExisting(hid);
@@ -1251,15 +1252,21 @@ function VersaAppMain() {
 
     // Save to DB
     try {
+      // Verify supabase client is healthy
+      if (!supabase || !supabase.from) {
+        console.error('VERSA: supabase client is broken!', typeof supabase);
+        throw new Error('Supabase client not available');
+      }
+      console.log('VERSA: saving, ex:', !!ex, 'newCount:', newCount);
       if (ex) {
         if (h.isRepeatable || ex.count < 1) {
           const { error } = await supabase.from('completions').update({
             count: newCount,
-            habit_points: basePts,
+            habit_points: parseInt(basePts) || 10,
             ...(bonusAmt > 0 ? { bonus_points: (ex.bonusPoints || 0) + bonusAmt } : {}),
             streak_multiplier: 1
           }).eq('id', ex.id);
-          if (error) { console.error('VERSA UPDATE ERROR:', JSON.stringify(error)); throw error; }
+          if (error) { console.error('VERSA UPDATE ERROR:', error.message, error.details, error.hint); throw error; }
         }
       } else {
         const payload = {
@@ -1268,9 +1275,8 @@ function VersaAppMain() {
           streak_multiplier: 1,
           ...(bonusAmt > 0 ? { bonus_points: bonusAmt } : {})
         };
-        console.log('VERSA INSERT:', JSON.stringify(payload));
-        const { error } = await supabase.from('completions').upsert(payload);
-        if (error) { console.error('VERSA UPSERT ERROR:', JSON.stringify(error)); throw error; }
+        const { data: insertData, error } = await supabase.from('completions').insert(payload);
+        if (error) { console.error('VERSA INSERT ERROR:', error.message, error.details, error.hint, error.code); throw error; }
       }
 
       // Bonus notification
