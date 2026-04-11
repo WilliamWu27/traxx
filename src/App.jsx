@@ -264,13 +264,9 @@ function VersaAppMain() {
   const [dailyTarget, setDailyTarget] = useState(400);
   const [streakTarget, setStreakTarget] = useState(80);
 
-  const getDynamicStreakTarget = (baseTarget, multi) => {
-    if (multi >= 3) return Math.round(baseTarget * 4.5);
-    if (multi >= 2.5) return Math.round(baseTarget * 3.5);
-    if (multi >= 2) return Math.round(baseTarget * 2.5);
-    if (multi >= 1.5) return Math.round(baseTarget * 1.75);
-    return baseTarget;
-  };
+  // Streak threshold for qualifying days
+  const getDynamicStreakTarget = (baseTarget) => baseTarget;
+
 
   useEffect(() => {
     if (currentUser) {
@@ -425,7 +421,7 @@ function VersaAppMain() {
     const fetchHabits = async () => {
       const { data, error } = await supabase.from('habits').select('*').eq('room_id', currentRoom.id);
       if (error) { console.error('Fetch habits error:', error); return; }
-      if (data) setHabits(data.map(h => ({ ...h, id: h.id, roomId: h.room_id, isRepeatable: h.is_repeatable, createdBy: h.created_by })));
+      if (data) setHabits(data.map(h => ({ ...h, id: h.id, roomId: h.room_id, isRepeatable: !!h.is_repeatable, createdBy: h.created_by })));
     };
     fetchHabits();
     subs.push(supabase.channel('habits-' + currentRoom.id).on('postgres_changes', { event: '*', schema: 'public', table: 'habits', filter: 'room_id=eq.' + currentRoom.id }, () => setTimeout(fetchHabits, 300)).subscribe());
@@ -585,7 +581,7 @@ function VersaAppMain() {
         });
         Object.entries(datePts).forEach(([date, pts]) => {
           const multi = dateMultis[date] || 1;
-          if (pts >= getDynamicStreakTarget(streakTarget, multi)) qualifyingDates.add(date);
+          if (pts >= getDynamicStreakTarget(streakTarget)) qualifyingDates.add(date);
         });
 
         const dates = [...qualifyingDates].sort().reverse();
@@ -667,7 +663,7 @@ function VersaAppMain() {
         });
         const userQualDates = {};
         Object.entries(userDates).forEach(([uid, dates]) => {
-          userQualDates[uid] = new Set(Object.entries(dates).filter(([date, pts]) => pts >= getDynamicStreakTarget(streakTarget, userDateMultis[uid]?.[date] || 1)).map(([date]) => date));
+          userQualDates[uid] = new Set(Object.entries(dates).filter(([date, pts]) => pts >= getDynamicStreakTarget(streakTarget)).map(([date]) => date));
         });
 
         // For each pair (me + rival), count consecutive days both qualified
@@ -914,7 +910,7 @@ function VersaAppMain() {
       };
       revoke();
     }
-  }, [currentUser, currentRoom, completions, habits, streakFreeze, dailyTarget]);
+  }, [currentUser, currentRoom, completions, habits, streakFreeze, dailyTarget, streakData]);
   useEffect(() => { freezeEarnedRef.current = false; }, [dateKey]);
 
   // ─── AUTH HANDLERS ───
@@ -1132,27 +1128,31 @@ function VersaAppMain() {
   // ─── COMPLETIONS (with embedded habit data for orphan-proofing) ───
   const getExisting = (hid) => { const t = getToday(); return completions.find(c => c.userId === currentUser.id && c.habitId === hid && c.date === t); };
 
-  // Mystery bonus: flat point bonuses with different probabilities
-  // ~10% total chance of getting a bonus on any completion
+  // Mystery bonus: flat point bonuses — streak boosts your chances
   const rollBonus = () => {
+    const luck = streakBonus.chance; // 1× to 5× based on streak
     const roll = Math.random();
-    if (roll < 0.002) return { flat: 50, label: '🎰 JACKPOT! +50', type: 'jackpot' };
-    if (roll < 0.007) return { flat: 20, label: '🔥 +20 BONUS!', type: 'epic' };
-    if (roll < 0.02) return { flat: 15, label: '⚡ +15 BONUS!', type: 'rare' };
-    if (roll < 0.05) return { flat: 10, label: '✨ +10 BONUS!', type: 'bonus' };
-    if (roll < 0.10) return { flat: 5, label: '🌟 +5 BONUS!', type: 'common' };
+    if (roll < 0.002 * luck) return { flat: 50, label: '🎰 JACKPOT! +50', type: 'jackpot' };
+    if (roll < 0.007 * luck) return { flat: 20, label: '🔥 +20 BONUS!', type: 'epic' };
+    if (roll < 0.02 * luck) return { flat: 15, label: '⚡ +15 BONUS!', type: 'rare' };
+    if (roll < 0.05 * luck) return { flat: 10, label: '✨ +10 BONUS!', type: 'bonus' };
+    if (roll < 0.10 * luck) return { flat: 5, label: '🌟 +5 BONUS!', type: 'common' };
     return null;
   };
 
-  // ─── STREAK MULTIPLIER (clean numbers) ───
-  const getStreakMultiplier = (streak) => {
-    if (streak >= 30) return { multi: 3, label: '3×', tier: 'Legend', color: 'text-red-400', bg: 'bg-red-500/20' };
-    if (streak >= 14) return { multi: 2.5, label: '2.5×', tier: 'Dedicated', color: 'text-[#e8864a]', bg: 'bg-[#e8864a]/20' };
-    if (streak >= 7) return { multi: 2, label: '2×', tier: 'Consistent', color: 'text-purple-400', bg: 'bg-purple-500/20' };
-    if (streak >= 3) return { multi: 1.5, label: '1.5×', tier: 'Building', color: 'text-blue-400', bg: 'bg-blue-500/20' };
-    return { multi: 1, label: '1×', tier: null, color: 'text-gray-500', bg: '' };
+  // ─── STREAK BONUS CHANCE ───
+  // Streaks boost your CHANCE of getting mystery bonuses (1.1× to 5× over a year)
+  const getStreakBonusChance = (streak) => {
+    const s = Math.min(streak, 365);
+    const chance = 1 + 4 * Math.sqrt(s / 365);
+    if (s >= 180) return { chance, label: Math.round(chance * 10) / 10 + '× luck', tier: 'Legend', color: 'text-red-400', bg: 'bg-red-500/20', icon: '🎰' };
+    if (s >= 90) return { chance, label: Math.round(chance * 10) / 10 + '× luck', tier: 'Master', color: 'text-amber-400', bg: 'bg-amber-500/20', icon: '💎' };
+    if (s >= 30) return { chance, label: Math.round(chance * 10) / 10 + '× luck', tier: 'Dedicated', color: 'text-purple-400', bg: 'bg-purple-500/20', icon: '🔥' };
+    if (s >= 7) return { chance, label: Math.round(chance * 10) / 10 + '× luck', tier: 'Consistent', color: 'text-blue-400', bg: 'bg-blue-500/20', icon: '⚡' };
+    if (s >= 3) return { chance, label: Math.round(chance * 10) / 10 + '× luck', tier: 'Building', color: 'text-emerald-400', bg: 'bg-emerald-500/20', icon: '🌱' };
+    return { chance: 1, label: '', tier: null, color: 'text-gray-500', bg: '', icon: '' };
   };
-  const streakMulti = getStreakMultiplier(streakData.streak || 0);
+  const streakBonus = getStreakBonusChance(streakData.streak || 0);
 
   const postActivity = async (text, bonus) => {
     try {
@@ -1206,7 +1206,7 @@ function VersaAppMain() {
 
     // Roll for mystery bonus (flat addition)
     const bonus = rollBonus();
-    const baseWithStreak = h.points * streakMulti.multi;
+    const basePts = h.points;
     const bonusAmt = bonus ? bonus.flat : 0;
 
     // Lock to prevent realtime refetch from stomping optimistic update
@@ -1216,10 +1216,10 @@ function VersaAppMain() {
     const cid = currentUser.id + '_' + hid + '_' + t;
     if (ex) {
       if (!h.isRepeatable && ex.count >= 1) { savingRef.current = false; return; }
-      setCompletions(prev => prev.map(c => c.id === ex.id ? { ...c, count: c.count + 1, habitPoints: baseWithStreak, bonusPoints: (c.bonusPoints || 0) + bonusAmt } : c));
+      setCompletions(prev => prev.map(c => c.id === ex.id ? { ...c, count: c.count + 1, habitPoints: basePts, bonusPoints: (c.bonusPoints || 0) + bonusAmt } : c));
       if (!h.isRepeatable && ex.count + 1 >= 1) triggerMaxed();
     } else {
-      setCompletions(prev => [...prev, { id: cid, userId: currentUser.id, habitId: hid, roomId: currentRoom.id, date: t, count: 1, habitName: h.name, habitPoints: baseWithStreak, habitCategory: h.category, streakMultiplier: streakMulti.multi, bonusPoints: bonusAmt }]);
+      setCompletions(prev => [...prev, { id: cid, userId: currentUser.id, habitId: hid, roomId: currentRoom.id, date: t, count: 1, habitName: h.name, habitPoints: basePts, habitCategory: h.category, bonusPoints: bonusAmt }]);
       if (max === 1) triggerMaxed();
     }
 
@@ -1228,9 +1228,8 @@ function VersaAppMain() {
         if (h.isRepeatable || ex.count < 1) {
           const { error } = await supabase.from('completions').update({
             count: ex.count + 1,
-            habit_points: baseWithStreak,
+            habit_points: basePts,
             bonus_points: (ex.bonusPoints || 0) + bonusAmt,
-            streak_multiplier: streakMulti.multi
           }).eq('id', ex.id);
           if (error) throw error;
         }
@@ -1238,8 +1237,7 @@ function VersaAppMain() {
         // Use upsert to handle ID collisions from rapid taps
         const { error } = await supabase.from('completions').upsert({
           id: cid, user_id: currentUser.id, habit_id: hid, room_id: currentRoom.id, date: t, count: 1,
-          habit_name: h.name, habit_points: baseWithStreak, habit_category: h.category,
-          streak_multiplier: streakMulti.multi,
+          habit_name: h.name, habit_points: basePts, habit_category: h.category,
           bonus_points: bonusAmt
         });
         if (error) throw error;
@@ -1252,10 +1250,10 @@ function VersaAppMain() {
       }
       // Post to activity feed
       const newCount = ex ? ex.count + 1 : 1;
-      const streakTag = streakMulti.multi > 1 ? ` 🔥${streakMulti.label}` : '';
+      const streakTag = streakData.streak >= 3 ? ` 🔥${streakData.streak}d` : '';
       const feedText = bonus
-        ? `${h.name} (${baseWithStreak > 0 ? '+' : ''}${baseWithStreak} ${bonus.label})${streakTag}`
-        : `${h.name} (${baseWithStreak > 0 ? '+' : ''}${baseWithStreak})${streakTag}`;
+        ? `${h.name} (${basePts > 0 ? '+' : ''}${basePts} ${bonus.label})${streakTag}`
+        : `${h.name} (${basePts > 0 ? '+' : ''}${basePts})${streakTag}`;
       if (newCount >= max) {
         postActivity(`Maxed out ${h.name}! 💎${streakTag}`, bonus);
       } else if (newCount === 1 || Math.random() < 0.3) {
@@ -1537,12 +1535,11 @@ function VersaAppMain() {
         const k = 'versa-nudge-' + today;
         if (!sessionStorage.getItem(k)) { sendLocalNotification('📋 Don\'t forget to log today', 'Your rivals might already be ahead.', 'daily-nudge'); sessionStorage.setItem(k, '1'); }
       }
-      const currentDynamicTarget = getDynamicStreakTarget(streakTarget, streakMulti.multi);
-      if (hour === 20 && myPts < currentDynamicTarget && streakData.streak > 0) {
+      if (hour === 20 && myPts < streakTarget && streakData.streak > 0) {
         const k = 'versa-s8-' + today;
-        if (!sessionStorage.getItem(k)) { sendLocalNotification('âš ️ Your ' + streakData.streak + '-day streak is at risk', 'Log ' + currentDynamicTarget + 'pts before midnight.', 'streak-8pm'); sessionStorage.setItem(k, '1'); }
+        if (!sessionStorage.getItem(k)) { sendLocalNotification('âš ️ Your ' + streakData.streak + '-day streak is at risk', 'Log ' + streakTarget + 'pts before midnight.', 'streak-8pm'); sessionStorage.setItem(k, '1'); }
       }
-      if (hour === 22 && myPts < currentDynamicTarget && streakData.streak > 0) {
+      if (hour === 22 && myPts < streakTarget && streakData.streak > 0) {
         const k = 'versa-s10-' + today;
         if (!sessionStorage.getItem(k)) { sendLocalNotification('🚨 2 hours left!', (streakFreeze > 0 ? 'Freeze will save you.' : 'No freeze — this is it.'), 'streak-10pm'); sessionStorage.setItem(k, '1'); }
       }
@@ -1557,7 +1554,7 @@ function VersaAppMain() {
     check();
     const iv = setInterval(check, 300000);
     return () => clearInterval(iv);
-  }, [notifPermission, myPts, streakData.streak, streakMulti.multi, streakTarget]);
+  }, [notifPermission, myPts, streakData.streak, 1, streakTarget]);
 
   // Celebration: won the week — only on Monday (day after reset)
   useEffect(() => {
@@ -1667,7 +1664,7 @@ function VersaAppMain() {
           <div className="space-y-3 mb-8">
             {[
               { icon: '📚', title: 'Track What Matters', desc: 'Studying, gym, screen time, sleep. Earn points for everything.', color: 'from-[#5b7cf5]/10 to-[#5b7cf5]/5' },
-              { icon: '🔥', title: 'Streak Multipliers', desc: 'Don\'t break the chain → earn up to 2× points.', color: 'from-[#e8864a]/10 to-[#e8864a]/5' },
+              { icon: '🔥', title: 'Streak Luck', desc: 'Don\'t break the chain → boost your bonus chances up to 5×.', color: 'from-[#e8864a]/10 to-[#e8864a]/5' },
               { icon: '🏆', title: 'Compete with Friends', desc: 'Real-time leaderboards. Set stakes. Loser pays.', color: 'from-[#d4a04a]/10 to-[#d4a04a]/5' },
               { icon: '💎', title: 'Win Crystals', desc: 'Top scorer in Study, Health, or Focus earns the crystal.', color: 'from-[#9b6bc8]/10 to-[#9b6bc8]/5' },
             ].map((item, i) => (
@@ -1866,7 +1863,7 @@ function VersaAppMain() {
   // ═══════════════════════════════════════
   const tourSteps = [
     { icon: '🎯', title: 'Track your habits', desc: 'Tap the + button on any habit to log it. Each completion earns you points. Try it now!' },
-    { icon: '🔥', title: 'Build your streak', desc: 'Complete at least one habit every day. The longer your streak, the higher your point multiplier — up to 3× at 30 days.' },
+    { icon: '🔥', title: 'Build your streak', desc: 'Complete at least one habit every day. The longer your streak, the luckier you get — up to 5× bonus chances over a year.' },
     { icon: '💎', title: 'Win crystals', desc: 'Score the most points in any category (Grind, Health, Discipline) to earn a crystal for the day.' },
     { icon: '🏆', title: 'Dominate the leaderboard', desc: 'Your weekly points determine the leaderboard rank. Set stakes to make losing hurt.' },
     { icon: '👥', title: 'Invite your friends', desc: 'Share your room code and start competing. The more rivals, the better.' },
@@ -2013,10 +2010,9 @@ function VersaAppMain() {
             <>
               <div>
                 <h1 className={`text-2xl font-black ${T.text}`}>Log Progress</h1>
-                <div className="text-[11px] font-semibold text-gray-400 mt-1">Consistency builds momentum.</div>
               </div>
               <div className="flex items-center gap-2">
-                {streakMulti.multi > 1 && <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full border ${darkMode ? (isSunset ? '${T.accentBg}/10 ${T.accentBg.replace('bg-','border-')}/20 text-[#ff4422]' : 'bg-blue-500/10 border-blue-500/20 text-blue-300') : (isSunset ? 'bg-orange-50 border-orange-200 text-orange-600' : 'bg-blue-50 border-blue-200 text-blue-600')} text-xs font-bold shadow-sm`}><TrendingUp size={14} />{streakMulti.label}</div>}
+                {streakBonus.tier && <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full border ${darkMode ? (isSunset ? 'bg-red-500/10 border-red-500/20 text-red-300' : 'bg-blue-500/10 border-blue-500/20 text-blue-300') : (isSunset ? 'bg-orange-50 border-orange-200 text-orange-600' : 'bg-blue-50 border-blue-200 text-blue-600')} text-xs font-bold shadow-sm`}><Zap size={14} />{streakBonus.label}</div>}
                 {habits.length > 0 && <button onClick={() => setEditMode(!editMode)} className={`p-2.5 rounded-2xl border shadow-sm ${editMode ? (darkMode ? (isSunset ? 'border-[#ff4422]/50 ${T.accentBg}/10 text-[#ff4422]' : 'border-blue-500/50 bg-blue-500/10 text-blue-400') : (isSunset ? 'border-orange-300 bg-orange-50 text-orange-600' : 'border-blue-300 bg-blue-50 text-blue-600')) : (darkMode ? (isSunset ? 'border-[#323236] text-gray-400 bg-[#1c1c1e]' : 'border-[#223858] text-gray-400 bg-[#182544]') : 'border-gray-200 text-gray-500 bg-white')}`}><Edit3 size={16} /></button>}
                 <button onClick={() => setShowAddHabit(true)} className={`p-2.5 rounded-2xl border shadow-sm ${darkMode ? (isSunset ? 'border-[#323236] text-[#ff4422] bg-[#1c1c1e]' : 'border-[#223858] text-blue-400 bg-[#182544]') : (isSunset ? 'border-gray-200 text-orange-600 bg-white' : 'border-gray-200 text-blue-600 bg-white')}`}><Plus size={18} /></button>
               </div>
@@ -2026,7 +2022,6 @@ function VersaAppMain() {
             <>
               <div>
                 <h1 className={`text-2xl font-black flex items-center gap-2 ${T.text}`}>Cohort <Users size={20} className={isSunset ? T.accentTxt : 'text-[#5b7cf5]'} /></h1>
-                <div className="text-[11px] font-semibold text-gray-400 mt-1">Stay accountable with your group.</div>
               </div>
               <div className="flex items-center gap-2">
                 <button onClick={() => setShowEmojiEditor(!showEmojiEditor)} className={`p-2.5 rounded-2xl border ${showEmojiEditor ? (darkMode ? (isSunset ? 'border-[#ff4422]/50 ${T.accentBg}/10 text-[#ff4422]' : 'border-blue-500/50 bg-blue-500/10 text-blue-400') : (isSunset ? 'border-orange-300 bg-orange-50 text-orange-600' : 'border-blue-300 bg-blue-50 text-blue-600')) : (T.border + ' text-gray-400 ' + T.bgCard)} shadow-sm`} title="Customize reactions">
@@ -2115,9 +2110,8 @@ function VersaAppMain() {
 
               <div className="absolute right-6 top-1/2 -translate-y-1/2 flex flex-col items-end gap-2">
                 <div className="flex items-center gap-2 px-4 py-2 anim-slide-right bg-white/20 backdrop-blur-md rounded-full border border-white/20 text-xs font-bold shadow-sm">
-                  <TrendingUp size={14} /> {streakMulti.multi}x Multiplier
+                  <Flame size={14} /> {streakData.streak || 0}d streak{streakBonus.label ? ` · ${streakBonus.label}` : ''}
                 </div>
-                <div className={`text-[10px] font-semibold ${isSunset ? 'text-orange-200' : 'text-blue-200'}`}>Consistency mode active</div>
               </div>
             </div>
 
@@ -2166,7 +2160,10 @@ function VersaAppMain() {
             {/* Daily Target Progress */}
             <div className={`p-5 rounded-3xl border ${T.border} ${T.bgCard} ${darkMode ? '' : 'shadow-sm'} mb-8 anim-fade-up`}>
               <div className="flex justify-between items-center mb-3">
-                <span className={`text-sm font-bold ${T.text}`}>Daily Target</span>
+                <div className="flex items-center gap-2">
+                  <span className={`text-sm font-bold ${T.text}`}>Daily Target</span>
+                  {streakBonus.tier && <span className={`text-[9px] px-1.5 py-0.5 rounded-full font-bold ${streakBonus.bg} ${streakBonus.color}`}>{streakBonus.icon} {streakBonus.label}</span>}
+                </div>
                 <span className={`text-sm font-black ${isSunset ? T.accentTxt : "text-[#5b7cf5]"}`}>{Math.min(100, Math.round(dailyProg * 100))}%</span>
               </div>
               <div className={`h-3 w-full ${darkMode ? (isSunset ? 'bg-[#120a14]' : 'bg-[#0f1b2d]') : 'bg-gray-100'} rounded-full overflow-hidden mb-3`}>
@@ -2796,9 +2793,9 @@ function VersaAppMain() {
         <div className="space-y-3 text-sm text-gray-400">
           {[
             { i: '🎯', t: 'Track & Earn', d: 'Tap + to log habits. Each completion earns points. Hit ' + dailyTarget + 'pts for a perfect day.' },
-            { i: '🔥', t: 'Streaks', d: 'Log at least ' + streakTarget + 'pts daily to maintain your streak (this threshold scales exponentially harder at higher tiers!). Tiers: 3d→1.5× · 7d→2× · 14d→2.5× · 30d→3×.' },
+            { i: '🔥', t: 'Streaks', d: 'Log at least ' + streakTarget + 'pts daily to maintain your streak. The longer your streak, the luckier you get — bonus chances scale from 1× up to 5× over a year.' },
             { i: '🛡️', t: 'Streak Freeze', d: 'Hit 90% (' + Math.round(dailyTarget * 0.9) + 'pts) in a day to bank a freeze. If you miss tomorrow, the freeze saves your streak. Max 1 at a time — unlog habits and you lose it.' },
-            { i: '🎰', t: 'Mystery Bonus', d: '~10% chance on every tap: +5 (common), +10, +15 (rare), +20 (epic), +50 (jackpot). Bonus points stack on top of streak multipliers.' },
+            { i: '🎰', t: 'Mystery Bonus', d: '~10% base chance per tap: +5, +10, +15, +20, +50. Your streak boosts these chances up to 5×.' },
             { i: '💎', t: 'Crystals', d: 'Score the most points in a category (Study, Health, Focus) to earn a crystal for the day. Ties = no crystal.' },
             { i: '🏆', t: 'Compete', d: 'Weekly leaderboard resets Sunday. Invite friends, set stakes, and see who actually follows through.' },
             { i: '⚡', t: 'Stakes', d: 'Set what the weekly loser has to do. Spin the punishment wheel for random consequences.' },
