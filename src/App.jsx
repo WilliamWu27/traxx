@@ -194,6 +194,15 @@ function VersaAppMain() {
   const [habits, setHabits] = useState([]);
   const [completions, setCompletions] = useState([]);
   const savingRef = useRef(false);
+  const savingTimer = useRef(null);
+  const lockSaving = () => {
+    savingRef.current = true;
+    clearTimeout(savingTimer.current);
+    savingTimer.current = setTimeout(() => { savingRef.current = false; }, 5000); // safety: always unlock after 5s
+  };
+  const unlockSaving = () => {
+    setTimeout(() => { savingRef.current = false; clearTimeout(savingTimer.current); }, 2000);
+  };
   const [allCompletions, setAllCompletions] = useState([]);
   const [historyCompletions, setHistoryCompletions] = useState([]);
   const [roomMembers, setRoomMembers] = useState([]);
@@ -1211,82 +1220,94 @@ function VersaAppMain() {
   };
 
   const handleIncrement = async (hid) => {
-    const t = getToday(), h = habits.find(x => x.id === hid); if (!h) return;
-    const max = h.isRepeatable ? 999999 : 1;
+    const t = getToday();
+    const h = habits.find(x => x.id === hid);
+    if (!h) { console.error('VERSA: habit not found', hid, habits.map(x => x.id)); return; }
+    
+    // Non-repeatable guard
     const ex = getExisting(hid);
-    const triggerMaxed = () => { setConfettiTrigger(v => v + 1); setMaxedHabit(hid); setTimeout(() => setMaxedHabit(null), 1500); };
+    if (ex && !h.isRepeatable && ex.count >= 1) return;
 
-    // Roll for mystery bonus (flat addition)
     const bonus = rollBonus();
     const basePts = h.points;
     const bonusAmt = bonus ? bonus.flat : 0;
-
-    // Lock to prevent realtime refetch from stomping optimistic update
-    savingRef.current = true;
-
-    // Optimistic update — immediately update local state
     const cid = currentUser.id + '_' + hid + '_' + t;
+    const newCount = ex ? ex.count + 1 : 1;
+
+    // Optimistic update
+    lockSaving();
     if (ex) {
-      if (!h.isRepeatable && ex.count >= 1) { savingRef.current = false; return; }
-      setCompletions(prev => prev.map(c => c.id === ex.id ? { ...c, count: c.count + 1, habitPoints: basePts, bonusPoints: (c.bonusPoints || 0) + bonusAmt } : c));
-      if (!h.isRepeatable && ex.count + 1 >= 1) triggerMaxed();
+      setCompletions(prev => prev.map(c => c.id === ex.id ? { ...c, count: newCount, habitPoints: basePts, bonusPoints: (c.bonusPoints || 0) + bonusAmt } : c));
     } else {
       setCompletions(prev => [...prev, { id: cid, userId: currentUser.id, habitId: hid, roomId: currentRoom.id, date: t, count: 1, habitName: h.name, habitPoints: basePts, habitCategory: h.category, bonusPoints: bonusAmt }]);
-      if (max === 1) triggerMaxed();
     }
 
-    try {
-      if (ex) {
-        if (h.isRepeatable || ex.count < 1) {
+    // Confetti for non-repeatable
+    if (!h.isRepeatable && newCount >= 1) {
+      setConfettiTrigger(v => v + 1);
+      setMaxedHabit(hid);
+      setTimeout(() => setMaxedHabit(null), 1500);
+    }
+
+    // Save to DB with retry
+    let saved = false;
+    for (let attempt = 0; attempt < 2 && !saved; attempt++) {
+      try {
+        if (ex) {
           const { error } = await supabase.from('completions').update({
-            count: ex.count + 1,
+            count: newCount,
             habit_points: basePts,
             bonus_points: (ex.bonusPoints || 0) + bonusAmt,
           }).eq('id', ex.id);
           if (error) throw error;
+        } else {
+          const { error } = await supabase.from('completions').upsert({
+            id: cid, user_id: currentUser.id, habit_id: hid, room_id: currentRoom.id, date: t, count: 1,
+            habit_name: h.name, habit_points: basePts, habit_category: h.category,
+            bonus_points: bonusAmt
+          }, { onConflict: 'id' });
+          if (error) throw error;
         }
-      } else {
-        // Use upsert to handle ID collisions from rapid taps
-        const { error } = await supabase.from('completions').upsert({
-          id: cid, user_id: currentUser.id, habit_id: hid, room_id: currentRoom.id, date: t, count: 1,
-          habit_name: h.name, habit_points: basePts, habit_category: h.category,
-          bonus_points: bonusAmt
-        });
-        if (error) throw error;
+        saved = true;
+      } catch (err) {
+        console.error('VERSA: save attempt', attempt + 1, 'failed:', err);
+        if (attempt === 1) {
+          // Final failure — revert optimistic update
+          if (ex) {
+            setCompletions(prev => prev.map(c => c.id === ex.id ? { ...c, count: ex.count, bonusPoints: ex.bonusPoints } : c));
+          } else {
+            setCompletions(prev => prev.filter(c => c.id !== cid));
+          }
+        }
+        await new Promise(r => setTimeout(r, 500)); // wait before retry
       }
-      // Show bonus notification
-      if (bonus) {
-        setBonusMsg(bonus);
-        setConfettiTrigger(v => v + 1);
-        setTimeout(() => setBonusMsg(null), 2500);
-      }
-      // Post to activity feed
-      const newCount = ex ? ex.count + 1 : 1;
-      const streakTag = streakData.streak >= 3 ? ` 🔥${streakData.streak}d` : '';
-      const feedText = bonus
-        ? `${h.name} (${basePts > 0 ? '+' : ''}${basePts} ${bonus.label})${streakTag}`
-        : `${h.name} (${basePts > 0 ? '+' : ''}${basePts})${streakTag}`;
-      if (newCount >= max) {
-        postActivity(`Maxed out ${h.name}! 💎${streakTag}`, bonus);
-      } else if (newCount === 1 || Math.random() < 0.3) {
-        postActivity(feedText, bonus);
-      }
-    } catch (err) {
-      console.error('Save completion error:', err);
-      // Revert optimistic update on failure
-      if (ex) {
-        setCompletions(prev => prev.map(c => c.id === ex.id ? { ...c, count: ex.count, bonusPoints: ex.bonusPoints } : c));
-      } else {
-        setCompletions(prev => prev.filter(c => c.id !== cid));
-      }
-    } finally {
-      // Release lock after a delay to let server sync
-      setTimeout(() => { savingRef.current = false; }, 1500);
+    }
+
+    // Release lock
+    unlockSaving();
+
+    if (!saved) return;
+
+    // Bonus notification
+    if (bonus) {
+      setBonusMsg(bonus);
+      setConfettiTrigger(v => v + 1);
+      setTimeout(() => setBonusMsg(null), 2500);
+    }
+    // Activity feed
+    const streakTag = streakData.streak >= 3 ? ` 🔥${streakData.streak}d` : '';
+    const feedText = bonus
+      ? `${h.name} (${basePts > 0 ? '+' : ''}${basePts} ${bonus.label})${streakTag}`
+      : `${h.name} (${basePts > 0 ? '+' : ''}${basePts})${streakTag}`;
+    if (!h.isRepeatable && newCount >= 1) {
+      postActivity(`Maxed out ${h.name}! 💎${streakTag}`, bonus);
+    } else if (newCount === 1 || Math.random() < 0.3) {
+      postActivity(feedText, bonus);
     }
   };
   const handleDecrement = async (hid) => {
     const ex = getExisting(hid); if (!ex) return;
-    savingRef.current = true;
+    lockSaving();
 
     const prevCount = ex.count;
     const prevBonus = ex.bonusPoints;
@@ -1322,7 +1343,7 @@ function VersaAppMain() {
         return [...prev, ex];
       });
     } finally {
-      setTimeout(() => { savingRef.current = false; }, 1500);
+      unlockSaving();
     }
   };
 
@@ -2206,17 +2227,17 @@ function VersaAppMain() {
                       const doneBorder = isNeg ? (darkMode ? 'border-rose-500/30 bg-rose-500/10' : 'border-rose-200 bg-rose-50/50') : (darkMode ? `${ct.bdr} ${ct.bgS}` : (isSunset ? `${ct.bdr} bg-orange-50/30` : `${ct.bdr} bg-blue-50/30`));
                       const defaultBorder = T.border + ' ' + T.bgCard + (darkMode ? '' : ' shadow-sm');
                       return (
-                        <div key={h.id} className={`habit-card flex items-center p-4 rounded-2xl border ${done ? doneBorder : defaultBorder}`}>
+                        <div key={h.id} className={`habit-card flex items-center p-4 rounded-2xl border cursor-pointer ${done ? doneBorder : defaultBorder}`} onClick={() => !editMode && handleIncrement(h.id)}>
                           {editMode ? (
-                            <button onClick={() => deleteHabit(h.id)} className="w-6 h-6 rounded-full bg-red-500/20 text-red-400 flex items-center justify-center mr-4"><X size={12} strokeWidth={3} /></button>
+                            <button onClick={(e) => { e.stopPropagation(); deleteHabit(h.id); }} className="w-6 h-6 rounded-full bg-red-500/20 text-red-400 flex items-center justify-center mr-4"><X size={12} strokeWidth={3} /></button>
                           ) : isNeg ? (
-                            <button onClick={() => handleIncrement(h.id)} className={`w-6 h-6 rounded-full border-2 flex items-center justify-center mr-4 transition-all ${done ? 'bg-rose-500 border-rose-500 text-white' : (darkMode ? 'border-gray-600' : 'border-gray-300')}`}>
+                            <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center mr-4 transition-all ${done ? 'bg-rose-500 border-rose-500 text-white' : (darkMode ? 'border-gray-600' : 'border-gray-300')}`}>
                               {done ? <X size={12} strokeWidth={4} /> : null}
-                            </button>
+                            </div>
                           ) : (
-                            <button onClick={() => handleIncrement(h.id)} className={`w-6 h-6 rounded-full border-2 flex items-center justify-center mr-4 transition-all ${done ? (isSunset ? 'bg-[#ff4422] border-[#ff4422] text-white' : 'bg-[#5b7cf5] border-[#5b7cf5] text-white') : (darkMode ? 'border-gray-600' : 'border-gray-300')}`}>
+                            <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center mr-4 transition-all ${done ? (isSunset ? 'bg-[#ff4422] border-[#ff4422] text-white' : 'bg-[#5b7cf5] border-[#5b7cf5] text-white') : (darkMode ? 'border-gray-600' : 'border-gray-300')}`}>
                               {done && <Check size={14} strokeWidth={4} />}
-                            </button>
+                            </div>
                           )}
                           <div className="flex-1">
                             <div className={`text-sm font-bold ${done ? (darkMode ? 'text-[#7a8ba8]' : 'text-gray-600') : (T.text)}`}>{h.name} {(h.isRepeatable || isNeg) && cnt > 0 && <span className={isNeg ? 'text-rose-400 ml-1' : `${ct.txt} ml-1`}>x{cnt}</span>}</div>
@@ -2226,9 +2247,9 @@ function VersaAppMain() {
                             </div>
                           </div>
                           <div className="flex items-center gap-1.5">
-                            {cnt > 0 && !editMode && <button onClick={() => handleDecrement(h.id)} className={`w-6 h-6 rounded-full flex items-center justify-center opacity-30 hover:opacity-70 ${isNeg ? 'text-emerald-400' : 'text-gray-400'}`}><MinusIcon size={12} /></button>}
-                            {editMode && <button onClick={() => openEditHabit(h)} className={`text-[10px] px-2.5 py-1 rounded-lg font-bold ${darkMode ? (isSunset ? 'text-[#ff4422] ${T.accentBg}/10' : 'text-blue-400 bg-blue-500/10') : (isSunset ? 'text-orange-600 bg-orange-50' : 'text-blue-600 bg-blue-50')}`}>Edit</button>}
-                            {!editMode && !isNeg && <button onClick={() => openEditHabit(h)} className={darkMode ? 'text-gray-600' : 'text-gray-300'}><ChevronRight size={16} /></button>}
+                            {cnt > 0 && !editMode && <button onClick={(e) => { e.stopPropagation(); handleDecrement(h.id); }} className={`w-6 h-6 rounded-full flex items-center justify-center opacity-30 hover:opacity-70 ${isNeg ? 'text-emerald-400' : 'text-gray-400'}`}><MinusIcon size={12} /></button>}
+                            {editMode && <button onClick={(e) => { e.stopPropagation(); openEditHabit(h); }} className={`text-[10px] px-2.5 py-1 rounded-lg font-bold ${darkMode ? (isSunset ? 'text-[#ff4422] bg-[#ff4422]/10' : 'text-blue-400 bg-blue-500/10') : (isSunset ? 'text-orange-600 bg-orange-50' : 'text-blue-600 bg-blue-50')}`}>Edit</button>}
+                            {!editMode && !isNeg && <button onClick={(e) => { e.stopPropagation(); openEditHabit(h); }} className={darkMode ? 'text-gray-600' : 'text-gray-300'}><ChevronRight size={16} /></button>}
                           </div>
                         </div>
                       );
