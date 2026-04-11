@@ -1254,19 +1254,24 @@ function VersaAppMain() {
     for (let attempt = 0; attempt < 2 && !saved; attempt++) {
       try {
         if (ex) {
-          const { error } = await supabase.from('completions').update({
-            count: newCount,
-            habit_points: basePts,
-            bonus_points: (ex.bonusPoints || 0) + bonusAmt,
-          }).eq('id', ex.id);
+          const updateData = { count: newCount, habit_points: basePts };
+          if (bonusAmt > 0 || ex.bonusPoints > 0) updateData.bonus_points = (ex.bonusPoints || 0) + bonusAmt;
+          const { error } = await supabase.from('completions').update(updateData).eq('id', ex.id);
           if (error) throw error;
         } else {
-          const { error } = await supabase.from('completions').upsert({
+          // Try insert first, fall back to upsert if ID already exists
+          const insertData = {
             id: cid, user_id: currentUser.id, habit_id: hid, room_id: currentRoom.id, date: t, count: 1,
             habit_name: h.name, habit_points: basePts, habit_category: h.category,
-            bonus_points: bonusAmt
-          }, { onConflict: 'id' });
-          if (error) throw error;
+            streak_multiplier: 1,
+          };
+          if (bonusAmt > 0) insertData.bonus_points = bonusAmt;
+          const { error: insertErr } = await supabase.from('completions').insert(insertData);
+          if (insertErr) {
+            // ID collision — try upsert
+            const { error: upsertErr } = await supabase.from('completions').upsert(insertData);
+            if (upsertErr) throw upsertErr;
+          }
         }
         saved = true;
       } catch (err) {
@@ -1327,7 +1332,7 @@ function VersaAppMain() {
         const newBonus = ex.bonusPoints ? Math.round((ex.bonusPoints / ex.count) * newCount) : 0;
         const { error } = await supabase.from('completions').update({
           count: newCount,
-          bonus_points: newBonus
+          ...(ex.bonusPoints ? { bonus_points: newBonus } : {})
         }).eq('id', ex.id);
         if (error) throw error;
       } else {
