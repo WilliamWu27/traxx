@@ -1072,21 +1072,40 @@ function VersaAppMain() {
     if (!settleStakeData.winnerId || !settleStakeData.loserId) { setError('Select both a winner and a loser.'); return; }
     if (settleStakeData.winnerId === settleStakeData.loserId) { setError('Winner and loser cannot be the same person.'); return; }
     setLoading(true); setError('');
+    const lws = getLastWeekStart();
+    const lwe = getLastWeekEnd();
+    const extended = {
+      room_id: currentRoom.id,
+      description: roomStakes.description,
+      type: roomStakes.type,
+      winner_id: settleStakeData.winnerId,
+      loser_id: settleStakeData.loserId,
+      date_archived: getToday(),
+      week_start: lws,
+      auto_settled: false,
+      stake_fulfilled: false
+    };
+    const minimal = {
+      room_id: currentRoom.id,
+      description: roomStakes.description,
+      type: roomStakes.type,
+      winner_id: settleStakeData.winnerId,
+      loser_id: settleStakeData.loserId,
+      date_archived: getToday()
+    };
     try {
-      await supabase.from('archived_stakes').insert({
-        room_id: currentRoom.id,
-        description: roomStakes.description,
-        type: roomStakes.type,
-        winner_id: settleStakeData.winnerId,
-        loser_id: settleStakeData.loserId,
-        date_archived: getToday()
-      });
+      let { error } = await supabase.from('archived_stakes').insert(extended);
+      if (error) {
+        const r2 = await supabase.from('archived_stakes').insert(minimal);
+        error = r2.error;
+      }
+      if (error) throw error;
       await supabase.from('stakes').delete().eq('id', currentRoom.id);
       setRoomStakes(null);
       setShowSettleStake(false);
       setSettleStakeData({ winnerId: '', loserId: '' });
       setConfettiTrigger(v => v + 1);
-      setSuccessMsg('Stake settled into Trophy Room!');
+      setSuccessMsg('Stake settled into the Graveyard!');
       setTimeout(() => setSuccessMsg(''), 3000);
     } catch (err) {
       setError(err.message || 'Failed to archive stake (You might need to create the table first in Supabase)');
@@ -1451,6 +1470,117 @@ function VersaAppMain() {
   const isPerfect = allCatNames.length > 0 && allCatNames.every(c => myCr[c]);
   const dailyProg = currentUser && currentRoom ? getDailyProgress() : 0;
   const displayHabits = habits;
+
+  const markArchivedStakeFulfilled = async (row) => {
+    if (!currentUser || !currentRoom) return;
+    const ownerId = roomCreatedBy || currentRoom?.createdBy;
+    const can = row.loser_id === currentUser.id || ownerId === currentUser.id;
+    if (!can) { setError('Only the person who owes the stake or the room owner can mark it done.'); setTimeout(() => setError(''), 2800); return; }
+    try {
+      const patch = { stake_fulfilled: true, fulfilled_at: new Date().toISOString(), fulfilled_by: currentUser.id };
+      let { error } = await supabase.from('archived_stakes').update(patch).eq('id', row.id);
+      if (error) {
+        const r2 = await supabase.from('archived_stakes').update({ fulfilled_at: patch.fulfilled_at }).eq('id', row.id);
+        error = r2.error;
+      }
+      if (error) throw error;
+      setArchivedStakes(prev => prev.map(s => s.id === row.id ? { ...s, stake_fulfilled: true, fulfilled_at: patch.fulfilled_at, fulfilled_by: currentUser.id } : s));
+      setSuccessMsg('Stake marked as completed');
+      setTimeout(() => setSuccessMsg(''), 2500);
+      const d = String(row.description || '');
+      await postActivity(`✅ Stake verified complete${d ? ': ' + d.slice(0, 50) + (d.length > 50 ? '…' : '') : ''}`, null);
+    } catch (e) {
+      setError(e.message || 'Could not save — run the optional SQL migration for stake verification columns.');
+      setTimeout(() => setError(''), 3500);
+    }
+  };
+
+  // Monday: auto-resolve active stake from last week’s points → archive + notifications + activity
+  useEffect(() => {
+    if (!currentUser || !currentRoom || !roomStakes || activeMembers.length < 2) return;
+    if (new Date().getDay() !== 1) return;
+    const lws = getLastWeekStart();
+    const lwe = getLastWeekEnd();
+    const lockKey = 'versa-stake-auto-' + currentRoom.id + '-' + lws;
+    try { if (localStorage.getItem(lockKey)) return; } catch { }
+
+    let cancelled = false;
+    const run = async () => {
+      try {
+        const st = roomStakes;
+        const { data: snapData } = await supabase.from('completions').select('*').eq('room_id', currentRoom.id).gte('date', lws).lte('date', lwe);
+        const comps = (snapData || []).map(d => ({ ...d, userId: d.user_id, habitId: d.habit_id, habitPoints: d.habit_points, bonusPoints: d.bonus_points, habitCategory: d.habit_category }));
+        if (!comps.length) return;
+        const scores = activeMembers.map(m => {
+          const mc = comps.filter(c => c.userId === m.id);
+          const pts = mc.reduce((s, c) => { const h = habits.find(x => x.id === c.habitId); return s + ((c.habitPoints || h?.points || 0) * (c.count || 1)) + (c.bonusPoints || 0); }, 0);
+          const activeDays = [...new Set(mc.map(c => c.date))].length;
+          return { member: m, pts, activeDays };
+        });
+        const sortedWin = [...scores].sort((a, b) => {
+          if (b.pts !== a.pts) return b.pts - a.pts;
+          if (b.activeDays !== a.activeDays) return b.activeDays - a.activeDays;
+          return (a.member.username || '').localeCompare(b.member.username || '');
+        });
+        const sortedLose = [...scores].sort((a, b) => {
+          if (a.pts !== b.pts) return a.pts - b.pts;
+          if (a.activeDays !== b.activeDays) return a.activeDays - b.activeDays;
+          return (a.member.username || '').localeCompare(b.member.username || '');
+        });
+        const winner = sortedWin[0];
+        const loser = sortedLose[0];
+        if (!winner || !loser || winner.member.id === loser.member.id) return;
+        if (cancelled) return;
+
+        const baseRow = {
+          room_id: currentRoom.id,
+          description: st.description,
+          type: st.type,
+          winner_id: winner.member.id,
+          loser_id: loser.member.id,
+          date_archived: lwe,
+          week_start: lws,
+          auto_settled: true,
+          stake_fulfilled: false
+        };
+        const minimal = {
+          room_id: baseRow.room_id,
+          description: baseRow.description,
+          type: baseRow.type,
+          winner_id: baseRow.winner_id,
+          loser_id: baseRow.loser_id,
+          date_archived: baseRow.date_archived
+        };
+        let { error } = await supabase.from('archived_stakes').insert(baseRow);
+        if (error) {
+          const r2 = await supabase.from('archived_stakes').insert(minimal);
+          error = r2.error;
+        }
+        if (error) { console.error('Auto stake archive', error); return; }
+
+        await supabase.from('stakes').delete().eq('id', currentRoom.id);
+        if (cancelled) return;
+        setRoomStakes(null);
+        try { localStorage.setItem(lockKey, '1'); } catch { }
+
+        const wName = winner.member.username;
+        const lName = loser.member.username;
+        const descSnippet = (typeof st.description === 'string' ? st.description : '').slice(0, 80);
+        if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
+          const uid = currentUser.id;
+          if (uid === winner.member.id) sendLocalNotification('🏆 You won the week', lName + ' owes the stake' + (descSnippet ? ': ' + descSnippet : '.'), 'versa-stake-' + lws + '-win');
+          else if (uid === loser.member.id) sendLocalNotification('📋 Your stake is due', 'You finished last. ' + (descSnippet || 'Complete what you owe.'), 'versa-stake-' + lws + '-lose');
+          else sendLocalNotification('⚖️ Weekly stake settled', wName + ' won · ' + lName + ' owes the consequence.', 'versa-stake-' + lws + '-room');
+        }
+        await postActivity('Weekly stake resolved: ' + wName + ' won the week, ' + lName + ' owes the stake.', null);
+        setConfettiTrigger(v => v + 1);
+        setSuccessMsg('Last week’s stake moved to the Graveyard');
+        setTimeout(() => setSuccessMsg(''), 4500);
+      } catch (e) { console.error('Auto stake settle', e); }
+    };
+    const t = setTimeout(run, 1800);
+    return () => { cancelled = true; clearTimeout(t); };
+  }, [currentUser?.id, currentRoom?.id, roomStakes?.description, roomStakes?.type, activeMembers.length, habits.length, dateKey]);
 
   const addCategory = async () => {
     if (!newCatName.trim() || activeCategories.find(c => c.name.toLowerCase() === newCatName.trim().toLowerCase())) return;
@@ -2577,22 +2707,38 @@ function VersaAppMain() {
               ) : (
                 <div className="space-y-3">
                   {[...archivedStakes].reverse().map(st => {
+                    const winr = roomMembers.find(m => m.id === st.winner_id)?.username || 'Winner';
                     const lsr = roomMembers.find(m => m.id === st.loser_id)?.username || 'Someone';
-                    const isMe = st.loser_id === currentUser.id;
-                    const bdr = isMe ? (darkMode ? 'border-red-500/30' : 'border-red-300') : T.border;
-                    const bgC = isMe ? (darkMode ? 'bg-red-500/10' : 'bg-red-50') : T.bgCard;
+                    const isLoser = st.loser_id === currentUser.id;
+                    const isWinner = st.winner_id === currentUser.id;
+                    const weekLbl = st.week_start ? formatDate(st.week_start) + ' week' : (st.date_archived ? 'Archived ' + formatDate(st.date_archived) : '');
+                    const fulfilled = st.stake_fulfilled === true || st.stake_fulfilled === 'true';
+                    const canVerify = (isLoser || isRoomCreator) && !fulfilled;
+                    const bdr = isLoser ? (darkMode ? 'border-red-500/30' : 'border-red-300') : isWinner ? (darkMode ? 'border-amber-500/30' : 'border-amber-200') : T.border;
+                    const bgC = isLoser ? (darkMode ? 'bg-red-500/10' : 'bg-red-50') : isWinner ? (darkMode ? 'bg-amber-500/5' : 'bg-amber-50/80') : T.bgCard;
+                    const descDisplay = st.type === 'wheel' ? '🎰 Wheel stake' : `"${String(st.description || '').slice(0, 120)}${String(st.description || '').length > 120 ? '…' : ''}"`;
                     return (
                       <div key={st.id} className={`p-4 rounded-3xl border ${bdr} ${bgC} ${darkMode ? '' : 'shadow-sm'}`}>
-                        <div className="flex items-start gap-4">
-                          <div className={`w-10 h-10 mt-1 rounded-full flex items-center justify-center text-xl shrink-0 border ${isMe ? 'border-red-500/50 bg-red-500/20 text-red-500 shadow-inner' : (darkMode ? 'border-[#223858] bg-[#0f1b2d] text-gray-400' : 'border-gray-200 bg-white shadow-sm text-gray-500')}`}>
+                        <div className="flex items-start gap-3">
+                          <div className={`w-10 h-10 mt-0.5 rounded-full flex items-center justify-center text-lg shrink-0 border ${isLoser ? 'border-red-500/50 bg-red-500/20 text-red-500' : isWinner ? 'border-amber-500/50 bg-amber-500/15 text-amber-500' : (darkMode ? 'border-[#223858] bg-[#0f1b2d] text-gray-400' : 'border-gray-200 bg-white text-gray-500')}`}>
                             {st.type === 'wheel' ? '🎰' : '⚖️'}
                           </div>
-                          <div className="flex-1">
-                            <div className="flex justify-between items-start mb-1">
-                              <div className={`text-sm font-black ${isMe ? 'text-red-500' : T.text}`}>{lsr} <span className={T.textDim}>failed.</span></div>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex flex-wrap justify-between gap-1 items-start mb-1">
+                              <div className={`text-[11px] font-bold uppercase tracking-wider ${T.textDim}`}>{weekLbl}{st.auto_settled ? <span className="ml-1.5 text-emerald-500/90">· auto</span> : null}</div>
                               <div className={`text-[9px] font-bold tracking-widest uppercase ${T.textMuted}`}>{st.type}</div>
                             </div>
-                            <div className={`text-sm leading-relaxed font-medium ${isMe ? (darkMode ? 'text-red-300' : 'text-red-800') : T.textDim}`}>"{st.description}"</div>
+                            <div className={`text-xs ${T.textMuted} mb-1`}><span className="text-amber-500 font-bold">🏆 {winr}</span> <span className={T.textDim}>won</span> · <span className="text-red-400 font-bold">💀 {lsr}</span> <span className={T.textDim}>owes</span></div>
+                            <div className={`text-sm leading-relaxed font-medium ${isLoser ? (darkMode ? 'text-red-200' : 'text-red-900') : T.textDim}`}>{descDisplay}</div>
+                            {fulfilled ? (
+                              <div className={`mt-3 flex items-center gap-2 text-[11px] font-bold ${darkMode ? 'text-emerald-400' : 'text-emerald-600'}`}><Check size={14} /> Stake verified done</div>
+                            ) : canVerify ? (
+                              <button type="button" onClick={() => markArchivedStakeFulfilled(st)} className={`mt-3 w-full py-2.5 rounded-xl text-xs font-bold transition-all active:scale-[0.98] ${darkMode ? 'bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 hover:bg-emerald-500/25' : 'bg-emerald-50 border border-emerald-200 text-emerald-800 hover:bg-emerald-100'}`}>
+                                Mark stake as completed
+                              </button>
+                            ) : (
+                              <p className={`mt-2 text-[10px] ${T.textDim}`}>{isWinner ? 'Waiting for ' + lsr + ' (or owner) to confirm.' : 'Owner or loser can confirm when done.'}</p>
+                            )}
                           </div>
                         </div>
                       </div>
@@ -2984,7 +3130,7 @@ function VersaAppMain() {
             { i: '🎰', t: 'Mystery Bonus', d: '~10% base chance per tap: +5, +10, +15, +20, +50. Your streak boosts these chances up to 5×.' },
             { i: '💎', t: 'Crystals', d: 'Score the most points in a category (Focus, Health, Mind, etc.) to earn a crystal for the day. Ties = no crystal.' },
             { i: '🏆', t: 'Compete', d: 'Weekly leaderboard resets Sunday. Invite friends, set stakes, and see who actually follows through.' },
-            { i: '⚡', t: 'Stakes', d: 'Set what the weekly loser has to do. Spin the punishment wheel for random consequences.' },
+            { i: '⚡', t: 'Stakes', d: 'On Mondays, an active stake auto-resolves: highest weekly points wins, lowest owes the consequence — saved to the Graveyard with notifications. The loser or room owner marks it done when finished.' },
             { i: '🔥', t: 'Reactions', d: 'React to your rivals\' completions with 🔥 💀 👏 😤 in the activity feed.' },
             { i: '👤', t: 'Solo Mode', d: 'No friends yet? Compete against your own yesterday score.' },
           ].map((s, i) => (
