@@ -251,7 +251,7 @@ function VersaAppMain() {
   const [activityFeed, setActivityFeed] = useState([]);
   const [showHeatMap, setShowHeatMap] = useState(false);
   const [heatMapData, setHeatMapData] = useState({});
-  const [heatMapRange, setHeatMapRange] = useState('30d');
+  const [heatMapRange, setHeatMapRange] = useState('3m'); // 1w | 1m | 3m | 6m | 1y | all
   const [bonusMsg, setBonusMsg] = useState(null);
   const [rivalStatus, setRivalStatus] = useState([]);
   const [showInsights, setShowInsights] = useState(false);
@@ -753,7 +753,7 @@ function VersaAppMain() {
   const loadHeatMap = async () => {
     if (!currentUser || !currentRoom) return;
     try {
-      const ago = new Date(); ago.setDate(ago.getDate() - 365);
+      const ago = new Date(); ago.setDate(ago.getDate() - 800);
       const agoStr = formatDateStr(ago);
       const { data: heatData2 } = await supabase.from('completions').select('*').eq('user_id', currentUser.id).eq('room_id', currentRoom.id).gte('date', agoStr);
       const map = {};
@@ -2044,41 +2044,45 @@ function VersaAppMain() {
           </div>
         </div>
       )}
-      {/* Streak milestone toast — dismiss: X, swipe down, or tap outside */}
+      {/* Streak milestone — full-screen dim; card anchored above iOS home indicator; sm+ centered */}
       {streakMilestone && (
-        <div
-          className="fixed inset-0 z-[101] flex items-end sm:items-center justify-center p-3 sm:p-4 pointer-events-auto"
-          role="dialog"
-          aria-label="Streak milestone"
-          onClick={() => setStreakMilestone(null)}
-        >
-          <div
-            className="pointer-events-auto w-full max-w-sm anim-pop-in"
-            onClick={e => e.stopPropagation()}
-            onTouchStart={e => { streakDismissTouch.current = e.touches[0]?.clientY ?? 0; }}
-            onTouchEnd={e => {
-              const y = e.changedTouches[0]?.clientY ?? 0;
-              if (y - streakDismissTouch.current > 56) setStreakMilestone(null);
-            }}
-          >
-            <div className={`relative overflow-hidden rounded-[1.35rem] shadow-2xl border ${darkMode ? 'border-orange-500/25 bg-[#141418]' : 'border-orange-200/80 bg-white'} ${isSunset ? 'shadow-orange-900/20' : 'shadow-black/15'}`}>
-              <div className={`absolute inset-x-0 top-0 h-1 ${isSunset ? 'bg-gradient-to-r from-[#ff2200] via-[#ff8800] to-[#ffdd00]' : 'bg-gradient-to-r from-emerald-600 via-[#4aba7a] to-cyan-500'}`} />
-              <div className="flex justify-center pt-2 pb-1 sm:hidden">
-                <div className={`h-1 w-10 rounded-full ${darkMode ? 'bg-white/15' : 'bg-gray-300/80'}`} aria-hidden />
-              </div>
-              <div className="px-5 pb-5 pt-1 sm:pt-4 flex items-start gap-4">
-                <div className="text-4xl shrink-0 anim-float drop-shadow-sm">🔥</div>
-                <div className="flex-1 min-w-0 pt-0.5">
-                  <div className={`text-lg font-black tracking-tight ${T.text}`}>{streakMilestone.days}-day streak</div>
-                  <div className={`text-xs mt-1 ${T.textMuted}`}>
-                    <span className="font-semibold text-[#e8864a]">{streakMilestone.tier}</span>
-                    <span className="opacity-80"> · bonus luck up</span>
-                  </div>
+        <div className="fixed inset-0 z-[130]" role="dialog" aria-label="Streak milestone">
+          <button
+            type="button"
+            className="absolute inset-0 bg-black/25 backdrop-blur-[2px] sm:bg-black/20"
+            aria-label="Dismiss streak message"
+            onClick={() => setStreakMilestone(null)}
+          />
+          <div className="absolute inset-0 flex flex-col justify-end sm:justify-center items-center pointer-events-none p-0">
+            <div
+              className="pointer-events-auto w-full max-w-sm px-3 anim-pop-in sm:px-4 sm:py-0"
+              style={{ paddingBottom: 'max(1rem, env(safe-area-inset-bottom, 12px))', paddingLeft: 'max(0.75rem, env(safe-area-inset-left, 0px))', paddingRight: 'max(0.75rem, env(safe-area-inset-right, 0px))' }}
+              onClick={e => e.stopPropagation()}
+              onTouchStart={e => { streakDismissTouch.current = e.touches[0]?.clientY ?? 0; }}
+              onTouchEnd={e => {
+                const y = e.changedTouches[0]?.clientY ?? 0;
+                if (y - streakDismissTouch.current > 48) setStreakMilestone(null);
+              }}
+            >
+              <div className={`relative overflow-hidden rounded-2xl border shadow-md ${darkMode ? 'border-orange-500/20 bg-[#161618]/[0.97]' : 'border-orange-200/50 bg-white/[0.97]'} backdrop-blur-md`}>
+                <div className={`absolute inset-x-0 top-0 h-0.5 ${isSunset ? 'bg-gradient-to-r from-[#ff2200] via-[#ff8800] to-[#ffdd00]' : 'bg-gradient-to-r from-emerald-600 via-[#4aba7a] to-cyan-500'}`} />
+                <div className="flex justify-center pt-2 pb-0.5 sm:hidden">
+                  <div className={`h-1 w-9 rounded-full ${darkMode ? 'bg-white/12' : 'bg-gray-400/40'}`} aria-hidden />
                 </div>
-                <button type="button" onClick={() => setStreakMilestone(null)} className={`shrink-0 w-9 h-9 rounded-full flex items-center justify-center text-lg leading-none ${darkMode ? 'hover:bg-white/10 text-gray-400' : 'hover:bg-gray-100 text-gray-500'} transition-all`} aria-label="Dismiss"><X size={16} /></button>
+                <div className="px-4 pb-4 pt-1 sm:px-5 sm:pt-3 sm:pb-4 flex items-center gap-3">
+                  <div className="text-3xl shrink-0 leading-none select-none">🔥</div>
+                  <div className="flex-1 min-w-0 py-0.5">
+                    <div className={`text-base sm:text-lg font-black tracking-tight leading-snug ${T.text}`}>{streakMilestone.days}-day streak</div>
+                    <div className={`text-[11px] sm:text-xs mt-0.5 ${T.textMuted} leading-snug`}>
+                      <span className="font-semibold text-[#e8864a]">{streakMilestone.tier}</span>
+                      <span className="opacity-75"> · bonus luck up</span>
+                    </div>
+                  </div>
+                  <button type="button" onClick={() => setStreakMilestone(null)} className={`shrink-0 w-10 h-10 min-w-[40px] min-h-[40px] rounded-full flex items-center justify-center active:scale-95 ${darkMode ? 'bg-white/5 text-gray-400 active:bg-white/10' : 'bg-gray-100 text-gray-500 active:bg-gray-200'} transition-all`} aria-label="Dismiss"><X size={18} /></button>
+                </div>
               </div>
+              <p className={`text-center text-[10px] mt-2 px-1 ${T.textDim} opacity-90`}>Tap dimmed area or swipe down</p>
             </div>
-            <p className={`text-center text-[10px] mt-2 ${T.textDim}`}>Tap outside or swipe down to close</p>
           </div>
         </div>
       )}
@@ -2348,22 +2352,39 @@ function VersaAppMain() {
                   <div className={`text-xs font-black uppercase tracking-widest ${T.textDim}`}>Customize Reactions</div>
                   <button onClick={() => setShowEmojiEditor(false)} className={`text-xs font-bold ${T.textMuted}`}><X size={16} /></button>
                 </div>
-                <p className={`text-[10px] ${T.textDim} mb-3`}>Drag to reorder. Tap ✕ to remove.</p>
+                <div className={`mb-4 p-3 rounded-2xl border ${isSunset ? 'border-[#ff4422]/25 bg-[#ff4422]/5' : 'border-[#5b7cf5]/25 bg-[#5b7cf5]/5'}`}>
+                  <div className={`text-[10px] font-black uppercase tracking-widest ${T.textDim} mb-2`}>Quick deck (first 3 — shown on every post)</div>
+                  <div className="flex justify-center gap-4">
+                    {[0, 1, 2].map(slot => (
+                      <div key={slot} className="flex flex-col items-center gap-1 min-w-[52px]">
+                        <span className={`text-[9px] font-bold tabular-nums ${isSunset ? 'text-[#ff8844]' : 'text-blue-300'}`}>{slot + 1}</span>
+                        <div className={`text-3xl leading-none rounded-2xl px-3 py-2 border ${darkMode ? (isSunset ? 'border-[#ff4422]/40 bg-[#1c1c1e]' : 'border-[#5b7cf5]/40 bg-[#0f1b2d]') : 'border-gray-200 bg-white shadow-sm'}`}>
+                          {reactionEmojis[slot] ?? '—'}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                <p className={`text-[10px] ${T.textDim} mb-3`}>Drag chips to reorder (anywhere in the list). Slots 1–3 are the deck. Tap ✕ to remove.</p>
                 <div className="flex flex-wrap gap-2 mb-3">
                   {reactionEmojis.map((em, i) => (
                     <div
-                      key={em + '-' + i}
-                      draggable
-                      onDragStart={(e) => { try { e.dataTransfer.effectAllowed = 'move'; } catch { } dragIdxRef.current = i; setDragIdx(i); }}
-                      onDragEnd={() => { dragIdxRef.current = null; setDragIdx(null); }}
-                      onTouchStart={() => { dragIdxRef.current = i; setDragIdx(i); }}
+                      key={'reaction-slot-' + i}
                       data-emoji-idx={i}
                       style={{ touchAction: 'none' }}
-                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full border cursor-grab active:cursor-grabbing transition-all select-none ${dragIdx === i ? 'opacity-50 ring-2 ring-white/20 z-10' : ''} ${darkMode ? (isSunset ? 'border-[#323236] bg-[#1c1c1e]' : 'border-[#223858] bg-[#0f1b2d]') : 'border-gray-200 bg-gray-50'}`}
+                      onPointerDown={(e) => {
+                        if (e.pointerType === 'mouse' && e.button !== 0) return;
+                        if (e.target.closest('button')) return;
+                        e.preventDefault();
+                        dragIdxRef.current = i;
+                        setDragIdx(i);
+                      }}
+                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full border cursor-grab active:cursor-grabbing transition-all select-none ${dragIdx === i ? 'opacity-50 ring-2 ring-white/30 z-10 scale-[1.02]' : ''} ${i < 3 ? (isSunset ? 'border-[#ff4422]/50 bg-[#ff4422]/10' : 'border-[#5b7cf5]/50 bg-[#5b7cf5]/12') : (darkMode ? (isSunset ? 'border-[#323236] bg-[#1c1c1e]' : 'border-[#223858] bg-[#0f1b2d]') : 'border-gray-200 bg-gray-50')}`}
                     >
+                      {i < 3 && <span className={`text-[9px] font-black tabular-nums w-4 h-4 rounded-full flex items-center justify-center shrink-0 ${isSunset ? 'bg-[#ff4422]/25 text-[#ff8844]' : 'bg-[#5b7cf5]/25 text-blue-300'}`}>{i + 1}</span>}
                       <GripVertical size={10} className={T.textDim} />
                       <span className="text-lg">{em}</span>
-                      <button type="button" onClick={(e) => { e.stopPropagation(); saveReactionEmojis(reactionEmojis.filter((_, idx) => idx !== i)); }} onTouchStart={e => e.stopPropagation()} className="text-gray-500 hover:text-red-400"><X size={12} /></button>
+                      <button type="button" onClick={(e) => { e.stopPropagation(); saveReactionEmojis(reactionEmojis.filter((_, idx) => idx !== i)); }} onPointerDown={e => e.stopPropagation()} className="text-gray-500 hover:text-red-400"><X size={12} /></button>
                     </div>
                   ))}
                 </div>
@@ -2431,14 +2452,15 @@ function VersaAppMain() {
                       <div className={`text-[10px] font-semibold ${T.textDim} mt-1`}>{timeAgo}</div>
                     </div>
                   </div>
-                  <div className={`flex items-center gap-1.5 mt-3 ${hasReactions ? '' : ''}`}>
-                    {reactionEmojis.slice(0, 3).map(emoji => {
+                  <div className={`flex items-center gap-1.5 mt-3 flex-wrap`}>
+                    {reactionEmojis.slice(0, 3).map((emoji, deckIdx) => {
                       const rxValues = Object.values(reactions);
                       const count = rxValues.filter(r => r === emoji).length;
                       const myReaction = reactions[currentUser.id] === emoji;
                       return (
-                        <button key={emoji} onClick={() => reactToActivity(a.id, emoji)} className={`flex items-center gap-1 px-2.5 py-1 rounded-full border text-xs font-semibold transition-all active:scale-95 ${myReaction ? (isSunset ? 'border-[#ff4422]/40 ${T.accentBg}/10 text-[#ff4422]' : 'border-[#5b7cf5]/40 bg-[#5b7cf5]/10 text-[#5b7cf5]') : (darkMode ? (isSunset ? 'border-[#323236] bg-transparent text-gray-500 hover:bg-[#1c1c1e]' : 'border-[#223858] bg-transparent text-gray-500 hover:bg-[#182544]') : 'border-gray-200 bg-transparent text-gray-400 hover:bg-gray-50')}`}>
-                          <span className="text-xs">{emoji}</span>{count > 0 && <span className="tabular-nums text-[10px]">{count}</span>}
+                        <button key={a.id + '-deck-' + deckIdx} type="button" title={'Deck slot ' + (deckIdx + 1)} onClick={() => reactToActivity(a.id, emoji)} className={`flex items-center gap-1 px-2.5 py-1 rounded-full border text-xs font-semibold transition-all active:scale-95 ${myReaction ? (isSunset ? 'border-[#ff4422]/40 ${T.accentBg}/10 text-[#ff4422]' : 'border-[#5b7cf5]/40 bg-[#5b7cf5]/10 text-[#5b7cf5]') : (darkMode ? (isSunset ? 'border-[#323236] bg-transparent text-gray-500 hover:bg-[#1c1c1e]' : 'border-[#223858] bg-transparent text-gray-500 hover:bg-[#182544]') : 'border-gray-200 bg-transparent text-gray-400 hover:bg-gray-50')}`}>
+                          <span className={`text-[9px] font-bold opacity-60 tabular-nums`}>{deckIdx + 1}</span>
+                          <span className="text-sm">{emoji}</span>{count > 0 && <span className="tabular-nums text-[10px]">{count}</span>}
                         </button>
                       );
                     })}
@@ -3339,58 +3361,35 @@ function VersaAppMain() {
         <ModalHeader title="Activity" onClose={() => setShowHeatMap(false)} icon={<Calendar size={18} className="text-emerald-400" />} dark={darkMode} />
         {(() => {
           const today = new Date();
+          const RANGE_OPTS = [
+            { id: '1w', label: 'Week' },
+            { id: '1m', label: 'Month' },
+            { id: '3m', label: '3 mo' },
+            { id: '6m', label: '6 mo' },
+            { id: '1y', label: 'Year' },
+            { id: 'all', label: 'All' },
+          ];
+          const RANGE_WEEKS = { '1w': 1, '1m': 4, '3m': 13, '6m': 26, '1y': 52, 'all': 104 };
+          const numWeeks = RANGE_WEEKS[heatMapRange] ?? 13;
           const emptySlot = darkMode ? (isSunset ? '#2a1510' : '#1a2238') : '#e8ecf2';
           const navyLevels = ['#152238', '#123d2c', '#1a6b4a', '#2d9868', '#4aba7a'];
           const sunsetLevels = ['#3d0c08', '#6b1c0c', '#a34012', '#ff6a1a', '#ffcc33'];
           const levelColors = isSunset ? sunsetLevels : navyLevels;
-          const cellOuter = 15;
+          const cellOuter = 14;
           const gap = 3;
-          const getDayStyle = (pts) => {
-            if (pts <= 0) return { fill: 0, color: emptySlot };
+          const getDayColor = (pts, isFuture) => {
+            if (isFuture) return 'transparent';
+            if (pts <= 0) return emptySlot;
             const pct = Math.min(pts / Math.max(dailyTarget, 1), 1);
             const li = Math.min(levelColors.length - 1, Math.max(0, Math.ceil(pct * levelColors.length) - 1));
-            const fillN = Math.max(1, Math.round(pct * 25));
-            return { fill: fillN, color: levelColors[li] };
+            return levelColors[li];
           };
-          const DaySquare = ({ pts, isFuture, isToday, title }) => {
-            const { fill, color } = getDayStyle(isFuture ? 0 : pts);
-            const subs = 25;
-            return (
-              <div
-                className={`rounded-[4px] p-[2px] ${isToday ? 'ring-1 ring-white/50' : ''}`}
-                style={{
-                  width: cellOuter,
-                  height: cellOuter,
-                  backgroundColor: isFuture ? 'transparent' : emptySlot,
-                  opacity: isFuture ? 0.12 : 1,
-                  boxSizing: 'border-box',
-                }}
-                title={title}
-              >
-                {!isFuture && (
-                  <div className="grid grid-cols-5 gap-[1px] w-full h-full" style={{ gridTemplateRows: 'repeat(5, 1fr)' }}>
-                    {Array.from({ length: subs }, (_, k) => (
-                      <div
-                        key={k}
-                        className="rounded-[1px] min-w-0 min-h-0"
-                        style={{
-                          backgroundColor: k < fill ? color : (darkMode ? (isSunset ? '#1f0e0c' : '#121a2e') : '#f0f3f8'),
-                          opacity: k < fill ? 1 : 0.85,
-                        }}
-                      />
-                    ))}
-                  </div>
-                )}
-              </div>
-            );
-          };
-          // 13 full weeks ending at this week's Saturday
           const endOfWeek = new Date(today);
           endOfWeek.setDate(endOfWeek.getDate() + (6 - endOfWeek.getDay()));
           const startOfGrid = new Date(endOfWeek);
-          startOfGrid.setDate(startOfGrid.getDate() - (13 * 7 - 1));
+          startOfGrid.setDate(startOfGrid.getDate() - (numWeeks * 7 - 1));
           const weeks = [];
-          for (let w = 0; w < 13; w++) {
+          for (let w = 0; w < numWeeks; w++) {
             const week = [];
             for (let d = 0; d < 7; d++) {
               const date = new Date(startOfGrid);
@@ -3405,54 +3404,69 @@ function VersaAppMain() {
             const m = week[0].getMonth();
             if (m !== lastMonth) { months.push({ idx: wi, label: week[0].toLocaleDateString('en-US', { month: 'short' }) }); lastMonth = m; }
           });
+          const visibleDates = weeks.flat().map(d => formatDateStr(d)).filter(ds => ds <= getToday());
+          const activeInView = visibleDates.filter(ds => (heatMapData[ds] || 0) > 0).length;
+          const ptsInView = visibleDates.reduce((s, ds) => s + (heatMapData[ds] || 0), 0);
           return (
-            <div>
-              <div className="overflow-x-auto">
-                <div style={{ paddingLeft: 22, marginBottom: 4, display: 'flex', position: 'relative', height: 14 }}>
-                  {months.map((m, i) => <div key={i} className={`text-[9px] font-bold ${T.textDim}`} style={{ position: 'absolute', left: 22 + m.idx * (cellOuter + gap) }}>{m.label}</div>)}
-                </div>
-                <div className="flex">
-                  <div className="flex flex-col shrink-0" style={{ width: 22, gap }}>
-                    {['S','M','T','W','T','F','S'].map((d, i) => <div key={i} className={`flex items-center justify-end pr-1 text-[8px] font-bold ${i % 2 === 1 ? T.textDim : 'text-transparent'}`} style={{ height: cellOuter }}>{d}</div>)}
-                  </div>
-                  <div className="flex" style={{ gap }}>
-                    {weeks.map((week, wi) => (
-                      <div key={wi} className="flex flex-col" style={{ gap }}>
-                        {week.map((day, di) => {
-                          const ds = formatDateStr(day);
-                          const pts = heatMapData[ds] || 0;
-                          const isFuture = day > today;
-                          const isToday = ds === getToday();
-                          return (
-                            <DaySquare
-                              key={di}
-                              pts={pts}
-                              isFuture={isFuture}
-                              isToday={isToday}
-                              title={isFuture ? '' : `${ds}: ${pts} pts`}
-                            />
-                          );
-                        })}
-                      </div>
-                    ))}
-                  </div>
-                </div>
+            <div className="flex flex-col items-center w-full">
+              <div className="flex flex-wrap justify-center gap-1.5 mb-4 w-full max-w-md">
+                {RANGE_OPTS.map(o => (
+                  <button
+                    key={o.id}
+                    type="button"
+                    onClick={() => setHeatMapRange(o.id)}
+                    className={`px-3 py-1.5 rounded-full text-[10px] font-bold tracking-wide transition-all ${heatMapRange === o.id ? (isSunset ? 'bg-[#ff4422] text-white shadow-md' : 'bg-[#5b7cf5] text-white shadow-md') : `${T.bgCard} border ${T.border} ${T.textMuted} opacity-90 hover:opacity-100`}`}
+                  >
+                    {o.label}
+                  </button>
+                ))}
               </div>
-              <div className="flex items-center justify-between mt-4">
-                <span className={`text-[10px] font-medium ${T.textDim}`}>Less</span>
-                <div className="flex items-center gap-1">
-                  {[emptySlot, ...levelColors].map((color, i) => (
-                    <div key={i} className="rounded-[3px] overflow-hidden p-[1px]" style={{ width: cellOuter, height: cellOuter, backgroundColor: emptySlot }}>
-                      <div className="w-full h-full rounded-[2px]" style={{ backgroundColor: i === 0 ? emptySlot : color }} />
+              <div className="w-full overflow-x-auto flex justify-center">
+                <div className="inline-flex flex-col items-center min-w-min">
+                  <div style={{ paddingLeft: 22, marginBottom: 4, display: 'flex', position: 'relative', height: 14, alignSelf: 'stretch' }}>
+                    {months.map((m, i) => <div key={i} className={`text-[9px] font-bold ${T.textDim}`} style={{ position: 'absolute', left: 22 + m.idx * (cellOuter + gap) }}>{m.label}</div>)}
+                  </div>
+                  <div className="flex justify-center">
+                    <div className="flex flex-col shrink-0" style={{ width: 22, gap }}>
+                      {['S','M','T','W','T','F','S'].map((d, i) => <div key={i} className={`flex items-center justify-end pr-1 text-[8px] font-bold ${i % 2 === 1 ? T.textDim : 'text-transparent'}`} style={{ height: cellOuter }}>{d}</div>)}
                     </div>
-                  ))}
+                    <div className="flex" style={{ gap }}>
+                      {weeks.map((week, wi) => (
+                        <div key={wi} className="flex flex-col" style={{ gap }}>
+                          {week.map((day, di) => {
+                            const ds = formatDateStr(day);
+                            const pts = heatMapData[ds] || 0;
+                            const isFuture = day > today;
+                            const isToday = ds === getToday();
+                            const bg = getDayColor(pts, isFuture);
+                            const has = !isFuture && pts > 0;
+                            return (
+                              <div
+                                key={di}
+                                className={`rounded-[4px] shrink-0 ${isToday ? 'ring-2 ring-white/70 z-[1]' : ''} ${has ? 'shadow-sm' : ''}`}
+                                style={{
+                                  width: cellOuter,
+                                  height: cellOuter,
+                                  backgroundColor: bg,
+                                  opacity: isFuture ? 0.14 : 1,
+                                  boxShadow: has ? (isSunset ? '0 1px 3px rgba(255,100,40,0.35)' : '0 1px 3px rgba(74,186,122,0.35)') : undefined,
+                                  boxSizing: 'border-box',
+                                }}
+                                title={isFuture ? '' : `${ds}: ${pts} pts`}
+                              />
+                            );
+                          })}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
                 </div>
-                <span className={`text-[10px] font-medium ${T.textDim}`}>More</span>
               </div>
-              <div className="grid grid-cols-3 gap-3 mt-5">{[
-                { v: Object.keys(heatMapData).length, l: 'Active Days', c: 'text-emerald-400' },
-                { v: Object.values(heatMapData).reduce((a, b) => a + b, 0), l: 'Total Points', c: isSunset ? 'text-[#ff4422]' : 'text-[#5b7cf5]' },
-                { v: streakData.streak || 0, l: 'Current Streak', c: 'text-[#e8864a]' }
+              <p className={`text-[10px] ${T.textDim} text-center mt-4 max-w-sm`}>One square per day. Empty = no points. Saturated color = closer to or above your daily target.</p>
+              <div className="grid grid-cols-3 gap-3 mt-5 w-full max-w-md">{[
+                { v: activeInView, l: 'Active days', c: 'text-emerald-400' },
+                { v: ptsInView, l: 'Points in view', c: isSunset ? 'text-[#ff4422]' : 'text-[#5b7cf5]' },
+                { v: streakData.streak || 0, l: 'Current streak', c: 'text-[#e8864a]' },
               ].map((s, i) => (
                 <div key={i} className={`text-center p-3 rounded-xl ${darkMode ? 'bg-[#0f1b2d] border border-[#1e3050]' : 'bg-gray-50 border border-gray-200'}`}>
                   <div className={`text-xl font-black ${s.c}`}>{s.v}</div>
