@@ -347,12 +347,11 @@ function VersaAppMain() {
     const defaultHabits = [
       // STUDY — time-based
       { name: 'Deep work', category: 'Study', points: 15, is_repeatable: true, unit: 'per 30 min' },
-      { name: 'Read', category: 'Study', points: 15, is_repeatable: true, unit: 'per 30 min' },
       // STUDY — completion-based
       { name: 'Small task', category: 'Study', points: 10, is_repeatable: true },
       { name: 'Big task', category: 'Study', points: 30, is_repeatable: true },
       // HEALTH — gym, sleep, nutrition
-      { name: 'Hit the gym', category: 'Health', points: 20, is_repeatable: true, unit: 'per 30 min' },
+      { name: 'Exercise', category: 'Health', points: 20, is_repeatable: true, unit: 'per 30 min' },
       { name: 'Slept 7+ hours', category: 'Health', points: 30, is_repeatable: false },
       { name: 'Woke up before 7', category: 'Health', points: 30, is_repeatable: false },
       { name: 'Junk food', category: 'Health', points: -15, is_repeatable: true, unit: 'per meal/snack' },
@@ -504,7 +503,7 @@ function VersaAppMain() {
 
     // Fetch activity feed
     const fetchActivity = async () => {
-      const { data } = await supabase.from('activity').select('*').eq('room_id', currentRoom.id).eq('date', today).order('ts', { ascending: false }).limit(20);
+      const { data } = await supabase.from('activity').select('*').eq('room_id', currentRoom.id).gte('date', ws).order('ts', { ascending: false }).limit(50);
       if (data) setActivityFeed(data.map(a => ({ ...a, id: a.id, userId: a.user_id, roomId: a.room_id })));
     };
     fetchActivity();
@@ -654,7 +653,7 @@ function VersaAppMain() {
             const tierNames = { 3: 'Building 1.5×', 7: 'Consistent 2×', 14: 'Dedicated 2.5×', 30: 'Legend 3×' };
             setStreakMilestone({ days: crossed, tier: tierNames[crossed] });
             setConfettiTrigger(v => v + 1);
-            setTimeout(() => setStreakMilestone(null), 4000);
+            setTimeout(() => setStreakMilestone(null), 8000);
           }
         }
         setStreakData({ streak, activeDays: dates.length, totalCompletions: allDocs.reduce((s, d) => s + (d.count || 1), 0) });
@@ -1190,6 +1189,7 @@ function VersaAppMain() {
     try { const stored = localStorage.getItem('versa-reaction-emojis'); return stored ? JSON.parse(stored) : DEFAULT_REACTION_EMOJIS; } catch { return DEFAULT_REACTION_EMOJIS; }
   });
   const [showEmojiEditor, setShowEmojiEditor] = useState(false);
+  const [dragIdx, setDragIdx] = useState(null);
   const [emojiDraft, setEmojiDraft] = useState('');
   const saveReactionEmojis = (emojis) => { setReactionEmojis(emojis); try { localStorage.setItem('versa-reaction-emojis', JSON.stringify(emojis)); } catch {} };
   const reactToActivity = async (activityId, emoji) => {
@@ -2011,18 +2011,30 @@ function VersaAppMain() {
       )}
       {/* Streak milestone popup */}
       {streakMilestone && (
-        <div className="fixed top-20 left-1/2 -translate-x-1/2 z-[101] anim-pop-in">
-          <div className="px-6 py-3 rounded-2xl shadow-2xl text-center bg-gradient-to-r from-orange-500 to-red-500 text-white">
-            <div className="text-lg font-black">🔥 {streakMilestone.days}-Day Streak!</div>
-            <div className="text-xs font-bold opacity-90">Unlocked: {streakMilestone.tier}</div>
+        <div className="fixed inset-0 z-[101] flex items-start justify-center pt-16 pointer-events-none">
+          <div className="pointer-events-auto anim-pop-in max-w-sm w-full mx-4">
+            <div className={`relative px-5 py-4 rounded-2xl shadow-2xl border ${darkMode ? 'bg-[#1a1a1e] border-orange-500/20' : 'bg-white border-orange-200'} flex items-center gap-4`}>
+              <div className="text-3xl anim-float">🔥</div>
+              <div className="flex-1">
+                <div className={`text-sm font-black ${T.text}`}>{streakMilestone.days}-Day Streak!</div>
+                <div className={`text-xs ${T.textMuted}`}>Tier unlocked: <span className="font-bold text-orange-400">{streakMilestone.tier}</span></div>
+              </div>
+              <button onClick={() => setStreakMilestone(null)} className={`w-7 h-7 rounded-full flex items-center justify-center ${darkMode ? 'hover:bg-white/10 text-gray-500' : 'hover:bg-gray-100 text-gray-400'} transition-all`}><X size={14}/></button>
+            </div>
           </div>
         </div>
       )}
       {/* Freeze popup */}
       {freezeMsg && (
-        <div className="fixed top-20 left-1/2 -translate-x-1/2 z-[101] anim-pop-in">
-          <div className="px-6 py-3 rounded-2xl shadow-2xl text-center bg-gradient-to-r from-cyan-500 to-blue-500 text-white">
-            <div className="text-sm font-black">{freezeMsg}</div>
+        <div className="fixed inset-0 z-[101] flex items-start justify-center pt-16 pointer-events-none">
+          <div className="pointer-events-auto anim-pop-in max-w-sm w-full mx-4">
+            <div className={`relative px-5 py-4 rounded-2xl shadow-2xl border ${darkMode ? 'bg-[#1a1a1e] border-cyan-500/20' : 'bg-white border-cyan-200'} flex items-center gap-4`}>
+              <div className="text-3xl">🛡️</div>
+              <div className="flex-1">
+                <div className={`text-sm font-bold ${T.text}`}>{freezeMsg}</div>
+              </div>
+              <button onClick={() => setFreezeMsg(null)} className={`w-7 h-7 rounded-full flex items-center justify-center ${darkMode ? 'hover:bg-white/10 text-gray-500' : 'hover:bg-gray-100 text-gray-400'} transition-all`}><X size={14}/></button>
+            </div>
           </div>
         </div>
       )}
@@ -2276,13 +2288,45 @@ function VersaAppMain() {
               <div className={`p-4 rounded-3xl border ${T.border} ${T.bgCard} ${darkMode ? '' : 'shadow-sm'} anim-slide-down`}>
                 <div className="flex items-center justify-between mb-3">
                   <div className={`text-xs font-black uppercase tracking-widest ${T.textDim}`}>Customize Reactions</div>
-                  <button onClick={() => setShowEmojiEditor(false)} className={`text-xs font-bold ${T.textMuted} hover:${T.text}`}><X size={16} /></button>
+                  <button onClick={() => setShowEmojiEditor(false)} className={`text-xs font-bold ${T.textMuted}`}><X size={16} /></button>
                 </div>
+                <p className={`text-[10px] ${T.textDim} mb-3`}>Drag to reorder. Tap ✕ to remove.</p>
                 <div className="flex flex-wrap gap-2 mb-3">
                   {reactionEmojis.map((em, i) => (
-                    <div key={i} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full border ${darkMode ? (isSunset ? 'border-[#323236] bg-[#1c1c1e]' : 'border-[#223858] bg-[#0f1b2d]') : 'border-gray-200 bg-gray-50'}`}>
+                    <div
+                      key={em + i}
+                      draggable
+                      onDragStart={() => setDragIdx(i)}
+                      onDragOver={(e) => { e.preventDefault(); }}
+                      onDrop={() => {
+                        if (dragIdx === null || dragIdx === i) return;
+                        const copy = [...reactionEmojis];
+                        const [moved] = copy.splice(dragIdx, 1);
+                        copy.splice(i, 0, moved);
+                        saveReactionEmojis(copy);
+                        setDragIdx(null);
+                      }}
+                      onDragEnd={() => setDragIdx(null)}
+                      onTouchStart={() => setDragIdx(i)}
+                      onTouchEnd={(e) => {
+                        if (dragIdx === null) return;
+                        const touch = e.changedTouches[0];
+                        const el = document.elementFromPoint(touch.clientX, touch.clientY);
+                        const targetIdx = el?.closest('[data-emoji-idx]')?.dataset?.emojiIdx;
+                        if (targetIdx !== undefined && parseInt(targetIdx) !== dragIdx) {
+                          const copy = [...reactionEmojis];
+                          const [moved] = copy.splice(dragIdx, 1);
+                          copy.splice(parseInt(targetIdx), 0, moved);
+                          saveReactionEmojis(copy);
+                        }
+                        setDragIdx(null);
+                      }}
+                      data-emoji-idx={i}
+                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full border cursor-grab active:cursor-grabbing transition-all ${dragIdx === i ? 'opacity-40 scale-90' : ''} ${darkMode ? (isSunset ? 'border-[#323236] bg-[#1c1c1e]' : 'border-[#223858] bg-[#0f1b2d]') : 'border-gray-200 bg-gray-50'}`}
+                    >
+                      <GripVertical size={10} className={T.textDim} />
                       <span className="text-lg">{em}</span>
-                      <button onClick={() => saveReactionEmojis(reactionEmojis.filter((_, idx) => idx !== i))} className="text-gray-500 hover:text-red-400"><X size={12} /></button>
+                      <button onClick={(e) => { e.stopPropagation(); saveReactionEmojis(reactionEmojis.filter((_, idx) => idx !== i)); }} className="text-gray-500 hover:text-red-400"><X size={12} /></button>
                     </div>
                   ))}
                 </div>
@@ -2293,13 +2337,20 @@ function VersaAppMain() {
                 {reactionEmojis.length === 0 && <button onClick={() => saveReactionEmojis(DEFAULT_REACTION_EMOJIS)} className={`mt-2 w-full text-center text-xs font-bold ${T.textMuted} hover:underline`}>Reset to defaults</button>}
               </div>
             )}
-            {activityFeed.length === 0 ? <p className="text-center text-gray-400 py-10 text-sm">No activity yet</p> : activityFeed.map(a => {
+            {activityFeed.length === 0 ? <p className="text-center text-gray-400 py-10 text-sm">No activity this week</p> : (() => {
+              let lastDateLabel = '';
+              return activityFeed.map(a => {
               const ts = a.ts ? new Date(a.ts) : null;
-              const timeAgo = ts ? (Math.floor((Date.now() - ts.getTime()) / 60000) < 60 ? Math.floor((Date.now() - ts.getTime()) / 60000) + 'm' : Math.floor((Date.now() - ts.getTime()) / 3600000) + 'h') + ' ago' : '';
+              const timeAgo = ts ? (Math.floor((Date.now() - ts.getTime()) / 60000) < 60 ? Math.floor((Date.now() - ts.getTime()) / 60000) + 'm' : Math.floor((Date.now() - ts.getTime()) / 3600000) < 24 ? Math.floor((Date.now() - ts.getTime()) / 3600000) + 'h' : Math.floor((Date.now() - ts.getTime()) / 86400000) + 'd') + ' ago' : '';
+              const dateLabel = a.date === getToday() ? 'Today' : a.date === getYesterday() ? 'Yesterday' : ts ? ts.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' }) : '';
+              const showDateHeader = dateLabel !== lastDateLabel;
+              if (showDateHeader) lastDateLabel = dateLabel;
               const reactions = a.reactions || {};
               const hasReactions = Object.keys(reactions).length > 0;
               return (
-                <div key={a.id} className={`p-4 rounded-3xl border ${T.border} ${T.bgCard} ${darkMode ? '' : 'shadow-sm'}`}>
+                <React.Fragment key={a.id}>
+                  {showDateHeader && <div className={`text-[10px] font-bold tracking-widest uppercase ${T.textDim} ${lastDateLabel !== 'Today' ? 'mt-2' : ''}`}>{dateLabel}</div>}
+                <div className={`p-4 rounded-3xl border ${T.border} ${T.bgCard} ${darkMode ? '' : 'shadow-sm'}`}>
                   <div className="flex gap-3">
                     <div className="flex-1">
                       <div className={`text-sm ${T.textMuted}`}><span className={`font-bold ${T.text}`}>{a.username}</span> {a.text}</div>
@@ -2319,8 +2370,9 @@ function VersaAppMain() {
                     })}
                   </div>
                 </div>
+                </React.Fragment>
               );
-            })}
+            })})()
           </div>
         )}
 
@@ -2577,7 +2629,7 @@ function VersaAppMain() {
       {/* Add Habit */}
       <Modal show={showAddHabit} onClose={() => setShowAddHabit(false)} dark={darkMode}>
         <ModalHeader title="Add Habit" onClose={() => setShowAddHabit(false)} dark={darkMode} />
-        <button onClick={loadDefaultHabits} disabled={loading} className={`w-full mb-5 px-4 py-3 ${T.accentBg} text-white rounded-xl shadow-lg text-sm font-bold active:scale-[0.98] disabled:opacity-50`}>{loading ? 'Loading...' : '⚡ Load Preset (9 habits)'}</button>
+        <button onClick={loadDefaultHabits} disabled={loading} className={`w-full mb-5 px-4 py-3 ${T.accentBg} text-white rounded-xl shadow-lg text-sm font-bold active:scale-[0.98] disabled:opacity-50`}>{loading ? 'Loading...' : '⚡ Load Preset (8 habits)'}</button>
         <div className="space-y-3">
           <input type="text" placeholder="Habit name" value={newHabit.name} onChange={e => setNewHabit({ ...newHabit, name: e.target.value })} className={inputCls} maxLength={30} />
           <div className="grid grid-cols-2 gap-3">
@@ -3202,99 +3254,71 @@ function VersaAppMain() {
         <ModalHeader title="Activity" onClose={() => setShowHeatMap(false)} icon={<Calendar size={18} className="text-emerald-400" />} dark={darkMode} />
         {(() => {
           const today = new Date();
-
-          let rangeDays = 30;
-          if (heatMapRange === '7d') rangeDays = 7;
-          if (heatMapRange === '90d') rangeDays = 90;
-          if (heatMapRange === '1y') rangeDays = 365;
-
-          const chartDates = [];
-          for (let i = rangeDays - 1; i >= 0; i--) {
-            const d = new Date(today);
-            d.setDate(d.getDate() - i);
-            chartDates.push(formatDateStr(d));
+          const accentColor = isSunset ? '#ff4422' : '#4aba7a';
+          const getColor = (pts) => {
+            if (pts <= 0) return darkMode ? '#1e2540' : '#eef2f7';
+            const pct = Math.min(pts / Math.max(dailyTarget, 1), 1);
+            if (pct >= 0.8) return accentColor;
+            if (pct >= 0.5) return isSunset ? '#cc4422' : '#3a9a64';
+            if (pct >= 0.3) return isSunset ? '#993322' : '#2d7a50';
+            return isSunset ? '#662211' : '#1e5a3a';
+          };
+          // 13 full weeks ending at this week's Saturday
+          const endOfWeek = new Date(today);
+          endOfWeek.setDate(endOfWeek.getDate() + (6 - endOfWeek.getDay()));
+          const startOfGrid = new Date(endOfWeek);
+          startOfGrid.setDate(startOfGrid.getDate() - (13 * 7 - 1));
+          const weeks = [];
+          for (let w = 0; w < 13; w++) {
+            const week = [];
+            for (let d = 0; d < 7; d++) {
+              const date = new Date(startOfGrid);
+              date.setDate(date.getDate() + w * 7 + d);
+              week.push(date);
+            }
+            weeks.push(week);
           }
-
-          const points = chartDates.map(date => heatMapData[date] || 0);
-          const maxPoints = Math.max(dailyTarget * 1.5, ...points, 10); // Ensure peak is at least goal + 50%
-          const minPoints = Math.min(0, ...points); // Accommodate negative habits going below 0
-
-          const SVG_W = 400;
-          const SVG_H = 160;
-          const M_TOP = 20;
-          const M_BTM = 20;
-          const M_LR = 10;
-          const USE_W = SVG_W - (M_LR * 2);
-          const USE_H = SVG_H - M_TOP - M_BTM;
-          const rangeY = maxPoints - minPoints;
-
-          const getX = (idx) => M_LR + (idx / Math.max(1, rangeDays - 1)) * USE_W;
-          const getY = (val) => SVG_H - M_BTM - ((val - minPoints) / Math.max(1, rangeY) * USE_H);
-
-          // Path generation
-          const pathStart = `M ${getX(0)} ${getY(points[0])}`;
-          let lines = '';
-          for (let i = 1; i < points.length; i++) {
-            lines += ` L ${getX(i)} ${getY(points[i])}`;
-          }
-
-          const strokePath = pathStart + lines;
-          // Filling down to the literal Y=0 line
-          const fillPath = `${strokePath} L ${getX(points.length - 1)} ${getY(0)} L ${getX(0)} ${getY(0)} Z`;
-
-          const yZero = getY(0);
-          const yGoal = getY(dailyTarget);
-
-          // Accent colors based on current theme
-          const accentStr = isSunset ? '#ff4422' : '#5b7cf5';
-          const accentOp = isSunset ? 'rgba(255, 123, 41, 0.2)' : 'rgba(91, 124, 245, 0.2)';
-
+          const months = [];
+          let lastMonth = -1;
+          weeks.forEach((week, wi) => {
+            const m = week[0].getMonth();
+            if (m !== lastMonth) { months.push({ idx: wi, label: week[0].toLocaleDateString('en-US', { month: 'short' }) }); lastMonth = m; }
+          });
+          const cellSize = 16;
+          const gap = 3;
           return (
             <div>
-              {/* Range Toggle */}
-              <div className={`flex gap-1 mb-5 p-1 rounded-xl ${darkMode ? 'bg-[#151d30]' : 'bg-gray-100'}`}>
-                {[{ id: '7d', l: '1 Week' }, { id: '30d', l: '1 Month' }, { id: '90d', l: '3 Months' }, { id: '1y', l: '1 Year' }].map(r => (
-                  <button key={r.id} onClick={() => setHeatMapRange(r.id)} className={`flex-1 py-1.5 text-[10px] font-bold rounded-lg transition-all tracking-wider uppercase ${heatMapRange === r.id ? (isSunset ? (darkMode ? 'bg-[#ff4422]/20 text-[#ff4422]' : 'bg-orange-100 text-orange-900') : (darkMode ? 'bg-[#223858] text-white' : 'bg-white shadow-sm text-blue-600')) : (darkMode ? 'text-gray-500 hover:text-gray-400' : 'text-gray-400 hover:text-gray-600')}`}>{r.l}</button>
-                ))}
-              </div>
-
-              {/* Chart SVG */}
-              <div className="relative mb-6">
-                <svg viewBox={`0 0 ${SVG_W} ${SVG_H}`} className="w-full h-auto drop-shadow-xl overflow-visible">
-                  <defs>
-                    <linearGradient id="heatGradient" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor={accentStr} stopOpacity={0.35} />
-                      <stop offset="100%" stopColor={accentStr} stopOpacity={0.01} />
-                    </linearGradient>
-                  </defs>
-
-                  {/* Grid Lines */}
-                  {/* Goal Line */}
-                  <line x1={M_LR} y1={yGoal} x2={SVG_W - M_LR} y2={yGoal} stroke={darkMode ? "rgba(255,255,255,0.2)" : "rgba(0,0,0,0.15)"} strokeWidth={1} strokeDasharray="4 4" />
-                  <text x={M_LR} y={yGoal - 4} fontSize="8" fill={darkMode ? "#a1a1aa" : "#85858a"} fontWeight="bold">DAILY GOAL ({dailyTarget})</text>
-
-                  {/* Zero Line */}
-                  <line x1={M_LR} y1={yZero} x2={SVG_W - M_LR} y2={yZero} stroke={darkMode ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.1)"} strokeWidth={1} strokeDasharray="2 4" />
-
-                  {/* Data Paths */}
-                  <path d={fillPath} fill="url(#heatGradient)" />
-                  <path d={strokePath} fill="none" stroke={accentStr} strokeWidth="2.5" strokeLinejoin="round" strokeLinecap="round" />
-
-                  {/* Active Point Highlight (Today) */}
-                  <circle cx={getX(points.length - 1)} cy={getY(points[points.length - 1])} r="3.5" fill={darkMode ? "#1c1c1e" : "#ffffff"} stroke={accentStr} strokeWidth="2" />
-                </svg>
-
-                {/* Min / Max Date Labels */}
-                <div className={`flex justify-between px-2 mt-1 text-[9px] font-medium ${T.textDim}`}>
-                  <span>{new Date(chartDates[0]).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}</span>
-                  <span>Today</span>
+              <div className="overflow-x-auto">
+                <div style={{ paddingLeft: 22, marginBottom: 4, display: 'flex', position: 'relative', height: 14 }}>
+                  {months.map((m, i) => <div key={i} className={`text-[9px] font-bold ${T.textDim}`} style={{ position: 'absolute', left: 22 + m.idx * (cellSize + gap) }}>{m.label}</div>)}
+                </div>
+                <div className="flex">
+                  <div className="flex flex-col shrink-0" style={{ width: 22, gap }}>
+                    {['S','M','T','W','T','F','S'].map((d, i) => <div key={i} className={`flex items-center justify-end pr-1 text-[8px] font-bold ${i % 2 === 1 ? T.textDim : 'text-transparent'}`} style={{ height: cellSize }}>{d}</div>)}
+                  </div>
+                  <div className="flex" style={{ gap }}>
+                    {weeks.map((week, wi) => <div key={wi} className="flex flex-col" style={{ gap }}>
+                      {week.map((day, di) => {
+                        const ds = formatDateStr(day);
+                        const pts = heatMapData[ds] || 0;
+                        const isFuture = day > today;
+                        const isToday = ds === getToday();
+                        return <div key={di} className={`rounded-[3px] ${isToday ? 'ring-1 ring-white/40' : ''}`} style={{ width: cellSize, height: cellSize, backgroundColor: isFuture ? 'transparent' : getColor(pts), opacity: isFuture ? 0.1 : 1 }} title={isFuture ? '' : `${ds}: ${pts} pts`} />;
+                      })}
+                    </div>)}
+                  </div>
                 </div>
               </div>
-
-              {/* Stats */}
+              <div className="flex items-center justify-between mt-4">
+                <span className={`text-[10px] font-medium ${T.textDim}`}>Less</span>
+                <div className="flex items-center gap-1">
+                  {[darkMode ? '#1e2540' : '#eef2f7', isSunset ? '#662211' : '#1e5a3a', isSunset ? '#993322' : '#2d7a50', isSunset ? '#cc4422' : '#3a9a64', accentColor].map((color, i) => <div key={i} className="rounded-[3px]" style={{ width: cellSize, height: cellSize, backgroundColor: color }} />)}
+                </div>
+                <span className={`text-[10px] font-medium ${T.textDim}`}>More</span>
+              </div>
               <div className="grid grid-cols-3 gap-3 mt-5">{[
                 { v: Object.keys(heatMapData).length, l: 'Active Days', c: 'text-emerald-400' },
-                { v: Object.values(heatMapData).reduce((a, b) => a + b, 0), l: 'Total Points', c: 'text-[#5b7cf5]' },
+                { v: Object.values(heatMapData).reduce((a, b) => a + b, 0), l: 'Total Points', c: isSunset ? 'text-[#ff4422]' : 'text-[#5b7cf5]' },
                 { v: streakData.streak || 0, l: 'Current Streak', c: 'text-[#e8864a]' }
               ].map((s, i) => (
                 <div key={i} className={`text-center p-3 rounded-xl ${darkMode ? 'bg-[#0f1b2d] border border-[#1e3050]' : 'bg-gray-50 border border-gray-200'}`}>
