@@ -1445,10 +1445,6 @@ function VersaAppMain() {
   const activeCategories = roomCategories.length > 0 ? roomCategories : DEFAULT_CATEGORIES;
   const allCatNames = activeCategories.map(c => c.name);
   const ICON_OPTIONS = ['🧠', '💪', '✨', '⭐', '📚', '🎨', '💼', '🏃', '🧘', '💰', '🎯', '❤️', '🌱', '🔬', '🎮', '🍎'];
-  // Theme-driven category colors — all categories use the theme accent
-  const getCT = () => T.cat;
-  const CT = {};
-  allCatNames.forEach(c => { CT[c] = T.cat; });
 
   const myCr = currentUser && currentRoom ? getTodayCrystals(currentUser.id) : {};
   const myPts = currentUser && currentRoom ? getTodayPts(currentUser.id) : 0;
@@ -1514,6 +1510,10 @@ function VersaAppMain() {
     },
   };
   const T = THEME_DEFS[theme] || THEME_DEFS['navy-dark'];
+  // Must run after T exists — was previously above THEME_DEFS/T and caused TDZ ("Cannot access before initialization")
+  const getCT = () => T.cat;
+  const CT = {};
+  allCatNames.forEach(c => { CT[c] = T.cat; });
   const inputCls = `w-full px-4 py-3 ${T.bgInput} border ${T.borderInput} rounded-xl focus:outline-none focus:border-[${T.accent}]/50 ${T.text} placeholder-[#4a6080] text-sm transition-all`;
   const btnPrimary = "w-full py-3.5 rounded-xl text-sm font-bold tracking-wide transition-all disabled:opacity-50 active:scale-[0.98]";
 
