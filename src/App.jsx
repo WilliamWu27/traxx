@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Clock, Plus, X, LogOut, Copy, Check, UserPlus, HelpCircle, Trophy, User, Flame, Zap, Star, TrendingUp, ArrowLeftRight, Edit3, Calendar, ChevronLeft, ChevronRight, Crown, Target, ArrowUp, ArrowDown, Minus as MinusIcon, GripVertical, BarChart3, Sun, Moon, ChevronDown, Trash2, Settings, Home, CheckSquare, Users } from 'lucide-react';
+import { Clock, Plus, X, LogOut, Copy, Check, UserPlus, HelpCircle, Trophy, User, Flame, Zap, Star, TrendingUp, ArrowLeftRight, Edit3, Calendar, ChevronLeft, ChevronRight, Crown, Target, ArrowUp, ArrowDown, Minus as MinusIcon, GripVertical, BarChart3, Sun, Moon, ChevronDown, Trash2, Settings, Home, CheckSquare, Users, Pause, Play } from 'lucide-react';
 import { supabase } from './supabase';
 
 // ─── PUSH NOTIFICATIONS ───
@@ -32,6 +32,15 @@ async function subscribeToPush(reg) {
     }
     return sub;
   } catch (err) { console.error('Push subscription failed:', err); return null; }
+}
+
+/** Archived stake is satisfied (or legacy row without tracking — does not block new stakes). */
+function isArchivedStakeRowDone(s) {
+  if (!s) return true;
+  if (s.fulfilled_at) return true;
+  if (s.stake_fulfilled === true || s.stake_fulfilled === 'true') return true;
+  if (s.stake_fulfilled === false) return false;
+  return true;
 }
 
 async function sendLocalNotification(title, body, tag) {
@@ -216,6 +225,9 @@ function VersaAppMain() {
   const [userRooms, setUserRooms] = useState([]);
   const [roomStakes, setRoomStakes] = useState(null);
   const [archivedStakes, setArchivedStakes] = useState([]);
+  /** Room-level stake pause (localStorage) — ms timestamp when break ends, or null */
+  const [stakeBreakEndMs, setStakeBreakEndMs] = useState(null);
+  const [markingArchivedStakeId, setMarkingArchivedStakeId] = useState(null);
   const [showSettleStake, setShowSettleStake] = useState(false);
   const [settleStakeData, setSettleStakeData] = useState({ winnerId: '', loserId: '' });
   const [newStake, setNewStake] = useState({ type: 'custom', description: '', duration: 'weekly' });
@@ -1016,6 +1028,51 @@ function VersaAppMain() {
 
   // ─── ROOM CREATOR PERMISSIONS ───
   const isRoomCreator = (roomCreatedBy || currentRoom?.createdBy) === currentUser?.id;
+  const stakeBreakActive = stakeBreakEndMs != null && Date.now() < stakeBreakEndMs;
+  const hasBlockingArchivedStake = archivedStakes.some(s => !isArchivedStakeRowDone(s));
+
+  useEffect(() => {
+    if (!currentRoom?.id) { setStakeBreakEndMs(null); return; }
+    try {
+      const raw = localStorage.getItem('versa-stakes-break-until-' + currentRoom.id);
+      if (!raw) { setStakeBreakEndMs(null); return; }
+      const ms = parseInt(raw, 10);
+      if (Number.isNaN(ms) || ms <= Date.now()) {
+        localStorage.removeItem('versa-stakes-break-until-' + currentRoom.id);
+        setStakeBreakEndMs(null);
+      } else setStakeBreakEndMs(ms);
+    } catch { setStakeBreakEndMs(null); }
+  }, [currentRoom?.id]);
+
+  useEffect(() => {
+    if (!stakeBreakEndMs || stakeBreakEndMs <= Date.now()) return;
+    const msLeft = stakeBreakEndMs - Date.now();
+    const t = setTimeout(() => {
+      setStakeBreakEndMs(null);
+      if (currentRoom?.id) try { localStorage.removeItem('versa-stakes-break-until-' + currentRoom.id); } catch {}
+      setSuccessMsg('Stake break ended');
+      setTimeout(() => setSuccessMsg(''), 2800);
+    }, msLeft);
+    return () => clearTimeout(t);
+  }, [stakeBreakEndMs, currentRoom?.id]);
+
+  const startStakeBreak = (durationMs) => {
+    if (!currentRoom?.id || !isRoomCreator) return;
+    if (!confirm('Pause automatic weekly stake actions for this room until the break ends (or you end it early)?')) return;
+    const end = Date.now() + durationMs;
+    setStakeBreakEndMs(end);
+    try { localStorage.setItem('versa-stakes-break-until-' + currentRoom.id, String(end)); } catch {}
+    setSuccessMsg('Stake break is on');
+    setTimeout(() => setSuccessMsg(''), 2500);
+  };
+  const endStakeBreakNow = () => {
+    if (!currentRoom?.id || !isRoomCreator) return;
+    setStakeBreakEndMs(null);
+    try { localStorage.removeItem('versa-stakes-break-until-' + currentRoom.id); } catch {}
+    setSuccessMsg('Stake break ended');
+    setTimeout(() => setSuccessMsg(''), 2500);
+  };
+
   const kickedIds = roomKicked;
   const activeMembers = roomMembers.filter(m => !kickedIds.includes(m.id));
   const kickMember = async (uid) => {
@@ -1049,6 +1106,9 @@ function VersaAppMain() {
 
   // ─── STAKES ───
   const saveStake = async () => {
+    if (stakeBreakActive) { setError('Stake break is active. End the break before setting a new stake.'); setTimeout(() => setError(''), 4000); return; }
+    if (hasBlockingArchivedStake) { setError('Mark every pending stake as complete in the Graveyard before setting a new stake.'); setTimeout(() => setError(''), 4500); return; }
+
     let finalDesc = newStake.description.trim();
     let finalType = newStake.type;
 
@@ -1206,6 +1266,11 @@ function VersaAppMain() {
 
   const endWeekEarly = async () => {
     if (!currentUser || !currentRoom || !roomStakes || activeMembers.length < 2) return;
+    if (stakeBreakActive) {
+      setError('Stake break is active — end the break first.');
+      setTimeout(() => setError(''), 3200);
+      return;
+    }
     if (!isRoomCreator && roomStakes.createdBy !== currentUser.id) {
       setError('Only the room owner or person who set the stake can end the week early.');
       setTimeout(() => setError(''), 3200);
@@ -1581,31 +1646,52 @@ function VersaAppMain() {
 
   const markArchivedStakeFulfilled = async (row) => {
     if (!currentUser || !currentRoom) return;
+    const rid = row?.id;
+    if (rid == null || rid === '') {
+      setError('Missing stake id — refresh and try again.');
+      setTimeout(() => setError(''), 3200);
+      return;
+    }
     const ownerId = roomCreatedBy || currentRoom?.createdBy;
     const can = row.loser_id === currentUser.id || ownerId === currentUser.id;
     if (!can) { setError('Only the person who owes the stake or the room owner can mark it done.'); setTimeout(() => setError(''), 2800); return; }
+    setMarkingArchivedStakeId(rid);
     try {
-      const patch = { stake_fulfilled: true, fulfilled_at: new Date().toISOString(), fulfilled_by: currentUser.id };
-      let { error } = await supabase.from('archived_stakes').update(patch).eq('id', row.id);
+      const at = new Date().toISOString();
+      const patch = { stake_fulfilled: true, fulfilled_at: at, fulfilled_by: currentUser.id };
+      let { error } = await supabase.from('archived_stakes').update(patch).eq('id', rid);
       if (error) {
-        const r2 = await supabase.from('archived_stakes').update({ fulfilled_at: patch.fulfilled_at }).eq('id', row.id);
+        const r2 = await supabase.from('archived_stakes').update({ fulfilled_at: at, fulfilled_by: currentUser.id, stake_fulfilled: true }).eq('id', rid);
         error = r2.error;
       }
+      if (error) {
+        const r3 = await supabase.from('archived_stakes').update({ fulfilled_at: at }).eq('id', rid);
+        error = r3.error;
+      }
       if (error) throw error;
-      setArchivedStakes(prev => prev.map(s => s.id === row.id ? { ...s, stake_fulfilled: true, fulfilled_at: patch.fulfilled_at, fulfilled_by: currentUser.id } : s));
+      const { data: fresh } = await supabase.from('archived_stakes').select('*').eq('room_id', currentRoom.id).order('date_archived', { ascending: false });
+      if (fresh) setArchivedStakes(fresh);
+      const updated = (fresh || []).find(s => String(s.id) === String(rid));
+      if (!updated || !isArchivedStakeRowDone(updated)) {
+        throw new Error('Update did not apply — in Supabase → Table editor → archived_stakes → enable UPDATE for authenticated users (RLS policies), and run the optional migration for stake_fulfilled / fulfilled_at columns.');
+      }
       setSuccessMsg('Stake marked as completed');
       setTimeout(() => setSuccessMsg(''), 2500);
       const d = String(row.description || '');
       await postActivity(`✅ Stake verified complete${d ? ': ' + d.slice(0, 50) + (d.length > 50 ? '…' : '') : ''}`, null);
     } catch (e) {
-      setError(e.message || 'Could not save — run the optional SQL migration for stake verification columns.');
-      setTimeout(() => setError(''), 3500);
+      console.error('markArchivedStakeFulfilled', e);
+      setError(e.message || 'Could not save stake status.');
+      setTimeout(() => setError(''), 4500);
+    } finally {
+      setMarkingArchivedStakeId(null);
     }
   };
 
   // Monday: auto-resolve active stake from last week’s points → archive + notifications + activity
   useEffect(() => {
     if (!currentUser || !currentRoom || !roomStakes || activeMembers.length < 2) return;
+    if (stakeBreakEndMs != null && Date.now() < stakeBreakEndMs) return;
     if (new Date().getDay() !== 1) return;
     const lws = getLastWeekStart();
     const lwe = getLastWeekEnd();
@@ -1688,7 +1774,7 @@ function VersaAppMain() {
     };
     const t = setTimeout(run, 1800);
     return () => { cancelled = true; clearTimeout(t); };
-  }, [currentUser?.id, currentRoom?.id, roomStakes?.description, roomStakes?.type, activeMembers.length, habits.length, dateKey]);
+  }, [currentUser?.id, currentRoom?.id, roomStakes?.description, roomStakes?.type, activeMembers.length, habits.length, dateKey, stakeBreakEndMs]);
 
   const addCategory = async () => {
     if (!newCatName.trim() || activeCategories.find(c => c.name.toLowerCase() === newCatName.trim().toLowerCase())) return;
@@ -2685,6 +2771,39 @@ function VersaAppMain() {
         {/* ======================================= */}
         {activeTab === 'stakes' && (
           <div className="tab-content pb-10">
+            {isRoomCreator && (
+              <div className={`p-4 rounded-3xl border mb-6 anim-fade-up ${stakeBreakActive ? (darkMode ? 'border-cyan-500/40 bg-cyan-500/10' : 'border-cyan-300 bg-cyan-50') : (T.border + ' ' + T.bgCard + (darkMode ? '' : ' shadow-sm'))}`}>
+                <div className="flex items-start gap-3">
+                  <div className={`p-2 rounded-xl shrink-0 ${stakeBreakActive ? 'bg-cyan-500/20 text-cyan-300' : (darkMode ? 'bg-gray-800/80 text-gray-400' : 'bg-gray-100 text-gray-600')}`}>
+                    {stakeBreakActive ? <Pause size={18} /> : <Play size={18} className="opacity-70" />}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className={`text-sm font-black ${T.text}`}>Stake break</div>
+                    <p className={`text-[11px] mt-1 leading-snug ${T.textMuted}`}>
+                      {stakeBreakActive ? (
+                        <>On until <span className="font-bold text-cyan-400">{stakeBreakEndMs ? new Date(stakeBreakEndMs).toLocaleString(undefined, { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : '—'}</span>. Monday auto-settle and &quot;end week early&quot; stay off.</>
+                      ) : (
+                        <>Pause automatic stake actions for this room. Everyone can still log habits. You can end the break anytime.</>
+                      )}
+                    </p>
+                    {stakeBreakActive ? (
+                      <button type="button" onClick={endStakeBreakNow} className={`mt-3 w-full py-2.5 rounded-xl text-xs font-bold border transition-all active:scale-[0.98] ${darkMode ? 'border-cyan-500/40 text-cyan-200 hover:bg-cyan-500/15' : 'border-cyan-400 text-cyan-900 hover:bg-cyan-100'}`}>
+                        End break now
+                      </button>
+                    ) : (
+                      <div className="flex flex-wrap gap-2 mt-3">
+                        {[{ label: '1 day', ms: 86400000 }, { label: '3 days', ms: 86400000 * 3 }, { label: '1 week', ms: 86400000 * 7 }, { label: '2 weeks', ms: 86400000 * 14 }].map(opt => (
+                          <button key={opt.label} type="button" onClick={() => startStakeBreak(opt.ms)} className={`px-3 py-1.5 rounded-lg text-[10px] font-bold border transition-all ${darkMode ? 'border-gray-600 text-gray-300 hover:bg-gray-800' : 'border-gray-300 text-gray-700 hover:bg-gray-100'}`}>
+                            {opt.label}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* ── Horizontal Distance Leaderboard ── */}
             {roomMembers.length > 0 && (() => {
               const ranked = [...activeMembers].map(m => ({ ...m, weeklyPts: getWeeklyPts(m.id) })).sort((a, b) => b.weeklyPts - a.weeklyPts);
@@ -2774,7 +2893,8 @@ function VersaAppMain() {
                 <button
                   type="button"
                   onClick={endWeekEarly}
-                  disabled={loading}
+                  disabled={loading || stakeBreakActive}
+                  title={stakeBreakActive ? 'End stake break first' : ''}
                   className={`mt-4 px-5 py-2.5 rounded-2xl text-xs font-bold border transition-all disabled:opacity-50 ${darkMode ? 'border-amber-500/40 bg-amber-500/10 text-amber-200 hover:bg-amber-500/15' : 'border-amber-300 bg-amber-50 text-amber-900 hover:bg-amber-100'}`}
                 >
                   End week early
@@ -2799,7 +2919,7 @@ function VersaAppMain() {
                     const isLoser = st.loser_id === currentUser.id;
                     const isWinner = st.winner_id === currentUser.id;
                     const weekLbl = st.week_start ? formatDate(st.week_start) + ' week' : (st.date_archived ? 'Archived ' + formatDate(st.date_archived) : '');
-                    const fulfilled = st.stake_fulfilled === true || st.stake_fulfilled === 'true';
+                    const fulfilled = isArchivedStakeRowDone(st);
                     const canVerify = (isLoser || isRoomCreator) && !fulfilled;
                     const bdr = isLoser ? (darkMode ? 'border-red-500/30' : 'border-red-300') : isWinner ? (darkMode ? 'border-amber-500/30' : 'border-amber-200') : T.border;
                     const bgC = isLoser ? (darkMode ? 'bg-red-500/10' : 'bg-red-50') : isWinner ? (darkMode ? 'bg-amber-500/5' : 'bg-amber-50/80') : T.bgCard;
@@ -2820,8 +2940,8 @@ function VersaAppMain() {
                             {fulfilled ? (
                               <div className={`mt-3 flex items-center gap-2 text-[11px] font-bold ${darkMode ? 'text-emerald-400' : 'text-emerald-600'}`}><Check size={14} /> Stake verified done</div>
                             ) : canVerify ? (
-                              <button type="button" onClick={() => markArchivedStakeFulfilled(st)} className={`mt-3 w-full py-2.5 rounded-xl text-xs font-bold transition-all active:scale-[0.98] ${darkMode ? 'bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 hover:bg-emerald-500/25' : 'bg-emerald-50 border border-emerald-200 text-emerald-800 hover:bg-emerald-100'}`}>
-                                Mark stake as completed
+                              <button type="button" disabled={markingArchivedStakeId != null} onClick={() => markArchivedStakeFulfilled(st)} className={`mt-3 w-full py-2.5 rounded-xl text-xs font-bold transition-all active:scale-[0.98] disabled:opacity-50 ${darkMode ? 'bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 hover:bg-emerald-500/25' : 'bg-emerald-50 border border-emerald-200 text-emerald-800 hover:bg-emerald-100'}`}>
+                                {markingArchivedStakeId != null && String(markingArchivedStakeId) === String(st.id) ? 'Saving…' : 'Mark stake as completed'}
                               </button>
                             ) : (
                               <p className={`mt-2 text-[10px] ${T.textDim}`}>{isWinner ? 'Waiting for ' + lsr + ' (or owner) to confirm.' : 'Owner or loser can confirm when done.'}</p>
@@ -3088,6 +3208,16 @@ function VersaAppMain() {
           </div>
         ) : (
           <div>
+            {stakeBreakActive && (
+              <div className="mb-3 p-3 rounded-xl border border-cyan-500/25 bg-cyan-500/10 text-cyan-200 text-xs leading-relaxed">
+                Stake break is on — end it from the <span className="font-bold">Weekly Stakes</span> tab first, then you can add a new stake.
+              </div>
+            )}
+            {hasBlockingArchivedStake && (
+              <div className="mb-3 p-3 rounded-xl border border-amber-500/25 bg-amber-500/10 text-amber-200 text-xs leading-relaxed">
+                Finish pending items in the Graveyard: tap <span className="font-bold">Mark stake as completed</span> for each open entry. Then you can set a new stake.
+              </div>
+            )}
             <div className="flex gap-1 mb-4 p-1 rounded-xl bg-black/20 shrink-0">
               <button onClick={() => setStakeMode('fixed')} className={`flex-1 py-1.5 text-[10px] font-bold rounded-lg transition-all tracking-wider uppercase ${stakeMode === 'fixed' ? 'bg-[#d06b4a] text-white shadow-sm' : (T.textMuted + ' hover:text-white')}`}>Fixed Stake</button>
               <button onClick={() => setStakeMode('wheel')} className={`flex-1 py-1.5 text-[10px] font-bold rounded-lg transition-all tracking-wider uppercase ${stakeMode === 'wheel' ? 'bg-[#d06b4a] text-white shadow-sm' : (T.textMuted + ' hover:text-white')}`}>Spin the Wheel</button>
@@ -3120,7 +3250,7 @@ function VersaAppMain() {
             )}
 
             <div className="flex gap-2 mb-4">{['weekly', 'monthly'].map(d => <button key={d} onClick={() => setNewStake({ ...newStake, duration: d })} className={'flex-1 py-2.5 text-xs font-bold rounded-xl transition-all uppercase tracking-wider ' + (newStake.duration === d ? (isSunset ? (darkMode ? 'bg-[#3d2640] text-white' : 'bg-orange-100 text-orange-900') : (darkMode ? 'bg-[#223858] text-white' : 'bg-gray-200 text-gray-900')) : (darkMode ? 'bg-[#182544] text-gray-600' : 'bg-gray-100 text-gray-400'))}>{d}</button>)}</div>
-            <button onClick={saveStake} disabled={loading} className="w-full px-4 py-4 bg-[#d06b4a] text-white rounded-xl text-base font-bold shadow-lg shadow-red-500/20 active:scale-[0.98] disabled:opacity-30 transition-all">{loading ? 'Saving...' : '⚡ Set Stakes'}</button>
+            <button onClick={saveStake} disabled={loading || stakeBreakActive || hasBlockingArchivedStake} className="w-full px-4 py-4 bg-[#d06b4a] text-white rounded-xl text-base font-bold shadow-lg shadow-red-500/20 active:scale-[0.98] disabled:opacity-30 transition-all">{loading ? 'Saving...' : '⚡ Set Stakes'}</button>
             {error && <p className="text-red-400 text-xs text-center mt-2">{error}</p>}
           </div>
         )}
