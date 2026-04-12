@@ -2372,7 +2372,8 @@ function VersaAppMain() {
                 </div>
                 </React.Fragment>
               );
-            })})()
+            });
+          })()}
           </div>
         )}
 
