@@ -257,8 +257,7 @@ function VersaAppMain() {
   const [showInsights, setShowInsights] = useState(false);
   const [showActivityExpanded, setShowActivityExpanded] = useState(false);
   const [insightsData, setInsightsData] = useState(null);
-  const [streakMilestone, setStreakMilestone] = useState(null);
-  const streakDismissTouch = useRef(0);
+  const [streakMilestoneGlow, setStreakMilestoneGlow] = useState(false);
   const [streakFreeze, setStreakFreeze] = useState(0);
   const [freezeMsg, setFreezeMsg] = useState(null);
   const [mutualStreaks, setMutualStreaks] = useState({});
@@ -648,8 +647,7 @@ function VersaAppMain() {
         if (streak > prevStreak) {
           const crossed = milestones.find(m => streak >= m && prevStreak < m);
           if (crossed) {
-            const tierNames = { 3: 'Building 1.5×', 7: 'Consistent 2×', 14: 'Dedicated 2.5×', 30: 'Legend 3×', 60: 'Unstoppable 4×' };
-            setStreakMilestone({ days: crossed, tier: tierNames[crossed] });
+            setStreakMilestoneGlow(true);
             setConfettiTrigger(v => v + 1);
           }
         }
@@ -658,6 +656,12 @@ function VersaAppMain() {
     };
     calc();
   }, [currentUser, currentRoom, completions, habits, streakTarget]);
+
+  useEffect(() => {
+    if (!streakMilestoneGlow) return;
+    const t = setTimeout(() => setStreakMilestoneGlow(false), 5000);
+    return () => clearTimeout(t);
+  }, [streakMilestoneGlow]);
 
   // ─── MUTUAL STREAKS (Snapchat-style between pairs) ───
   useEffect(() => {
@@ -1198,6 +1202,110 @@ function VersaAppMain() {
         text, bonus: bonus?.type || null, date: getToday()
       });
     } catch { }
+  };
+
+  const endWeekEarly = async () => {
+    if (!currentUser || !currentRoom || !roomStakes || activeMembers.length < 2) return;
+    if (!isRoomCreator && roomStakes.createdBy !== currentUser.id) {
+      setError('Only the room owner or person who set the stake can end the week early.');
+      setTimeout(() => setError(''), 3200);
+      return;
+    }
+    if (!confirm('End this week now? The stake resolves from everyone’s points so far. This cannot be undone.')) return;
+    const ws = getWeekStart();
+    const today = getToday();
+    const lockKey = 'versa-stake-early-' + currentRoom.id + '-' + ws;
+    try {
+      if (localStorage.getItem(lockKey)) {
+        setError('This week was already settled early.');
+        setTimeout(() => setError(''), 3200);
+        return;
+      }
+    } catch { }
+    setLoading(true);
+    setError('');
+    try {
+      const st = roomStakes;
+      const { data: snapData } = await supabase.from('completions').select('*').eq('room_id', currentRoom.id).gte('date', ws).lte('date', today);
+      const comps = (snapData || []).map(d => ({ ...d, userId: d.user_id, habitId: d.habit_id, habitPoints: d.habit_points, bonusPoints: d.bonus_points, habitCategory: d.habit_category }));
+      if (!comps.length) {
+        setError('No completions logged for this week yet — nothing to settle.');
+        setTimeout(() => setError(''), 3500);
+        return;
+      }
+      const scores = activeMembers.map(m => {
+        const mc = comps.filter(c => c.userId === m.id);
+        const pts = mc.reduce((s, c) => { const h = habits.find(x => x.id === c.habitId); return s + ((c.habitPoints || h?.points || 0) * (c.count || 1)) + (c.bonusPoints || 0); }, 0);
+        const activeDays = [...new Set(mc.map(c => c.date))].length;
+        return { member: m, pts, activeDays };
+      });
+      const sortedWin = [...scores].sort((a, b) => {
+        if (b.pts !== a.pts) return b.pts - a.pts;
+        if (b.activeDays !== a.activeDays) return b.activeDays - a.activeDays;
+        return (a.member.username || '').localeCompare(b.member.username || '');
+      });
+      const sortedLose = [...scores].sort((a, b) => {
+        if (a.pts !== b.pts) return a.pts - b.pts;
+        if (a.activeDays !== b.activeDays) return a.activeDays - b.activeDays;
+        return (a.member.username || '').localeCompare(b.member.username || '');
+      });
+      const winner = sortedWin[0];
+      const loser = sortedLose[0];
+      if (!winner || !loser || winner.member.id === loser.member.id) {
+        setError('Could not determine a winner and loser from current scores.');
+        setTimeout(() => setError(''), 3500);
+        return;
+      }
+      const baseRow = {
+        room_id: currentRoom.id,
+        description: st.description,
+        type: st.type,
+        winner_id: winner.member.id,
+        loser_id: loser.member.id,
+        date_archived: today,
+        week_start: ws,
+        auto_settled: false,
+        stake_fulfilled: false
+      };
+      const minimal = {
+        room_id: baseRow.room_id,
+        description: baseRow.description,
+        type: baseRow.type,
+        winner_id: baseRow.winner_id,
+        loser_id: baseRow.loser_id,
+        date_archived: baseRow.date_archived
+      };
+      let { error } = await supabase.from('archived_stakes').insert(baseRow);
+      if (error) {
+        const r2 = await supabase.from('archived_stakes').insert(minimal);
+        error = r2.error;
+      }
+      if (error) throw error;
+      await supabase.from('stakes').delete().eq('id', currentRoom.id);
+      setRoomStakes(null);
+      try { localStorage.setItem(lockKey, '1'); } catch { }
+      const { data: arch } = await supabase.from('archived_stakes').select('*').eq('room_id', currentRoom.id).order('date_archived', { ascending: false });
+      if (arch) setArchivedStakes(arch);
+      const wName = winner.member.username;
+      const lName = loser.member.username;
+      const descSnippet = (typeof st.description === 'string' ? st.description : '').slice(0, 80);
+      if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
+        const uid = currentUser.id;
+        if (uid === winner.member.id) sendLocalNotification('🏆 You won the week', lName + ' owes the stake' + (descSnippet ? ': ' + descSnippet : '.'), 'versa-stake-early-' + ws + '-win');
+        else if (uid === loser.member.id) sendLocalNotification('📋 Your stake is due', 'You finished last. ' + (descSnippet || 'Complete what you owe.'), 'versa-stake-early-' + ws + '-lose');
+        else sendLocalNotification('⚖️ Weekly stake settled (early)', wName + ' won · ' + lName + ' owes the consequence.', 'versa-stake-early-' + ws + '-room');
+      }
+      await postActivity('Week ended early — stake resolved: ' + wName + ' won the week, ' + lName + ' owes the stake.', null);
+      setConfettiTrigger(v => v + 1);
+      setSuccessMsg('This week’s stake is resolved and moved to the Graveyard');
+      setTimeout(() => setSuccessMsg(''), 4500);
+    } catch (e) {
+      console.error('endWeekEarly', e);
+      setError(e.message || 'Could not end the week early.');
+      setTimeout(() => setError(''), 4000);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const DEFAULT_REACTION_EMOJIS = ['🔥', '💀', '👏', '😤'];
@@ -2174,48 +2282,6 @@ function VersaAppMain() {
           </div>
         </div>
       )}
-      {/* Streak milestone — full-screen dim; card anchored above iOS home indicator; sm+ centered */}
-      {streakMilestone && (
-        <div className="fixed inset-0 z-[130]" role="dialog" aria-label="Streak milestone">
-          <button
-            type="button"
-            className="absolute inset-0 bg-black/25 backdrop-blur-[2px] sm:bg-black/20"
-            aria-label="Dismiss streak message"
-            onClick={() => setStreakMilestone(null)}
-          />
-          <div className="absolute inset-0 flex flex-col justify-end sm:justify-center items-center pointer-events-none p-0">
-            <div
-              className="pointer-events-auto w-full max-w-sm px-3 anim-pop-in sm:px-4 sm:py-0"
-              style={{ paddingBottom: 'max(1rem, env(safe-area-inset-bottom, 12px))', paddingLeft: 'max(0.75rem, env(safe-area-inset-left, 0px))', paddingRight: 'max(0.75rem, env(safe-area-inset-right, 0px))' }}
-              onClick={e => e.stopPropagation()}
-              onTouchStart={e => { streakDismissTouch.current = e.touches[0]?.clientY ?? 0; }}
-              onTouchEnd={e => {
-                const y = e.changedTouches[0]?.clientY ?? 0;
-                if (y - streakDismissTouch.current > 48) setStreakMilestone(null);
-              }}
-            >
-              <div className={`relative overflow-hidden rounded-2xl border shadow-md ${darkMode ? 'border-orange-500/20 bg-[#161618]/[0.97]' : 'border-orange-200/50 bg-white/[0.97]'} backdrop-blur-md`}>
-                <div className={`absolute inset-x-0 top-0 h-0.5 ${isSunset ? 'bg-gradient-to-r from-[#ff2200] via-[#ff8800] to-[#ffdd00]' : 'bg-gradient-to-r from-emerald-600 via-[#4aba7a] to-cyan-500'}`} />
-                <div className="flex justify-center pt-2 pb-0.5 sm:hidden">
-                  <div className={`h-1 w-9 rounded-full ${darkMode ? 'bg-white/12' : 'bg-gray-400/40'}`} aria-hidden />
-                </div>
-                <div className="px-4 pb-4 pt-1 sm:px-5 sm:pt-3 sm:pb-4 flex items-center gap-3">
-                  <div className="text-3xl shrink-0 leading-none select-none">🔥</div>
-                  <div className="flex-1 min-w-0 py-0.5">
-                    <div className={`text-base sm:text-lg font-black tracking-tight leading-snug ${T.text}`}>{streakMilestone.days}-day streak</div>
-                    <div className={`text-[11px] sm:text-xs mt-0.5 ${T.textMuted} leading-snug`}>
-                      <span className="font-semibold text-[#e8864a]">{streakMilestone.tier}</span>
-                      <span className="opacity-75"> · bonus luck up</span>
-                    </div>
-                  </div>
-                  <button type="button" onClick={() => setStreakMilestone(null)} className={`shrink-0 w-10 h-10 min-w-[40px] min-h-[40px] rounded-full flex items-center justify-center active:scale-95 ${darkMode ? 'bg-white/5 text-gray-400 active:bg-white/10' : 'bg-gray-100 text-gray-500 active:bg-gray-200'} transition-all`} aria-label="Dismiss"><X size={18} /></button>
-                </div>
-              </div>
-              <p className={`text-center text-[10px] mt-2 px-1 ${T.textDim} opacity-90`}>Tap dimmed area or swipe down</p>
-            </div>
-          </div>
-        </div>
-      )}
       {/* Freeze popup */}
       {freezeMsg && (
         <div className="fixed inset-0 z-[101] flex items-start justify-center pt-16 pointer-events-none">
@@ -2349,10 +2415,21 @@ function VersaAppMain() {
               <div className={`font-bold tracking-widest uppercase text-[10px] mb-2 ${isSunset ? 'text-orange-100' : 'text-blue-100'}`}>WEEKLY POINTS</div>
               <div className="text-6xl font-black mb-1 anim-count">{getWeeklyPts(currentUser.id)}</div>
 
-              <div className="absolute right-6 top-1/2 -translate-y-1/2 flex flex-col items-end gap-2">
+              <div className="absolute right-6 top-1/2 -translate-y-1/2 flex flex-col items-end gap-2 max-w-[58%]">
                 <div className="flex items-center gap-2 px-4 py-2 anim-slide-right bg-white/20 backdrop-blur-md rounded-full border border-white/20 text-xs font-bold shadow-sm">
-                  <Flame size={14} /> {streakData.streak || 0}d streak{streakBonus.label ? ` · ${streakBonus.label}` : ''}
+                  <Flame size={14} /> {streakData.streak || 0}d streak
                 </div>
+                {streakBonus.tier && (
+                  <button
+                    type="button"
+                    tabIndex={-1}
+                    className={`relative flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-xs font-bold shadow-sm pointer-events-none overflow-hidden ${darkMode ? (isSunset ? 'bg-red-500/15 border-red-400/35 text-orange-100' : 'bg-blue-500/15 border-blue-400/35 text-blue-100') : (isSunset ? 'bg-orange-50/90 border-orange-200/80 text-orange-800' : 'bg-blue-50/90 border-blue-200/80 text-blue-800')} ${streakMilestoneGlow ? 'streak-multiplier-celebrate' : ''}`}
+                  >
+                    <span className="relative z-[2] flex items-center gap-1.5 min-w-0">
+                      <Zap size={14} className="shrink-0 opacity-95" /> {streakBonus.label}
+                    </span>
+                  </button>
+                )}
               </div>
             </div>
 
@@ -2692,6 +2769,16 @@ function VersaAppMain() {
                 <div className={`mt-3 px-4 py-2 rounded-full border text-xs font-bold ${darkMode ? 'border-[#223858] bg-[#182544] text-gray-400' : 'border-gray-200 bg-gray-50 text-gray-600'}`}>
                   {roomStakes.type === 'wheel' ? '🎰 Wheel' : '⚖️ Fixed'}: {(() => { try { return roomStakes.type === 'wheel' ? `${JSON.parse(roomStakes.description).length} options` : `"${roomStakes.description.substring(0, 30)}${roomStakes.description.length > 30 ? '...' : ''}"`; } catch { return roomStakes.description?.substring(0, 30) || 'Custom'; } })()}
                 </div>
+              )}
+              {roomStakes && activeMembers.length >= 2 && (isRoomCreator || roomStakes.createdBy === currentUser.id) && (
+                <button
+                  type="button"
+                  onClick={endWeekEarly}
+                  disabled={loading}
+                  className={`mt-4 px-5 py-2.5 rounded-2xl text-xs font-bold border transition-all disabled:opacity-50 ${darkMode ? 'border-amber-500/40 bg-amber-500/10 text-amber-200 hover:bg-amber-500/15' : 'border-amber-300 bg-amber-50 text-amber-900 hover:bg-amber-100'}`}
+                >
+                  End week early
+                </button>
               )}
             </div>
 
