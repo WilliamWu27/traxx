@@ -222,7 +222,7 @@ function VersaAppMain() {
   const [stakeMode, setStakeMode] = useState('fixed'); // 'fixed' | 'wheel'
   const [wheelOptions, setWheelOptions] = useState([...PUNISHMENTS.slice(0, 5)]);
   const [newWheelOption, setNewWheelOption] = useState('');
-  const [newHabit, setNewHabit] = useState({ name: '', category: 'Study', points: 10, isRepeatable: false, unit: '', description: '', isNegative: false });
+  const [newHabit, setNewHabit] = useState({ name: '', category: 'Focus', points: 10, isRepeatable: false, unit: '', description: '', isNegative: false });
   const [historyDate, setHistoryDate] = useState(null);
   const [editHabitData, setEditHabitData] = useState({});
   const [activeTab, setActiveTab] = useState('overview');
@@ -258,6 +258,7 @@ function VersaAppMain() {
   const [showActivityExpanded, setShowActivityExpanded] = useState(false);
   const [insightsData, setInsightsData] = useState(null);
   const [streakMilestone, setStreakMilestone] = useState(null);
+  const streakDismissTouch = useRef(0);
   const [streakFreeze, setStreakFreeze] = useState(0);
   const [freezeMsg, setFreezeMsg] = useState(null);
   const [mutualStreaks, setMutualStreaks] = useState({});
@@ -345,18 +346,15 @@ function VersaAppMain() {
   // ─── DEFAULT HABITS ───
   const loadDefaultHabits = async () => {
     const defaultHabits = [
-      // STUDY — time-based
-      { name: 'Deep work', category: 'Study', points: 15, is_repeatable: true, unit: 'per 30 min' },
-      // STUDY — completion-based
-      { name: 'Small task', category: 'Study', points: 10, is_repeatable: true },
-      { name: 'Big task', category: 'Study', points: 30, is_repeatable: true },
-      // HEALTH — gym, sleep, nutrition
+      { name: 'Deep work', category: 'Focus', points: 15, is_repeatable: true, unit: 'per 30 min' },
+      { name: 'Small task', category: 'Focus', points: 10, is_repeatable: true },
+      { name: 'Big task', category: 'Focus', points: 30, is_repeatable: true },
+      { name: 'Work done before 9pm', category: 'Focus', points: 30, is_repeatable: false },
       { name: 'Exercise', category: 'Health', points: 20, is_repeatable: true, unit: 'per 30 min' },
       { name: 'Slept 7+ hours', category: 'Health', points: 30, is_repeatable: false },
       { name: 'Woke up before 7', category: 'Health', points: 30, is_repeatable: false },
       { name: 'Junk food', category: 'Health', points: -15, is_repeatable: true, unit: 'per meal/snack' },
-      // FOCUS — mindset, productivity
-      { name: 'Work done before 9pm', category: 'Focus', points: 30, is_repeatable: false },
+      { name: 'Mindful break', category: 'Mind', points: 10, is_repeatable: true, unit: 'per 15 min' },
     ];
     try {
       setLoading(true);
@@ -503,7 +501,7 @@ function VersaAppMain() {
 
     // Fetch activity feed
     const fetchActivity = async () => {
-      const { data } = await supabase.from('activity').select('*').eq('room_id', currentRoom.id).gte('date', ws).order('ts', { ascending: false }).limit(50);
+      const { data } = await supabase.from('activity').select('*').eq('room_id', currentRoom.id).gte('date', ws).order('ts', { ascending: false }).limit(200);
       if (data) setActivityFeed(data.map(a => ({ ...a, id: a.id, userId: a.user_id, roomId: a.room_id })));
     };
     fetchActivity();
@@ -571,7 +569,7 @@ function VersaAppMain() {
           const mc = comps.filter(c => c.userId === m.id);
           const pts = mc.reduce((s, c) => { const h = habits.find(x => x.id === c.habitId); return s + ((c.habitPoints || h?.points || 0) * (c.count || 1)) + (c.bonusPoints || 0); }, 0);
           const catPts = {}; allCatNames.forEach(c => catPts[c] = 0);
-          mc.forEach(c => { const h = habits.find(x => x.id === c.habitId); const cat = h?.category || c.habitCategory || 'Study'; catPts[cat] += ((c.habitPoints || h?.points || 0) * (c.count || 1)) + (c.bonusPoints || 0); });
+          mc.forEach(c => { const h = habits.find(x => x.id === c.habitId); const cat = h?.category || c.habitCategory || 'Focus'; catPts[cat] += ((c.habitPoints || h?.points || 0) * (c.count || 1)) + (c.bonusPoints || 0); });
           const activeDays = [...new Set(mc.map(c => c.date))].length;
           return { member: m, pts, catPts, activeDays, completions: mc.length };
         }).sort((a, b) => b.pts - a.pts);
@@ -650,10 +648,9 @@ function VersaAppMain() {
         if (streak > prevStreak) {
           const crossed = milestones.find(m => streak >= m && prevStreak < m);
           if (crossed) {
-            const tierNames = { 3: 'Building 1.5×', 7: 'Consistent 2×', 14: 'Dedicated 2.5×', 30: 'Legend 3×' };
+            const tierNames = { 3: 'Building 1.5×', 7: 'Consistent 2×', 14: 'Dedicated 2.5×', 30: 'Legend 3×', 60: 'Unstoppable 4×' };
             setStreakMilestone({ days: crossed, tier: tierNames[crossed] });
             setConfettiTrigger(v => v + 1);
-            setTimeout(() => setStreakMilestone(null), 8000);
           }
         }
         setStreakData({ streak, activeDays: dates.length, totalCompletions: allDocs.reduce((s, d) => s + (d.count || 1), 0) });
@@ -1101,7 +1098,7 @@ function VersaAppMain() {
   // ─── HABITS (CREATE, EDIT, DELETE) ───
   const addHabit = async () => {
     if (!newHabit.name.trim()) return;
-    const cat = newHabit.category.trim() || 'Study';
+    const cat = newHabit.category.trim() || 'Focus';
     // Auto-create category if new
     if (cat && !allCatNames.includes(cat)) {
       const updated = [...activeCategories, { name: cat, icon: '⭐' }];
@@ -1188,10 +1185,48 @@ function VersaAppMain() {
   const [reactionEmojis, setReactionEmojis] = useState(() => {
     try { const stored = localStorage.getItem('versa-reaction-emojis'); return stored ? JSON.parse(stored) : DEFAULT_REACTION_EMOJIS; } catch { return DEFAULT_REACTION_EMOJIS; }
   });
+  const reactionEmojisRef = useRef(reactionEmojis);
+  reactionEmojisRef.current = reactionEmojis;
+  const dragIdxRef = useRef(null);
   const [showEmojiEditor, setShowEmojiEditor] = useState(false);
   const [dragIdx, setDragIdx] = useState(null);
   const [emojiDraft, setEmojiDraft] = useState('');
-  const saveReactionEmojis = (emojis) => { setReactionEmojis(emojis); try { localStorage.setItem('versa-reaction-emojis', JSON.stringify(emojis)); } catch {} };
+  const saveReactionEmojis = (emojis) => { setReactionEmojis(emojis); reactionEmojisRef.current = emojis; try { localStorage.setItem('versa-reaction-emojis', JSON.stringify(emojis)); } catch {} };
+  useEffect(() => { dragIdxRef.current = dragIdx; }, [dragIdx]);
+  useEffect(() => {
+    if (dragIdx === null) return;
+    const move = (clientX, clientY) => {
+      const el = document.elementFromPoint(clientX, clientY);
+      const row = el?.closest?.('[data-emoji-idx]');
+      if (!row) return;
+      const ti = parseInt(row.dataset.emojiIdx, 10);
+      if (Number.isNaN(ti)) return;
+      const cur = dragIdxRef.current;
+      if (cur === null || ti === cur) return;
+      const copy = [...reactionEmojisRef.current];
+      if (ti < 0 || ti >= copy.length) return;
+      const [moved] = copy.splice(cur, 1);
+      copy.splice(ti, 0, moved);
+      saveReactionEmojis(copy);
+      dragIdxRef.current = ti;
+      setDragIdx(ti);
+    };
+    const onPointerMove = (e) => { move(e.clientX, e.clientY); };
+    const onTouchMove = (e) => { e.preventDefault(); const t = e.touches[0]; if (t) move(t.clientX, t.clientY); };
+    const end = () => { dragIdxRef.current = null; setDragIdx(null); };
+    window.addEventListener('pointermove', onPointerMove);
+    window.addEventListener('touchmove', onTouchMove, { passive: false });
+    window.addEventListener('pointerup', end);
+    window.addEventListener('touchend', end);
+    window.addEventListener('pointercancel', end);
+    return () => {
+      window.removeEventListener('pointermove', onPointerMove);
+      window.removeEventListener('touchmove', onTouchMove);
+      window.removeEventListener('pointerup', end);
+      window.removeEventListener('touchend', end);
+      window.removeEventListener('pointercancel', end);
+    };
+  }, [dragIdx]);
   const reactToActivity = async (activityId, emoji) => {
     if (!currentUser) return;
     // Optimistic update
@@ -1403,9 +1438,9 @@ function VersaAppMain() {
   const getLeaderboard = () => activeMembers.map(m => ({ member: m, todayPts: getTodayPts(m.id), weeklyPts: getWeeklyPts(m.id), crystals: getTodayCrystals(m.id), weeklyCrystals: getWeeklyCrystals(m.id) })).sort((a, b) => leaderboardTab === 'today' ? b.todayPts - a.todayPts : b.weeklyPts - a.weeklyPts);
 
   const DEFAULT_CATEGORIES = [
-    { name: 'Study', icon: '📚' },
-    { name: 'Health', icon: '💪' },
     { name: 'Focus', icon: '🎯' },
+    { name: 'Health', icon: '💪' },
+    { name: 'Mind', icon: '🧠' },
   ];
   const activeCategories = roomCategories.length > 0 ? roomCategories : DEFAULT_CATEGORIES;
   const allCatNames = activeCategories.map(c => c.name);
@@ -1432,7 +1467,7 @@ function VersaAppMain() {
   const deleteCategory = async (catName) => {
     const catHabits = habits.filter(h => h.category === catName);
     if (catHabits.length > 0) { setError('Delete habits in this category first'); setTimeout(() => setError(''), 2000); return; }
-    if (['Study', 'Health', 'Focus'].includes(catName)) { setError("Can't delete default categories"); setTimeout(() => setError(''), 2000); return; }
+    if (activeCategories.length <= 1) { setError('Keep at least one category'); setTimeout(() => setError(''), 2000); return; }
     const updated = activeCategories.filter(c => c.name !== catName);
     try { await supabase.from('room_categories').upsert({ room_id: currentRoom.id, categories: updated }); } catch { }
   };
@@ -1700,10 +1735,10 @@ function VersaAppMain() {
           {/* Feature cards */}
           <div className="space-y-3 mb-8">
             {[
-              { icon: '📚', title: 'Track What Matters', desc: 'Studying, gym, screen time, sleep. Earn points for everything.', color: 'from-[#5b7cf5]/10 to-[#5b7cf5]/5' },
+              { icon: '📚', title: 'Track What Matters', desc: 'Focus, exercise, sleep, screen time — earn points for what matters.', color: 'from-[#5b7cf5]/10 to-[#5b7cf5]/5' },
               { icon: '🔥', title: 'Streak Luck', desc: 'Don\'t break the chain → boost your bonus chances up to 5×.', color: 'from-[#e8864a]/10 to-[#e8864a]/5' },
               { icon: '🏆', title: 'Compete with Friends', desc: 'Real-time leaderboards. Set stakes. Loser pays.', color: 'from-[#d4a04a]/10 to-[#d4a04a]/5' },
-              { icon: '💎', title: 'Win Crystals', desc: 'Top scorer in Study, Health, or Focus earns the crystal.', color: 'from-[#9b6bc8]/10 to-[#9b6bc8]/5' },
+              { icon: '💎', title: 'Win Crystals', desc: 'Top scorer in Focus, Health, or Mind earns the crystal.', color: 'from-[#9b6bc8]/10 to-[#9b6bc8]/5' },
             ].map((item, i) => (
               <div key={i} className={`bg-gradient-to-r ${item.color} backdrop-blur-sm border border-[#223858] rounded-2xl p-4 flex items-center gap-4`}>
                 <span className="text-2xl">{item.icon}</span>
@@ -1901,7 +1936,7 @@ function VersaAppMain() {
   const tourSteps = [
     { icon: '🎯', title: 'Track your habits', desc: 'Tap the + button on any habit to log it. Each completion earns you points. Try it now!' },
     { icon: '🔥', title: 'Build your streak', desc: 'Complete at least one habit every day. The longer your streak, the luckier you get — up to 5× bonus chances over a year.' },
-    { icon: '💎', title: 'Win crystals', desc: 'Score the most points in any category (Grind, Health, Discipline) to earn a crystal for the day.' },
+    { icon: '💎', title: 'Win crystals', desc: 'Score the most points in any category (Focus, Health, Mind, etc.) to earn a crystal for the day.' },
     { icon: '🏆', title: 'Dominate the leaderboard', desc: 'Your weekly points determine the leaderboard rank. Set stakes to make losing hurt.' },
     { icon: '👥', title: 'Invite your friends', desc: 'Share your room code and start competing. The more rivals, the better.' },
   ];
@@ -2009,18 +2044,41 @@ function VersaAppMain() {
           </div>
         </div>
       )}
-      {/* Streak milestone popup */}
+      {/* Streak milestone toast — dismiss: X, swipe down, or tap outside */}
       {streakMilestone && (
-        <div className="fixed inset-0 z-[101] flex items-start justify-center pt-16 pointer-events-none">
-          <div className="pointer-events-auto anim-pop-in max-w-sm w-full mx-4">
-            <div className={`relative px-5 py-4 rounded-2xl shadow-2xl border ${darkMode ? 'bg-[#1a1a1e] border-orange-500/20' : 'bg-white border-orange-200'} flex items-center gap-4`}>
-              <div className="text-3xl anim-float">🔥</div>
-              <div className="flex-1">
-                <div className={`text-sm font-black ${T.text}`}>{streakMilestone.days}-Day Streak!</div>
-                <div className={`text-xs ${T.textMuted}`}>Tier unlocked: <span className="font-bold text-orange-400">{streakMilestone.tier}</span></div>
+        <div
+          className="fixed inset-0 z-[101] flex items-end sm:items-center justify-center p-3 sm:p-4 pointer-events-auto"
+          role="dialog"
+          aria-label="Streak milestone"
+          onClick={() => setStreakMilestone(null)}
+        >
+          <div
+            className="pointer-events-auto w-full max-w-sm anim-pop-in"
+            onClick={e => e.stopPropagation()}
+            onTouchStart={e => { streakDismissTouch.current = e.touches[0]?.clientY ?? 0; }}
+            onTouchEnd={e => {
+              const y = e.changedTouches[0]?.clientY ?? 0;
+              if (y - streakDismissTouch.current > 56) setStreakMilestone(null);
+            }}
+          >
+            <div className={`relative overflow-hidden rounded-[1.35rem] shadow-2xl border ${darkMode ? 'border-orange-500/25 bg-[#141418]' : 'border-orange-200/80 bg-white'} ${isSunset ? 'shadow-orange-900/20' : 'shadow-black/15'}`}>
+              <div className={`absolute inset-x-0 top-0 h-1 ${isSunset ? 'bg-gradient-to-r from-[#ff2200] via-[#ff8800] to-[#ffdd00]' : 'bg-gradient-to-r from-emerald-600 via-[#4aba7a] to-cyan-500'}`} />
+              <div className="flex justify-center pt-2 pb-1 sm:hidden">
+                <div className={`h-1 w-10 rounded-full ${darkMode ? 'bg-white/15' : 'bg-gray-300/80'}`} aria-hidden />
               </div>
-              <button onClick={() => setStreakMilestone(null)} className={`w-7 h-7 rounded-full flex items-center justify-center ${darkMode ? 'hover:bg-white/10 text-gray-500' : 'hover:bg-gray-100 text-gray-400'} transition-all`}><X size={14}/></button>
+              <div className="px-5 pb-5 pt-1 sm:pt-4 flex items-start gap-4">
+                <div className="text-4xl shrink-0 anim-float drop-shadow-sm">🔥</div>
+                <div className="flex-1 min-w-0 pt-0.5">
+                  <div className={`text-lg font-black tracking-tight ${T.text}`}>{streakMilestone.days}-day streak</div>
+                  <div className={`text-xs mt-1 ${T.textMuted}`}>
+                    <span className="font-semibold text-[#e8864a]">{streakMilestone.tier}</span>
+                    <span className="opacity-80"> · bonus luck up</span>
+                  </div>
+                </div>
+                <button type="button" onClick={() => setStreakMilestone(null)} className={`shrink-0 w-9 h-9 rounded-full flex items-center justify-center text-lg leading-none ${darkMode ? 'hover:bg-white/10 text-gray-400' : 'hover:bg-gray-100 text-gray-500'} transition-all`} aria-label="Dismiss"><X size={16} /></button>
+              </div>
             </div>
+            <p className={`text-center text-[10px] mt-2 ${T.textDim}`}>Tap outside or swipe down to close</p>
           </div>
         </div>
       )}
@@ -2294,39 +2352,18 @@ function VersaAppMain() {
                 <div className="flex flex-wrap gap-2 mb-3">
                   {reactionEmojis.map((em, i) => (
                     <div
-                      key={em + i}
+                      key={em + '-' + i}
                       draggable
-                      onDragStart={() => setDragIdx(i)}
-                      onDragOver={(e) => { e.preventDefault(); }}
-                      onDrop={() => {
-                        if (dragIdx === null || dragIdx === i) return;
-                        const copy = [...reactionEmojis];
-                        const [moved] = copy.splice(dragIdx, 1);
-                        copy.splice(i, 0, moved);
-                        saveReactionEmojis(copy);
-                        setDragIdx(null);
-                      }}
-                      onDragEnd={() => setDragIdx(null)}
-                      onTouchStart={() => setDragIdx(i)}
-                      onTouchEnd={(e) => {
-                        if (dragIdx === null) return;
-                        const touch = e.changedTouches[0];
-                        const el = document.elementFromPoint(touch.clientX, touch.clientY);
-                        const targetIdx = el?.closest('[data-emoji-idx]')?.dataset?.emojiIdx;
-                        if (targetIdx !== undefined && parseInt(targetIdx) !== dragIdx) {
-                          const copy = [...reactionEmojis];
-                          const [moved] = copy.splice(dragIdx, 1);
-                          copy.splice(parseInt(targetIdx), 0, moved);
-                          saveReactionEmojis(copy);
-                        }
-                        setDragIdx(null);
-                      }}
+                      onDragStart={(e) => { try { e.dataTransfer.effectAllowed = 'move'; } catch { } dragIdxRef.current = i; setDragIdx(i); }}
+                      onDragEnd={() => { dragIdxRef.current = null; setDragIdx(null); }}
+                      onTouchStart={() => { dragIdxRef.current = i; setDragIdx(i); }}
                       data-emoji-idx={i}
-                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full border cursor-grab active:cursor-grabbing transition-all ${dragIdx === i ? 'opacity-40 scale-90' : ''} ${darkMode ? (isSunset ? 'border-[#323236] bg-[#1c1c1e]' : 'border-[#223858] bg-[#0f1b2d]') : 'border-gray-200 bg-gray-50'}`}
+                      style={{ touchAction: 'none' }}
+                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full border cursor-grab active:cursor-grabbing transition-all select-none ${dragIdx === i ? 'opacity-50 ring-2 ring-white/20 z-10' : ''} ${darkMode ? (isSunset ? 'border-[#323236] bg-[#1c1c1e]' : 'border-[#223858] bg-[#0f1b2d]') : 'border-gray-200 bg-gray-50'}`}
                     >
                       <GripVertical size={10} className={T.textDim} />
                       <span className="text-lg">{em}</span>
-                      <button onClick={(e) => { e.stopPropagation(); saveReactionEmojis(reactionEmojis.filter((_, idx) => idx !== i)); }} className="text-gray-500 hover:text-red-400"><X size={12} /></button>
+                      <button type="button" onClick={(e) => { e.stopPropagation(); saveReactionEmojis(reactionEmojis.filter((_, idx) => idx !== i)); }} onTouchStart={e => e.stopPropagation()} className="text-gray-500 hover:text-red-400"><X size={12} /></button>
                     </div>
                   ))}
                 </div>
@@ -2337,6 +2374,43 @@ function VersaAppMain() {
                 {reactionEmojis.length === 0 && <button onClick={() => saveReactionEmojis(DEFAULT_REACTION_EMOJIS)} className={`mt-2 w-full text-center text-xs font-bold ${T.textMuted} hover:underline`}>Reset to defaults</button>}
               </div>
             )}
+            {(() => {
+              const ws = getWeekStart(), we = getWeekEnd();
+              const weekRows = [...allCompletions].filter(c => c.date >= ws && c.date <= we).sort((a, b) => (b.date !== a.date ? b.date.localeCompare(a.date) : String(b.id || '').localeCompare(String(a.id || ''))));
+              if (weekRows.length === 0) return null;
+              let prevD = '';
+              return (
+                <div className={`p-4 rounded-3xl border ${T.border} ${T.bgCard} ${darkMode ? '' : 'shadow-sm'}`}>
+                  <div className={`text-[10px] font-black uppercase tracking-widest ${T.textDim} mb-3`}>This week · habit log</div>
+                  <div className="space-y-1.5 max-h-[min(55vh,420px)] overflow-y-auto pr-1">
+                    {weekRows.map(c => {
+                      const h = habits.find(x => x.id === c.habitId);
+                      const mem = activeMembers.find(m => m.id === c.userId);
+                      const name = h?.name || c.habitName || 'Habit';
+                      const pts = ((c.habitPoints || h?.points || 0) * (c.count || 1)) + (c.bonusPoints || 0);
+                      const cat = h?.category || c.habitCategory || 'Focus';
+                      const ct = getCT(cat);
+                      const showDh = c.date !== prevD;
+                      if (showDh) prevD = c.date;
+                      return (
+                        <React.Fragment key={c.id}>
+                          {showDh && <div className={`text-[9px] font-bold tracking-widest uppercase ${T.textDim} pt-2 first:pt-0`}>{formatDate(c.date)}</div>}
+                          <div className="flex items-center justify-between gap-2 text-sm">
+                            <div className="flex items-center gap-2 min-w-0">
+                              <div className={`w-1.5 h-1.5 rounded-full shrink-0 ${ct.bg}`} />
+                              <span className={`font-semibold ${T.text} truncate`}>{mem?.username || 'Member'}</span>
+                              <span className={`${T.textMuted} truncate`}>{name}</span>
+                              {c.count > 1 && <span className={`text-[10px] font-bold shrink-0 ${ct.txt}`}>×{c.count}</span>}
+                            </div>
+                            <span className={`font-bold shrink-0 ${ct.txt}`}>{pts > 0 ? '+' : ''}{pts}</span>
+                          </div>
+                        </React.Fragment>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })()}
             {activityFeed.length === 0 ? <p className="text-center text-gray-400 py-10 text-sm">No activity this week</p> : (() => {
               let lastDateLabel = '';
               return activityFeed.map(a => {
@@ -2453,7 +2527,7 @@ function VersaAppMain() {
                 style={{ filter: `drop-shadow(0 0 30px ${isSunset ? 'rgba(255,123,41,0.15)' : 'rgba(91,124,245,0.15)'})` }}
               >
                 {/* Outer ring pulse */}
-                <div className={`absolute inset-0 rounded-full border-2 ${isSunset ? '${T.accentBg.replace('bg-','border-')}/20' : 'border-[#5b7cf5]/20'} group-hover:scale-110 transition-transform duration-500`} />
+                <div className={`absolute inset-0 rounded-full border-2 ${isSunset ? 'border-[#ff4422]/20' : 'border-[#5b7cf5]/20'} group-hover:scale-110 transition-transform duration-500`} />
                 <div className={`absolute inset-2 rounded-full border ${isSunset ? 'border-[#ff4422]/10' : 'border-[#5b7cf5]/10'} group-hover:scale-105 transition-transform duration-700`} />
                 <Target size={100} className={`${isSunset ? T.accentTxt : 'text-[#5b7cf5]'} transition-all duration-300 group-hover:opacity-90`} strokeWidth={1} />
                 {/* Center dot glow */}
@@ -2694,7 +2768,7 @@ function VersaAppMain() {
           return (
             <div key={cat.name} className={`flex items-center justify-between p-3 rounded-xl border ${ct.bdr} ${ct.bgS}`}>
               <div className="flex items-center gap-2"><span>{cat.icon}</span><span className={`text-sm font-semibold ${ct.txt}`}>{cat.name}</span></div>
-              {!['Study', 'Health', 'Focus'].includes(cat.name) && <button onClick={() => deleteCategory(cat.name)} className="text-[10px] text-gray-600 hover:text-red-400 uppercase tracking-wider">Remove</button>}
+              <button type="button" onClick={() => deleteCategory(cat.name)} className="text-[10px] text-gray-600 hover:text-red-400 uppercase tracking-wider">Remove</button>
             </div>
           );
         })}</div>
@@ -2725,7 +2799,7 @@ function VersaAppMain() {
               const h = habits.find(x => x.id === c.habitId);
               const name = h?.name || c.habitName || 'Deleted habit';
               const pts = ((c.habitPoints || h?.points || 0) * (c.count || 1)) + (c.bonusPoints || 0);
-              const cat = h?.category || c.habitCategory || 'Study';
+              const cat = h?.category || c.habitCategory || 'Focus';
               return (
                 <div key={c.id} className={'p-3 rounded-xl border bg-[#182544] ' + (CT[cat] || getCT(cat)).bdr + ' flex items-center justify-between'}>
                   <div className="flex items-center gap-2"><span className="text-sm">{activeCategories.find(ac => ac.name === cat)?.icon || '⭐'}</span><span className="text-sm text-gray-300">{name}</span></div>
@@ -2886,7 +2960,7 @@ function VersaAppMain() {
             { i: '🔥', t: 'Streaks', d: 'Log at least ' + streakTarget + 'pts daily to maintain your streak. The longer your streak, the luckier you get — bonus chances scale from 1× up to 5× over a year.' },
             { i: '🛡️', t: 'Streak Freeze', d: 'Hit 90% (' + Math.round(dailyTarget * 0.9) + 'pts) in a day to bank a freeze. If you miss tomorrow, the freeze saves your streak. Max 1 at a time — unlog habits and you lose it.' },
             { i: '🎰', t: 'Mystery Bonus', d: '~10% base chance per tap: +5, +10, +15, +20, +50. Your streak boosts these chances up to 5×.' },
-            { i: '💎', t: 'Crystals', d: 'Score the most points in a category (Study, Health, Focus) to earn a crystal for the day. Ties = no crystal.' },
+            { i: '💎', t: 'Crystals', d: 'Score the most points in a category (Focus, Health, Mind, etc.) to earn a crystal for the day. Ties = no crystal.' },
             { i: '🏆', t: 'Compete', d: 'Weekly leaderboard resets Sunday. Invite friends, set stakes, and see who actually follows through.' },
             { i: '⚡', t: 'Stakes', d: 'Set what the weekly loser has to do. Spin the punishment wheel for random consequences.' },
             { i: '🔥', t: 'Reactions', d: 'React to your rivals\' completions with 🔥 💀 👏 😤 in the activity feed.' },
@@ -2940,7 +3014,7 @@ function VersaAppMain() {
           const uid = showCompetitor.id;
           const theirPts = getTodayPts(uid);
           const theirWeekPts = getWeeklyPts(uid);
-          const theirComps = completions.filter(c => c.userId === uid && c.date === getToday());
+          const theirComps = allCompletions.filter(c => c.userId === uid && c.date >= getWeekStart() && c.date <= getWeekEnd()).sort((a, b) => (a.date === b.date ? 0 : a.date < b.date ? 1 : -1));
           const ms = mutualStreaks[uid] || 0;
           const ahead = theirPts > myPts;
           const diff = Math.abs(theirPts - myPts);
@@ -2973,26 +3047,36 @@ function VersaAppMain() {
               </div>;
             })}</div>
 
-            {/* What they logged today */}
+            {/* What they logged this week */}
             <div className={`rounded-xl border p-4 mb-4 ${T.border} ${T.bgCard}`}>
-              <div className={`text-[10px] font-bold tracking-wider uppercase mb-3 ${T.textDim}`}>Logged today</div>
+              <div className={`text-[10px] font-bold tracking-wider uppercase mb-3 ${T.textDim}`}>Logged this week</div>
               {theirComps.length > 0 ? (
-                <div className="space-y-2">{theirComps.map(c => {
-                  const h = habits.find(x => x.id === c.habitId);
-                  const cat = h?.category || c.habitCategory || 'Study';
-                  const ct = getCT(cat);
-                  const pts = (c.habitPoints || h?.points || 0) * (c.count || 1) + (c.bonusPoints || 0);
-                  return <div key={c.id} className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <div className={`w-1.5 h-1.5 rounded-full ${ct.bg}`} />
-                      <span className={`text-sm ${T.textMuted}`}>{h?.name || c.habitName || 'Unknown'}</span>
-                      {c.count > 1 && <span className={`text-[10px] font-bold ${ct.txt}`}>×{c.count}</span>}
-                    </div>
-                    <span className={`text-sm font-bold ${ct.txt}`}>{pts}</span>
-                  </div>;
-                })}</div>
+                <div className="space-y-2">{(() => {
+                  let prevD = '';
+                  return theirComps.map(c => {
+                    const h = habits.find(x => x.id === c.habitId);
+                    const cat = h?.category || c.habitCategory || 'Focus';
+                    const ct = getCT(cat);
+                    const pts = (c.habitPoints || h?.points || 0) * (c.count || 1) + (c.bonusPoints || 0);
+                    const showDh = c.date !== prevD;
+                    if (showDh) prevD = c.date;
+                    return (
+                      <React.Fragment key={c.id}>
+                        {showDh && <div className={`text-[9px] font-bold tracking-widest uppercase ${T.textDim} pt-1`}>{formatDate(c.date)}</div>}
+                        <div className="flex items-center justify-between pl-0">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <div className={`w-1.5 h-1.5 rounded-full shrink-0 ${ct.bg}`} />
+                            <span className={`text-sm ${T.textMuted} truncate`}>{h?.name || c.habitName || 'Unknown'}</span>
+                            {c.count > 1 && <span className={`text-[10px] font-bold shrink-0 ${ct.txt}`}>×{c.count}</span>}
+                          </div>
+                          <span className={`text-sm font-bold shrink-0 ${ct.txt}`}>{pts}</span>
+                        </div>
+                      </React.Fragment>
+                    );
+                  });
+                })()}</div>
               ) : (
-                <div className={`text-sm text-center py-3 ${T.textDim}`}>Nothing logged yet</div>
+                <div className={`text-sm text-center py-3 ${T.textDim}`}>Nothing logged this week</div>
               )}
             </div>
 
@@ -3255,14 +3339,50 @@ function VersaAppMain() {
         <ModalHeader title="Activity" onClose={() => setShowHeatMap(false)} icon={<Calendar size={18} className="text-emerald-400" />} dark={darkMode} />
         {(() => {
           const today = new Date();
-          const accentColor = isSunset ? '#ff4422' : '#4aba7a';
-          const getColor = (pts) => {
-            if (pts <= 0) return darkMode ? '#1e2540' : '#eef2f7';
+          const emptySlot = darkMode ? (isSunset ? '#2a1510' : '#1a2238') : '#e8ecf2';
+          const navyLevels = ['#152238', '#123d2c', '#1a6b4a', '#2d9868', '#4aba7a'];
+          const sunsetLevels = ['#3d0c08', '#6b1c0c', '#a34012', '#ff6a1a', '#ffcc33'];
+          const levelColors = isSunset ? sunsetLevels : navyLevels;
+          const cellOuter = 15;
+          const gap = 3;
+          const getDayStyle = (pts) => {
+            if (pts <= 0) return { fill: 0, color: emptySlot };
             const pct = Math.min(pts / Math.max(dailyTarget, 1), 1);
-            if (pct >= 0.8) return accentColor;
-            if (pct >= 0.5) return isSunset ? '#cc4422' : '#3a9a64';
-            if (pct >= 0.3) return isSunset ? '#993322' : '#2d7a50';
-            return isSunset ? '#662211' : '#1e5a3a';
+            const li = Math.min(levelColors.length - 1, Math.max(0, Math.ceil(pct * levelColors.length) - 1));
+            const fillN = Math.max(1, Math.round(pct * 25));
+            return { fill: fillN, color: levelColors[li] };
+          };
+          const DaySquare = ({ pts, isFuture, isToday, title }) => {
+            const { fill, color } = getDayStyle(isFuture ? 0 : pts);
+            const subs = 25;
+            return (
+              <div
+                className={`rounded-[4px] p-[2px] ${isToday ? 'ring-1 ring-white/50' : ''}`}
+                style={{
+                  width: cellOuter,
+                  height: cellOuter,
+                  backgroundColor: isFuture ? 'transparent' : emptySlot,
+                  opacity: isFuture ? 0.12 : 1,
+                  boxSizing: 'border-box',
+                }}
+                title={title}
+              >
+                {!isFuture && (
+                  <div className="grid grid-cols-5 gap-[1px] w-full h-full" style={{ gridTemplateRows: 'repeat(5, 1fr)' }}>
+                    {Array.from({ length: subs }, (_, k) => (
+                      <div
+                        key={k}
+                        className="rounded-[1px] min-w-0 min-h-0"
+                        style={{
+                          backgroundColor: k < fill ? color : (darkMode ? (isSunset ? '#1f0e0c' : '#121a2e') : '#f0f3f8'),
+                          opacity: k < fill ? 1 : 0.85,
+                        }}
+                      />
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
           };
           // 13 full weeks ending at this week's Saturday
           const endOfWeek = new Date(today);
@@ -3285,35 +3405,47 @@ function VersaAppMain() {
             const m = week[0].getMonth();
             if (m !== lastMonth) { months.push({ idx: wi, label: week[0].toLocaleDateString('en-US', { month: 'short' }) }); lastMonth = m; }
           });
-          const cellSize = 16;
-          const gap = 3;
           return (
             <div>
               <div className="overflow-x-auto">
                 <div style={{ paddingLeft: 22, marginBottom: 4, display: 'flex', position: 'relative', height: 14 }}>
-                  {months.map((m, i) => <div key={i} className={`text-[9px] font-bold ${T.textDim}`} style={{ position: 'absolute', left: 22 + m.idx * (cellSize + gap) }}>{m.label}</div>)}
+                  {months.map((m, i) => <div key={i} className={`text-[9px] font-bold ${T.textDim}`} style={{ position: 'absolute', left: 22 + m.idx * (cellOuter + gap) }}>{m.label}</div>)}
                 </div>
                 <div className="flex">
                   <div className="flex flex-col shrink-0" style={{ width: 22, gap }}>
-                    {['S','M','T','W','T','F','S'].map((d, i) => <div key={i} className={`flex items-center justify-end pr-1 text-[8px] font-bold ${i % 2 === 1 ? T.textDim : 'text-transparent'}`} style={{ height: cellSize }}>{d}</div>)}
+                    {['S','M','T','W','T','F','S'].map((d, i) => <div key={i} className={`flex items-center justify-end pr-1 text-[8px] font-bold ${i % 2 === 1 ? T.textDim : 'text-transparent'}`} style={{ height: cellOuter }}>{d}</div>)}
                   </div>
                   <div className="flex" style={{ gap }}>
-                    {weeks.map((week, wi) => <div key={wi} className="flex flex-col" style={{ gap }}>
-                      {week.map((day, di) => {
-                        const ds = formatDateStr(day);
-                        const pts = heatMapData[ds] || 0;
-                        const isFuture = day > today;
-                        const isToday = ds === getToday();
-                        return <div key={di} className={`rounded-[3px] ${isToday ? 'ring-1 ring-white/40' : ''}`} style={{ width: cellSize, height: cellSize, backgroundColor: isFuture ? 'transparent' : getColor(pts), opacity: isFuture ? 0.1 : 1 }} title={isFuture ? '' : `${ds}: ${pts} pts`} />;
-                      })}
-                    </div>)}
+                    {weeks.map((week, wi) => (
+                      <div key={wi} className="flex flex-col" style={{ gap }}>
+                        {week.map((day, di) => {
+                          const ds = formatDateStr(day);
+                          const pts = heatMapData[ds] || 0;
+                          const isFuture = day > today;
+                          const isToday = ds === getToday();
+                          return (
+                            <DaySquare
+                              key={di}
+                              pts={pts}
+                              isFuture={isFuture}
+                              isToday={isToday}
+                              title={isFuture ? '' : `${ds}: ${pts} pts`}
+                            />
+                          );
+                        })}
+                      </div>
+                    ))}
                   </div>
                 </div>
               </div>
               <div className="flex items-center justify-between mt-4">
                 <span className={`text-[10px] font-medium ${T.textDim}`}>Less</span>
                 <div className="flex items-center gap-1">
-                  {[darkMode ? '#1e2540' : '#eef2f7', isSunset ? '#662211' : '#1e5a3a', isSunset ? '#993322' : '#2d7a50', isSunset ? '#cc4422' : '#3a9a64', accentColor].map((color, i) => <div key={i} className="rounded-[3px]" style={{ width: cellSize, height: cellSize, backgroundColor: color }} />)}
+                  {[emptySlot, ...levelColors].map((color, i) => (
+                    <div key={i} className="rounded-[3px] overflow-hidden p-[1px]" style={{ width: cellOuter, height: cellOuter, backgroundColor: emptySlot }}>
+                      <div className="w-full h-full rounded-[2px]" style={{ backgroundColor: i === 0 ? emptySlot : color }} />
+                    </div>
+                  ))}
                 </div>
                 <span className={`text-[10px] font-medium ${T.textDim}`}>More</span>
               </div>
