@@ -34,13 +34,21 @@ async function subscribeToPush(reg) {
   } catch (err) { console.error('Push subscription failed:', err); return null; }
 }
 
-/** Archived stake is satisfied (or legacy row without tracking — does not block new stakes). */
+/** Archived stake is satisfied for *gating* new stakes (legacy rows without tracking do not block). */
 function isArchivedStakeRowDone(s) {
   if (!s) return true;
   if (s.fulfilled_at) return true;
   if (s.stake_fulfilled === true || s.stake_fulfilled === 'true') return true;
   if (s.stake_fulfilled === false) return false;
   return true;
+}
+
+/** Only true after someone explicitly verified (checkbox) — never “automatic” for legacy/unknown rows. */
+function isStakeExplicitlyVerified(s) {
+  if (!s) return false;
+  if (s.fulfilled_at) return true;
+  if (s.stake_fulfilled === true || s.stake_fulfilled === 'true') return true;
+  return false;
 }
 
 async function sendLocalNotification(title, body, tag) {
@@ -228,6 +236,7 @@ function VersaAppMain() {
   /** Room-level stake pause (localStorage) — ms timestamp when break ends, or null */
   const [stakeBreakEndMs, setStakeBreakEndMs] = useState(null);
   const [markingArchivedStakeId, setMarkingArchivedStakeId] = useState(null);
+  const [deletingArchivedStakeId, setDeletingArchivedStakeId] = useState(null);
   const [showSettleStake, setShowSettleStake] = useState(false);
   const [settleStakeData, setSettleStakeData] = useState({ winnerId: '', loserId: '' });
   const [newStake, setNewStake] = useState({ type: 'custom', description: '', duration: 'weekly' });
@@ -1029,7 +1038,12 @@ function VersaAppMain() {
   // ─── ROOM CREATOR PERMISSIONS ───
   const isRoomCreator = (roomCreatedBy || currentRoom?.createdBy) === currentUser?.id;
   const stakeBreakActive = stakeBreakEndMs != null && Date.now() < stakeBreakEndMs;
-  const hasBlockingArchivedStake = archivedStakes.some(s => !isArchivedStakeRowDone(s));
+  const hasBlockingArchivedStake = archivedStakes.some(s => {
+    if (isStakeExplicitlyVerified(s)) return false;
+    if (s.stake_fulfilled === false) return true;
+    if (s.week_start != null && s.week_start !== '') return true;
+    return false;
+  });
 
   useEffect(() => {
     if (!currentRoom?.id) { setStakeBreakEndMs(null); return; }
@@ -1107,7 +1121,7 @@ function VersaAppMain() {
   // ─── STAKES ───
   const saveStake = async () => {
     if (stakeBreakActive) { setError('Stake break is active. End the break before setting a new stake.'); setTimeout(() => setError(''), 4000); return; }
-    if (hasBlockingArchivedStake) { setError('Mark every pending stake as complete in the Graveyard before setting a new stake.'); setTimeout(() => setError(''), 4500); return; }
+    if (hasBlockingArchivedStake) { setError('Check “Stake verified done” for every pending entry in the Graveyard (loser or owner) before setting a new stake.'); setTimeout(() => setError(''), 4500); return; }
 
     let finalDesc = newStake.description.trim();
     let finalType = newStake.type;
@@ -1672,7 +1686,7 @@ function VersaAppMain() {
       const { data: fresh } = await supabase.from('archived_stakes').select('*').eq('room_id', currentRoom.id).order('date_archived', { ascending: false });
       if (fresh) setArchivedStakes(fresh);
       const updated = (fresh || []).find(s => String(s.id) === String(rid));
-      if (!updated || !isArchivedStakeRowDone(updated)) {
+      if (!updated || !isStakeExplicitlyVerified(updated)) {
         throw new Error('Update did not apply — in Supabase → Table editor → archived_stakes → enable UPDATE for authenticated users (RLS policies), and run the optional migration for stake_fulfilled / fulfilled_at columns.');
       }
       setSuccessMsg('Stake marked as completed');
@@ -1685,6 +1699,33 @@ function VersaAppMain() {
       setTimeout(() => setError(''), 4500);
     } finally {
       setMarkingArchivedStakeId(null);
+    }
+  };
+
+  const deleteArchivedStakeFromGraveyard = async (row) => {
+    if (!currentUser || !currentRoom || !isRoomCreator) return;
+    const rid = row?.id;
+    if (rid == null || rid === '') return;
+    if (!confirm('Permanently remove this stake from the Graveyard? This cannot be undone.')) return;
+    const typed = window.prompt('Type DELETE in capital letters to confirm removal.');
+    if (typed !== 'DELETE') {
+      if (typed != null && typed !== '') setError('You must type DELETE exactly to remove an entry.');
+      setTimeout(() => setError(''), 4000);
+      return;
+    }
+    setDeletingArchivedStakeId(rid);
+    try {
+      const { error } = await supabase.from('archived_stakes').delete().eq('id', rid);
+      if (error) throw error;
+      setArchivedStakes(prev => prev.filter(s => String(s.id) !== String(rid)));
+      setSuccessMsg('Graveyard entry removed');
+      setTimeout(() => setSuccessMsg(''), 2500);
+    } catch (e) {
+      console.error('deleteArchivedStakeFromGraveyard', e);
+      setError(e.message || 'Could not delete — enable DELETE on archived_stakes for the room owner in Supabase (RLS).');
+      setTimeout(() => setError(''), 4500);
+    } finally {
+      setDeletingArchivedStakeId(null);
     }
   };
 
@@ -2919,8 +2960,9 @@ function VersaAppMain() {
                     const isLoser = st.loser_id === currentUser.id;
                     const isWinner = st.winner_id === currentUser.id;
                     const weekLbl = st.week_start ? formatDate(st.week_start) + ' week' : (st.date_archived ? 'Archived ' + formatDate(st.date_archived) : '');
-                    const fulfilled = isArchivedStakeRowDone(st);
-                    const canVerify = (isLoser || isRoomCreator) && !fulfilled;
+                    const verified = isStakeExplicitlyVerified(st);
+                    const canVerify = (isLoser || isRoomCreator) && !verified;
+                    const verifyCheckboxDisabled = verified || markingArchivedStakeId != null || !canVerify;
                     const bdr = isLoser ? (darkMode ? 'border-red-500/30' : 'border-red-300') : isWinner ? (darkMode ? 'border-amber-500/30' : 'border-amber-200') : T.border;
                     const bgC = isLoser ? (darkMode ? 'bg-red-500/10' : 'bg-red-50') : isWinner ? (darkMode ? 'bg-amber-500/5' : 'bg-amber-50/80') : T.bgCard;
                     const descDisplay = st.type === 'wheel' ? '🎰 Wheel stake' : `"${String(st.description || '').slice(0, 120)}${String(st.description || '').length > 120 ? '…' : ''}"`;
@@ -2937,14 +2979,35 @@ function VersaAppMain() {
                             </div>
                             <div className={`text-xs ${T.textMuted} mb-1`}><span className="text-amber-500 font-bold">🏆 {winr}</span> <span className={T.textDim}>won</span> · <span className="text-red-400 font-bold">💀 {lsr}</span> <span className={T.textDim}>owes</span></div>
                             <div className={`text-sm leading-relaxed font-medium ${isLoser ? (darkMode ? 'text-red-200' : 'text-red-900') : T.textDim}`}>{descDisplay}</div>
-                            {fulfilled ? (
-                              <div className={`mt-3 flex items-center gap-2 text-[11px] font-bold ${darkMode ? 'text-emerald-400' : 'text-emerald-600'}`}><Check size={14} /> Stake verified done</div>
-                            ) : canVerify ? (
-                              <button type="button" disabled={markingArchivedStakeId != null} onClick={() => markArchivedStakeFulfilled(st)} className={`mt-3 w-full py-2.5 rounded-xl text-xs font-bold transition-all active:scale-[0.98] disabled:opacity-50 ${darkMode ? 'bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 hover:bg-emerald-500/25' : 'bg-emerald-50 border border-emerald-200 text-emerald-800 hover:bg-emerald-100'}`}>
-                                {markingArchivedStakeId != null && String(markingArchivedStakeId) === String(st.id) ? 'Saving…' : 'Mark stake as completed'}
+                            <label className={`mt-3 flex items-start gap-2.5 ${verifyCheckboxDisabled && !verified ? 'cursor-not-allowed' : 'cursor-pointer'}`}>
+                              <input
+                                type="checkbox"
+                                className={`mt-0.5 h-4 w-4 shrink-0 rounded border-gray-500 bg-transparent ${darkMode ? 'border-gray-500' : 'border-gray-400'} text-emerald-500 focus:ring-emerald-500 focus:ring-offset-0 disabled:opacity-50`}
+                                checked={verified}
+                                disabled={verifyCheckboxDisabled}
+                                onChange={(e) => {
+                                  if (!e.target.checked) return;
+                                  if (canVerify && !verified) markArchivedStakeFulfilled(st);
+                                }}
+                              />
+                              <span className={`text-[11px] font-bold leading-snug ${verified ? (darkMode ? 'text-emerald-400' : 'text-emerald-600') : T.textMuted}`}>
+                                Stake verified done
+                                {markingArchivedStakeId != null && String(markingArchivedStakeId) === String(st.id) ? <span className={`block mt-0.5 font-semibold ${T.textDim}`}>Saving…</span> : null}
+                              </span>
+                            </label>
+                            {!canVerify && !verified && (
+                              <p className={`mt-1.5 text-[10px] ${T.textDim}`}>{isWinner ? 'Waiting for ' + lsr + ' or the room owner to verify.' : 'Only the loser or room owner can check this when done.'}</p>
+                            )}
+                            {isRoomCreator && (
+                              <button
+                                type="button"
+                                disabled={deletingArchivedStakeId != null}
+                                onClick={() => deleteArchivedStakeFromGraveyard(st)}
+                                className={`mt-2 inline-flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider transition-opacity ${darkMode ? 'text-red-400/70 hover:text-red-400' : 'text-red-600/80 hover:text-red-700'} disabled:opacity-40`}
+                              >
+                                <Trash2 size={12} />
+                                {deletingArchivedStakeId != null && String(deletingArchivedStakeId) === String(st.id) ? 'Removing…' : 'Remove from Graveyard'}
                               </button>
-                            ) : (
-                              <p className={`mt-2 text-[10px] ${T.textDim}`}>{isWinner ? 'Waiting for ' + lsr + ' (or owner) to confirm.' : 'Owner or loser can confirm when done.'}</p>
                             )}
                           </div>
                         </div>
@@ -3215,7 +3278,7 @@ function VersaAppMain() {
             )}
             {hasBlockingArchivedStake && (
               <div className="mb-3 p-3 rounded-xl border border-amber-500/25 bg-amber-500/10 text-amber-200 text-xs leading-relaxed">
-                Finish pending items in the Graveyard: tap <span className="font-bold">Mark stake as completed</span> for each open entry. Then you can set a new stake.
+                Finish pending items in the Graveyard: check <span className="font-bold">Stake verified done</span> for each open entry (loser or owner). Then you can set a new stake.
               </div>
             )}
             <div className="flex gap-1 mb-4 p-1 rounded-xl bg-black/20 shrink-0">
