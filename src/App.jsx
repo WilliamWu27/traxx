@@ -1442,31 +1442,22 @@ function VersaAppMain() {
         loser_id: baseRow.loser_id,
         date_archived: baseRow.date_archived
       };
-      let insertedRow = null;
-      const ins1 = await supabase.from('archived_stakes').insert(baseRow).select('*').maybeSingle();
-      if (ins1.error) {
-        const ins2 = await supabase.from('archived_stakes').insert(minimal).select('*').maybeSingle();
-        if (ins2.error) throw ins2.error;
-        insertedRow = ins2.data;
-      } else {
-        insertedRow = ins1.data;
+      // Plain insert + error check only (same as archiveStake). Do NOT use .select().maybeSingle() here:
+      // when RLS hides RETURNING rows, maybeSingle() reports PGRST116, we retried insert, and we never reached delete.
+      let { error: insertError } = await supabase.from('archived_stakes').insert(baseRow);
+      if (insertError) {
+        const r2 = await supabase.from('archived_stakes').insert(minimal);
+        insertError = r2.error;
       }
+      if (insertError) throw insertError;
+
       await deleteStakeRowsForRoom(currentRoom.id);
       setRoomStakes(null);
       try { localStorage.setItem(lockKey, '1'); } catch { }
       const { data: arch, error: archErr } = await supabase.from('archived_stakes').select('*').eq('room_id', currentRoom.id).order('date_archived', { ascending: false });
       if (archErr) console.warn('archived_stakes refetch after early end', archErr);
-      if (arch && arch.length > 0) {
-        if (insertedRow && !arch.some(s => String(s.id) === String(insertedRow.id))) {
-          setArchivedStakes([insertedRow, ...arch]);
-        } else {
-          setArchivedStakes(arch);
-        }
-      } else if (insertedRow) {
-        setArchivedStakes(prev => [insertedRow, ...prev.filter(p => String(p.id) !== String(insertedRow.id))]);
-      } else {
-        throw new Error(archErr?.message || 'Stake was saved but the app could not read archived_stakes back. In Supabase, allow SELECT (and INSERT with RETURNING) on archived_stakes for authenticated users.');
-      }
+      if (arch && arch.length > 0) setArchivedStakes(arch);
+      else console.warn('executeEndWeekEarly: archived_stakes select returned no rows after insert; check SELECT RLS. Realtime may still refresh the list.');
       const wName = winner.member.username;
       const lName = loser.member.username;
       const descSnippet = descVal.slice(0, 80);
