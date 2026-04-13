@@ -57,7 +57,9 @@ function pickWeeklyStakeWinnerLoser(scores) {
   const sorted = [...scores].sort((a, b) => {
     if (b.pts !== a.pts) return b.pts - a.pts;
     if (b.activeDays !== a.activeDays) return b.activeDays - a.activeDays;
-    return (a.member.username || '').localeCompare(b.member.username || '');
+    const u = (a.member.username || '').localeCompare(b.member.username || '');
+    if (u !== 0) return u;
+    return String(a.member.id).localeCompare(String(b.member.id));
   });
   if (sorted.length < 2) return { winner: sorted[0] || null, loser: null };
   const winner = sorted[0];
@@ -1375,7 +1377,20 @@ function VersaAppMain() {
       const st = roomStakes;
       const { data: snapData, error: snapErr } = await supabase.from('completions').select('*').eq('room_id', currentRoom.id).gte('date', ws).lte('date', today);
       if (snapErr) throw snapErr;
-      const comps = (snapData || []).map(d => ({ ...d, userId: d.user_id, habitId: d.habit_id, habitPoints: d.habit_points, bonusPoints: d.bonus_points, habitCategory: d.habit_category }));
+      const mapComp = (d) => ({ ...d, userId: d.user_id, habitId: d.habit_id, habitPoints: d.habit_points, bonusPoints: d.bonus_points, habitCategory: d.habit_category });
+      const remote = (snapData || []).map(mapComp);
+      const compKey = (c) => (c.id != null && c.id !== '' ? String(c.id) : `${String(c.userId)}|${c.date}|${String(c.habitId)}`);
+      const merged = new Map();
+      for (const c of remote) merged.set(compKey(c), c);
+      for (const c of allCompletions || []) {
+        const rid = c.roomId ?? c.room_id;
+        if (String(rid) !== String(currentRoom.id)) continue;
+        if (c.date < ws || c.date > today) continue;
+        const k = compKey(c);
+        const prev = merged.get(k);
+        merged.set(k, prev ? { ...prev, ...c } : c);
+      }
+      const comps = [...merged.values()];
       const scores = activeMembers.map(m => {
         const mc = comps.filter(c => String(c.userId) === String(m.id));
         const pts = mc.reduce((s, c) => { const h = habits.find(x => x.id === c.habitId); return s + ((c.habitPoints || h?.points || 0) * (c.count || 1)) + (c.bonusPoints || 0); }, 0);
@@ -1389,10 +1404,11 @@ function VersaAppMain() {
         return;
       }
       const descVal = st.description != null ? String(st.description) : '';
+      const stakeType = st.type || 'custom';
       const baseRow = {
         room_id: currentRoom.id,
         description: descVal,
-        type: st.type,
+        type: stakeType,
         winner_id: winner.member.id,
         loser_id: loser.member.id,
         date_archived: today,
@@ -1403,22 +1419,36 @@ function VersaAppMain() {
       const minimal = {
         room_id: baseRow.room_id,
         description: baseRow.description,
-        type: baseRow.type,
+        type: stakeType,
         winner_id: baseRow.winner_id,
         loser_id: baseRow.loser_id,
         date_archived: baseRow.date_archived
       };
-      let { error } = await supabase.from('archived_stakes').insert(baseRow);
-      if (error) {
-        const r2 = await supabase.from('archived_stakes').insert(minimal);
-        error = r2.error;
+      let insertedRow = null;
+      const ins1 = await supabase.from('archived_stakes').insert(baseRow).select('*').maybeSingle();
+      if (ins1.error) {
+        const ins2 = await supabase.from('archived_stakes').insert(minimal).select('*').maybeSingle();
+        if (ins2.error) throw ins2.error;
+        insertedRow = ins2.data;
+      } else {
+        insertedRow = ins1.data;
       }
-      if (error) throw error;
       await deleteStakeRowsForRoom(currentRoom.id);
       setRoomStakes(null);
       try { localStorage.setItem(lockKey, '1'); } catch { }
-      const { data: arch } = await supabase.from('archived_stakes').select('*').eq('room_id', currentRoom.id).order('date_archived', { ascending: false });
-      if (arch) setArchivedStakes(arch);
+      const { data: arch, error: archErr } = await supabase.from('archived_stakes').select('*').eq('room_id', currentRoom.id).order('date_archived', { ascending: false });
+      if (archErr) console.warn('archived_stakes refetch after early end', archErr);
+      if (arch && arch.length > 0) {
+        if (insertedRow && !arch.some(s => String(s.id) === String(insertedRow.id))) {
+          setArchivedStakes([insertedRow, ...arch]);
+        } else {
+          setArchivedStakes(arch);
+        }
+      } else if (insertedRow) {
+        setArchivedStakes(prev => [insertedRow, ...prev.filter(p => String(p.id) !== String(insertedRow.id))]);
+      } else {
+        throw new Error(archErr?.message || 'Stake was saved but the app could not read archived_stakes back. In Supabase, allow SELECT (and INSERT with RETURNING) on archived_stakes for authenticated users.');
+      }
       const wName = winner.member.username;
       const lName = loser.member.username;
       const descSnippet = descVal.slice(0, 80);
@@ -2855,6 +2885,7 @@ function VersaAppMain() {
         {/* ======================================= */}
         {activeTab === 'stakes' && (
           <div className="tab-content pb-10">
+            {error && <p className="text-red-400 text-xs text-center mb-4 px-3">{error}</p>}
             {isRoomCreator && (
               <div className={`p-4 rounded-3xl border mb-6 anim-fade-up ${stakeBreakActive ? (darkMode ? 'border-cyan-500/40 bg-cyan-500/10' : 'border-cyan-300 bg-cyan-50') : (T.border + ' ' + T.bgCard + (darkMode ? '' : ' shadow-sm'))}`}>
                 <div className="flex items-start gap-3">
