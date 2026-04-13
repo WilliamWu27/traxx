@@ -157,7 +157,7 @@ function Modal({ show, onClose, children, wide, dark }) {
   const isDark = dark !== undefined ? dark : true;
   const mbg = isDark ? 'bg-[#122040] border-[#1e3050]' : 'bg-white border-[#dce4ee]';
   return (
-    <div className="modal-overlay fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50" onClick={onClose}>
+    <div className="modal-overlay fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 pb-24 z-[1100]" onClick={onClose}>
       <div className={`modal-content rounded-2xl w-full p-6 border shadow-2xl max-h-[85vh] overflow-y-auto ${mbg} ` + (wide ? 'max-w-md' : 'max-w-sm')} onClick={e => e.stopPropagation()}>
         {children}
       </div>
@@ -265,6 +265,8 @@ function VersaAppMain() {
   const [deletingArchivedStakeId, setDeletingArchivedStakeId] = useState(null);
   const [showSettleStake, setShowSettleStake] = useState(false);
   const [showEndWeekEarlyModal, setShowEndWeekEarlyModal] = useState(false);
+  const [endWeekEarlyBusy, setEndWeekEarlyBusy] = useState(false);
+  const endWeekEarlyStakeRef = useRef(null);
   const [settleStakeData, setSettleStakeData] = useState({ winnerId: '', loserId: '' });
   const [newStake, setNewStake] = useState({ type: 'custom', description: '', duration: 'weekly' });
   const [stakeMode, setStakeMode] = useState('fixed'); // 'fixed' | 'wheel'
@@ -1353,12 +1355,29 @@ function VersaAppMain() {
       setTimeout(() => setError(''), 3200);
       return;
     }
+    endWeekEarlyStakeRef.current = roomStakes;
     setShowEndWeekEarlyModal(true);
   };
 
   /** Step 2: run settlement after user confirms in the modal. */
   const executeEndWeekEarly = async () => {
-    if (!currentUser || !currentRoom || !roomStakes) return;
+    const st = endWeekEarlyStakeRef.current ?? roomStakes;
+    if (!currentUser || !currentRoom) {
+      setError('Sign in and open a room first.');
+      setShowEndWeekEarlyModal(false);
+      return;
+    }
+    if (!st) {
+      setError('Stake data was lost before we could finish. Close this and tap “End week early” again.');
+      setShowEndWeekEarlyModal(false);
+      return;
+    }
+    const stakeRoomId = st.room_id ?? st.roomId;
+    if (stakeRoomId != null && String(stakeRoomId) !== String(currentRoom.id)) {
+      setError('Room mismatch — close the dialog and try again.');
+      setShowEndWeekEarlyModal(false);
+      return;
+    }
     const ws = getWeekStart();
     const today = getToday();
     const lockKey = 'versa-stake-early-' + currentRoom.id + '-' + ws;
@@ -1371,10 +1390,9 @@ function VersaAppMain() {
       }
     } catch { }
     setShowEndWeekEarlyModal(false);
-    setLoading(true);
+    setEndWeekEarlyBusy(true);
     setError('');
     try {
-      const st = roomStakes;
       const { data: snapData, error: snapErr } = await supabase.from('completions').select('*').eq('room_id', currentRoom.id).gte('date', ws).lte('date', today);
       if (snapErr) throw snapErr;
       const mapComp = (d) => ({ ...d, userId: d.user_id, habitId: d.habit_id, habitPoints: d.habit_points, bonusPoints: d.bonus_points, habitCategory: d.habit_category });
@@ -1467,7 +1485,8 @@ function VersaAppMain() {
       setError(e.message || 'Could not end the week early.');
       setTimeout(() => setError(''), 5000);
     } finally {
-      setLoading(false);
+      setEndWeekEarlyBusy(false);
+      endWeekEarlyStakeRef.current = null;
     }
   };
 
@@ -3029,7 +3048,7 @@ function VersaAppMain() {
                 <button
                   type="button"
                   onClick={endWeekEarly}
-                  disabled={loading || stakeBreakActive}
+                  disabled={loading || endWeekEarlyBusy || stakeBreakActive}
                   title={stakeBreakActive ? 'End stake break first' : ''}
                   className={`mt-4 px-5 py-2.5 rounded-2xl text-xs font-bold border transition-all disabled:opacity-50 ${darkMode ? 'border-amber-500/40 bg-amber-500/10 text-amber-200 hover:bg-amber-500/15' : 'border-amber-300 bg-amber-50 text-amber-900 hover:bg-amber-100'}`}
                 >
@@ -4250,18 +4269,18 @@ function VersaAppMain() {
         {successMsg && <p className="text-emerald-400 text-xs text-center mt-3">{successMsg}</p>}
       </Modal>
 
-      <Modal show={showEndWeekEarlyModal} onClose={() => !loading && setShowEndWeekEarlyModal(false)} dark={darkMode}>
-        <ModalHeader title="End week early?" onClose={() => !loading && setShowEndWeekEarlyModal(false)} dark={darkMode} />
+      <Modal show={showEndWeekEarlyModal} onClose={() => !endWeekEarlyBusy && setShowEndWeekEarlyModal(false)} dark={darkMode}>
+        <ModalHeader title="End week early?" onClose={() => !endWeekEarlyBusy && setShowEndWeekEarlyModal(false)} dark={darkMode} />
         <div className="p-1">
           <p className={`text-sm mb-4 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
             The stake will resolve from everyone’s points logged so far this week. This cannot be undone.
           </p>
           <div className="flex gap-2">
-            <button type="button" onClick={() => setShowEndWeekEarlyModal(false)} disabled={loading} className={`flex-1 py-3 rounded-xl text-sm font-bold border ${darkMode ? 'border-[#223858] text-gray-300 hover:bg-white/5' : 'border-gray-200 text-gray-700 hover:bg-gray-50'} disabled:opacity-50`}>
+            <button type="button" onClick={() => { setShowEndWeekEarlyModal(false); endWeekEarlyStakeRef.current = null; }} disabled={endWeekEarlyBusy} className={`flex-1 py-3 rounded-xl text-sm font-bold border ${darkMode ? 'border-[#223858] text-gray-300 hover:bg-white/5' : 'border-gray-200 text-gray-700 hover:bg-gray-50'} disabled:opacity-50`}>
               Cancel
             </button>
-            <button type="button" onClick={executeEndWeekEarly} disabled={loading} className="flex-1 py-3 rounded-xl text-sm font-bold bg-gradient-to-r from-[#d4a04a] to-[#c28e3b] text-white shadow-lg shadow-[#d4a04a]/20 disabled:opacity-50">
-              {loading ? 'Working…' : 'End week now'}
+            <button type="button" onClick={() => { void executeEndWeekEarly(); }} disabled={endWeekEarlyBusy} className="flex-1 py-3 rounded-xl text-sm font-bold bg-gradient-to-r from-[#d4a04a] to-[#c28e3b] text-white shadow-lg shadow-[#d4a04a]/20 disabled:opacity-50">
+              {endWeekEarlyBusy ? 'Working…' : 'End week now'}
             </button>
           </div>
         </div>
