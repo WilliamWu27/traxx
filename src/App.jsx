@@ -68,8 +68,10 @@ function pickWeeklyStakeWinnerLoser(scores) {
 
 async function deleteStakeRowsForRoom(roomId) {
   if (!roomId) return;
-  await supabase.from('stakes').delete().eq('room_id', roomId);
-  await supabase.from('stakes').delete().eq('id', roomId);
+  const byId = await supabase.from('stakes').delete().eq('id', roomId);
+  if (byId.error) console.warn('stakes delete id', byId.error);
+  const byRoom = await supabase.from('stakes').delete().eq('room_id', roomId);
+  if (byRoom.error) console.warn('stakes delete room_id', byRoom.error);
 }
 
 async function sendLocalNotification(title, body, tag) {
@@ -260,6 +262,7 @@ function VersaAppMain() {
   const [markingArchivedStakeId, setMarkingArchivedStakeId] = useState(null);
   const [deletingArchivedStakeId, setDeletingArchivedStakeId] = useState(null);
   const [showSettleStake, setShowSettleStake] = useState(false);
+  const [showEndWeekEarlyModal, setShowEndWeekEarlyModal] = useState(false);
   const [settleStakeData, setSettleStakeData] = useState({ winnerId: '', loserId: '' });
   const [newStake, setNewStake] = useState({ type: 'custom', description: '', duration: 'weekly' });
   const [stakeMode, setStakeMode] = useState('fixed'); // 'fixed' | 'wheel'
@@ -518,8 +521,9 @@ function VersaAppMain() {
 
     // Fetch stakes
     const fetchStakes = async () => {
-      const { data, error } = await supabase.from('stakes').select('*').eq('room_id', currentRoom.id).limit(1).maybeSingle();
-      if (error) console.error('fetchStakes', error);
+      const { data: rows, error } = await supabase.from('stakes').select('*').eq('room_id', currentRoom.id).limit(1);
+      if (error) { console.error('fetchStakes', error); setRoomStakes(null); return; }
+      const data = rows?.[0];
       if (data) setRoomStakes({ ...data, id: data.id, roomId: data.room_id, createdBy: data.created_by ?? data.createdBy });
       else setRoomStakes(null);
     };
@@ -1318,7 +1322,8 @@ function VersaAppMain() {
     } catch { }
   };
 
-  const endWeekEarly = async () => {
+  /** Step 1: validate + open in-app confirm (avoids broken window.confirm in some WebViews). */
+  const endWeekEarly = () => {
     if (!currentUser || !currentRoom) {
       setError('Sign in and open a room first.');
       setTimeout(() => setError(''), 3500);
@@ -1346,29 +1351,33 @@ function VersaAppMain() {
       setTimeout(() => setError(''), 3200);
       return;
     }
-    if (!confirm('End this week now? The stake resolves from everyone’s points so far. This cannot be undone.')) return;
+    setShowEndWeekEarlyModal(true);
+  };
+
+  /** Step 2: run settlement after user confirms in the modal. */
+  const executeEndWeekEarly = async () => {
+    if (!currentUser || !currentRoom || !roomStakes) return;
     const ws = getWeekStart();
     const today = getToday();
     const lockKey = 'versa-stake-early-' + currentRoom.id + '-' + ws;
     try {
       if (localStorage.getItem(lockKey)) {
+        setShowEndWeekEarlyModal(false);
         setError('This week was already settled early.');
         setTimeout(() => setError(''), 3200);
         return;
       }
     } catch { }
+    setShowEndWeekEarlyModal(false);
     setLoading(true);
     setError('');
     try {
       const st = roomStakes;
-      let comps = (allCompletions || []).filter(c => c.date >= ws && c.date <= today);
-      if (!comps.length) {
-        const { data: snapData, error: snapErr } = await supabase.from('completions').select('*').eq('room_id', currentRoom.id).gte('date', ws).lte('date', today);
-        if (snapErr) console.error('endWeekEarly completions', snapErr);
-        comps = (snapData || []).map(d => ({ ...d, userId: d.user_id, habitId: d.habit_id, habitPoints: d.habit_points, bonusPoints: d.bonus_points, habitCategory: d.habit_category }));
-      }
+      const { data: snapData, error: snapErr } = await supabase.from('completions').select('*').eq('room_id', currentRoom.id).gte('date', ws).lte('date', today);
+      if (snapErr) throw snapErr;
+      const comps = (snapData || []).map(d => ({ ...d, userId: d.user_id, habitId: d.habit_id, habitPoints: d.habit_points, bonusPoints: d.bonus_points, habitCategory: d.habit_category }));
       const scores = activeMembers.map(m => {
-        const mc = comps.filter(c => c.userId === m.id);
+        const mc = comps.filter(c => String(c.userId) === String(m.id));
         const pts = mc.reduce((s, c) => { const h = habits.find(x => x.id === c.habitId); return s + ((c.habitPoints || h?.points || 0) * (c.count || 1)) + (c.bonusPoints || 0); }, 0);
         const activeDays = [...new Set(mc.map(c => c.date))].length;
         return { member: m, pts, activeDays };
@@ -1379,9 +1388,10 @@ function VersaAppMain() {
         setTimeout(() => setError(''), 4000);
         return;
       }
+      const descVal = st.description != null ? String(st.description) : '';
       const baseRow = {
         room_id: currentRoom.id,
-        description: st.description,
+        description: descVal,
         type: st.type,
         winner_id: winner.member.id,
         loser_id: loser.member.id,
@@ -1411,7 +1421,7 @@ function VersaAppMain() {
       if (arch) setArchivedStakes(arch);
       const wName = winner.member.username;
       const lName = loser.member.username;
-      const descSnippet = (typeof st.description === 'string' ? st.description : '').slice(0, 80);
+      const descSnippet = descVal.slice(0, 80);
       if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
         const uid = currentUser.id;
         if (uid === winner.member.id) sendLocalNotification('🏆 You won the week', lName + ' owes the stake' + (descSnippet ? ': ' + descSnippet : '.'), 'versa-stake-early-' + ws + '-win');
@@ -1423,9 +1433,9 @@ function VersaAppMain() {
       setSuccessMsg('This week’s stake is resolved and moved to the Graveyard');
       setTimeout(() => setSuccessMsg(''), 4500);
     } catch (e) {
-      console.error('endWeekEarly', e);
+      console.error('executeEndWeekEarly', e);
       setError(e.message || 'Could not end the week early.');
-      setTimeout(() => setError(''), 4000);
+      setTimeout(() => setError(''), 5000);
     } finally {
       setLoading(false);
     }
@@ -4207,6 +4217,23 @@ function VersaAppMain() {
         )}
         {error && <p className="text-red-400 text-xs text-center mt-3">{error}</p>}
         {successMsg && <p className="text-emerald-400 text-xs text-center mt-3">{successMsg}</p>}
+      </Modal>
+
+      <Modal show={showEndWeekEarlyModal} onClose={() => !loading && setShowEndWeekEarlyModal(false)} dark={darkMode}>
+        <ModalHeader title="End week early?" onClose={() => !loading && setShowEndWeekEarlyModal(false)} dark={darkMode} />
+        <div className="p-1">
+          <p className={`text-sm mb-4 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+            The stake will resolve from everyone’s points logged so far this week. This cannot be undone.
+          </p>
+          <div className="flex gap-2">
+            <button type="button" onClick={() => setShowEndWeekEarlyModal(false)} disabled={loading} className={`flex-1 py-3 rounded-xl text-sm font-bold border ${darkMode ? 'border-[#223858] text-gray-300 hover:bg-white/5' : 'border-gray-200 text-gray-700 hover:bg-gray-50'} disabled:opacity-50`}>
+              Cancel
+            </button>
+            <button type="button" onClick={executeEndWeekEarly} disabled={loading} className="flex-1 py-3 rounded-xl text-sm font-bold bg-gradient-to-r from-[#d4a04a] to-[#c28e3b] text-white shadow-lg shadow-[#d4a04a]/20 disabled:opacity-50">
+              {loading ? 'Working…' : 'End week now'}
+            </button>
+          </div>
+        </div>
       </Modal>
 
     </div>
