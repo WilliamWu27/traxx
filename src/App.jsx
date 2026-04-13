@@ -51,6 +51,27 @@ function isStakeExplicitlyVerified(s) {
   return false;
 }
 
+/** Best score wins; worst loses (same sort: strongest first → weakest last). Avoids winner === loser on full ties. */
+function pickWeeklyStakeWinnerLoser(scores) {
+  if (!scores?.length) return { winner: null, loser: null };
+  const sorted = [...scores].sort((a, b) => {
+    if (b.pts !== a.pts) return b.pts - a.pts;
+    if (b.activeDays !== a.activeDays) return b.activeDays - a.activeDays;
+    return (a.member.username || '').localeCompare(b.member.username || '');
+  });
+  if (sorted.length < 2) return { winner: sorted[0] || null, loser: null };
+  const winner = sorted[0];
+  const loser = sorted[sorted.length - 1];
+  if (winner.member.id === loser.member.id) return { winner: null, loser: null };
+  return { winner, loser };
+}
+
+async function deleteStakeRowsForRoom(roomId) {
+  if (!roomId) return;
+  await supabase.from('stakes').delete().eq('room_id', roomId);
+  await supabase.from('stakes').delete().eq('id', roomId);
+}
+
 async function sendLocalNotification(title, body, tag) {
   if (!('Notification' in window) || Notification.permission !== 'granted') return;
   const reg = await navigator.serviceWorker?.ready;
@@ -235,6 +256,7 @@ function VersaAppMain() {
   const [archivedStakes, setArchivedStakes] = useState([]);
   /** Room-level stake pause (localStorage) — ms timestamp when break ends, or null */
   const [stakeBreakEndMs, setStakeBreakEndMs] = useState(null);
+  const [stakeBreakCustomHours, setStakeBreakCustomHours] = useState('');
   const [markingArchivedStakeId, setMarkingArchivedStakeId] = useState(null);
   const [deletingArchivedStakeId, setDeletingArchivedStakeId] = useState(null);
   const [showSettleStake, setShowSettleStake] = useState(false);
@@ -1087,6 +1109,17 @@ function VersaAppMain() {
     setTimeout(() => setSuccessMsg(''), 2500);
   };
 
+  const applyCustomStakeBreakHours = () => {
+    const h = parseFloat(String(stakeBreakCustomHours).trim(), 10);
+    if (!Number.isFinite(h) || h < 0.5 || h > 8760) {
+      setError('Enter hours between 0.5 and 8760.');
+      setTimeout(() => setError(''), 3500);
+      return;
+    }
+    startStakeBreak(Math.round(h * 3600000));
+    setStakeBreakCustomHours('');
+  };
+
   const kickedIds = roomKicked;
   const activeMembers = roomMembers.filter(m => !kickedIds.includes(m.id));
   const kickMember = async (uid) => {
@@ -1144,7 +1177,7 @@ function VersaAppMain() {
     } catch (err) { console.error('Stakes error:', err); setError(err.message || 'Failed to save'); }
     finally { setLoading(false); }
   };
-  const clearStake = async () => { if (!isRoomCreator && roomStakes?.createdBy !== currentUser?.id) return; if (!confirm('Remove stake?')) return; try { await supabase.from('stakes').delete().eq('id', currentRoom.id); setRoomStakes(null); } catch { } };
+  const clearStake = async () => { if (!isRoomCreator && roomStakes?.createdBy !== currentUser?.id) return; if (!confirm('Remove stake?')) return; try { await deleteStakeRowsForRoom(currentRoom.id); setRoomStakes(null); } catch { } };
 
   const archiveStake = async () => {
     if (!settleStakeData.winnerId || !settleStakeData.loserId) { setError('Select both a winner and a loser.'); return; }
@@ -1178,7 +1211,7 @@ function VersaAppMain() {
         error = r2.error;
       }
       if (error) throw error;
-      await supabase.from('stakes').delete().eq('id', currentRoom.id);
+      await deleteStakeRowsForRoom(currentRoom.id);
       setRoomStakes(null);
       setShowSettleStake(false);
       setSettleStakeData({ winnerId: '', loserId: '' });
@@ -1318,21 +1351,10 @@ function VersaAppMain() {
         const activeDays = [...new Set(mc.map(c => c.date))].length;
         return { member: m, pts, activeDays };
       });
-      const sortedWin = [...scores].sort((a, b) => {
-        if (b.pts !== a.pts) return b.pts - a.pts;
-        if (b.activeDays !== a.activeDays) return b.activeDays - a.activeDays;
-        return (a.member.username || '').localeCompare(b.member.username || '');
-      });
-      const sortedLose = [...scores].sort((a, b) => {
-        if (a.pts !== b.pts) return a.pts - b.pts;
-        if (a.activeDays !== b.activeDays) return a.activeDays - b.activeDays;
-        return (a.member.username || '').localeCompare(b.member.username || '');
-      });
-      const winner = sortedWin[0];
-      const loser = sortedLose[0];
-      if (!winner || !loser || winner.member.id === loser.member.id) {
-        setError('Could not determine a winner and loser from current scores.');
-        setTimeout(() => setError(''), 3500);
+      const { winner, loser } = pickWeeklyStakeWinnerLoser(scores);
+      if (!winner || !loser) {
+        setError('Could not determine a winner and loser from current scores (need at least two people, or scores are identical in a way we can’t split).');
+        setTimeout(() => setError(''), 4000);
         return;
       }
       const baseRow = {
@@ -1360,7 +1382,7 @@ function VersaAppMain() {
         error = r2.error;
       }
       if (error) throw error;
-      await supabase.from('stakes').delete().eq('id', currentRoom.id);
+      await deleteStakeRowsForRoom(currentRoom.id);
       setRoomStakes(null);
       try { localStorage.setItem(lockKey, '1'); } catch { }
       const { data: arch } = await supabase.from('archived_stakes').select('*').eq('room_id', currentRoom.id).order('date_archived', { ascending: false });
@@ -1752,19 +1774,8 @@ function VersaAppMain() {
           const activeDays = [...new Set(mc.map(c => c.date))].length;
           return { member: m, pts, activeDays };
         });
-        const sortedWin = [...scores].sort((a, b) => {
-          if (b.pts !== a.pts) return b.pts - a.pts;
-          if (b.activeDays !== a.activeDays) return b.activeDays - a.activeDays;
-          return (a.member.username || '').localeCompare(b.member.username || '');
-        });
-        const sortedLose = [...scores].sort((a, b) => {
-          if (a.pts !== b.pts) return a.pts - b.pts;
-          if (a.activeDays !== b.activeDays) return a.activeDays - b.activeDays;
-          return (a.member.username || '').localeCompare(b.member.username || '');
-        });
-        const winner = sortedWin[0];
-        const loser = sortedLose[0];
-        if (!winner || !loser || winner.member.id === loser.member.id) return;
+        const { winner, loser } = pickWeeklyStakeWinnerLoser(scores);
+        if (!winner || !loser) return;
         if (cancelled) return;
 
         const baseRow = {
@@ -1793,7 +1804,7 @@ function VersaAppMain() {
         }
         if (error) { console.error('Auto stake archive', error); return; }
 
-        await supabase.from('stakes').delete().eq('id', currentRoom.id);
+        await deleteStakeRowsForRoom(currentRoom.id);
         if (cancelled) return;
         setRoomStakes(null);
         try { localStorage.setItem(lockKey, '1'); } catch { }
@@ -2822,7 +2833,7 @@ function VersaAppMain() {
                     <div className={`text-sm font-black ${T.text}`}>Stake break</div>
                     <p className={`text-[11px] mt-1 leading-snug ${T.textMuted}`}>
                       {stakeBreakActive ? (
-                        <>On until <span className="font-bold text-cyan-400">{stakeBreakEndMs ? new Date(stakeBreakEndMs).toLocaleString(undefined, { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : '—'}</span>. Monday auto-settle and &quot;end week early&quot; stay off.</>
+                        <>On until <span className="font-bold text-cyan-400">{stakeBreakEndMs ? new Date(stakeBreakEndMs).toLocaleString(undefined, { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : '—'}</span>. Monday auto-settle and “end week early” stay off.</>
                       ) : (
                         <>Pause automatic stake actions for this room. Everyone can still log habits. You can end the break anytime.</>
                       )}
@@ -2832,13 +2843,34 @@ function VersaAppMain() {
                         End break now
                       </button>
                     ) : (
-                      <div className="flex flex-wrap gap-2 mt-3">
-                        {[{ label: '1 day', ms: 86400000 }, { label: '3 days', ms: 86400000 * 3 }, { label: '1 week', ms: 86400000 * 7 }, { label: '2 weeks', ms: 86400000 * 14 }].map(opt => (
-                          <button key={opt.label} type="button" onClick={() => startStakeBreak(opt.ms)} className={`px-3 py-1.5 rounded-lg text-[10px] font-bold border transition-all ${darkMode ? 'border-gray-600 text-gray-300 hover:bg-gray-800' : 'border-gray-300 text-gray-700 hover:bg-gray-100'}`}>
-                            {opt.label}
+                      <>
+                        <div className="flex flex-wrap gap-2 mt-3">
+                          {[{ label: '1 day', ms: 86400000 }, { label: '3 days', ms: 86400000 * 3 }, { label: '1 week', ms: 86400000 * 7 }, { label: '2 weeks', ms: 86400000 * 14 }].map(opt => (
+                            <button key={opt.label} type="button" onClick={() => startStakeBreak(opt.ms)} className={`px-3 py-1.5 rounded-lg text-[10px] font-bold border transition-all ${darkMode ? 'border-gray-600 text-gray-300 hover:bg-gray-800' : 'border-gray-300 text-gray-700 hover:bg-gray-100'}`}>
+                              {opt.label}
+                            </button>
+                          ))}
+                        </div>
+                        <div className="mt-3 flex flex-wrap items-end gap-2">
+                          <div className="flex-1 min-w-[140px]">
+                            <div className={`text-[9px] font-bold uppercase tracking-wider mb-1 ${T.textDim}`}>Custom (hours)</div>
+                            <input
+                              type="number"
+                              min={0.5}
+                              max={8760}
+                              step={0.5}
+                              placeholder="e.g. 36"
+                              value={stakeBreakCustomHours}
+                              onChange={e => setStakeBreakCustomHours(e.target.value)}
+                              onKeyDown={e => { if (e.key === 'Enter') applyCustomStakeBreakHours(); }}
+                              className={`w-full px-3 py-2 rounded-xl text-xs font-semibold border ${darkMode ? 'bg-[#0f1b2d] border-[#223858] text-white placeholder:text-gray-600' : 'bg-white border-gray-200 text-gray-900 placeholder:text-gray-400'}`}
+                            />
+                          </div>
+                          <button type="button" onClick={applyCustomStakeBreakHours} className={`px-4 py-2 rounded-xl text-[10px] font-bold border shrink-0 ${darkMode ? 'border-cyan-500/40 text-cyan-200 hover:bg-cyan-500/10' : 'border-cyan-400 text-cyan-900 hover:bg-cyan-50'}`}>
+                            Start custom
                           </button>
-                        ))}
-                      </div>
+                        </div>
+                      </>
                     )}
                   </div>
                 </div>
@@ -3322,15 +3354,15 @@ function VersaAppMain() {
       {/* Switch Room */}
       {/* Leaderboard */}
       <Modal show={showLeaderboard} onClose={() => setShowLeaderboard(false)} wide dark={darkMode}>
-        <ModalHeader title="Leaderboard" onClose={() => setShowLeaderboard(false)} icon={<span className="text-xl">&#x1F3C6;</span>} dark={darkMode} />
+        <ModalHeader title="Leaderboard" onClose={() => setShowLeaderboard(false)} icon={<span className="text-xl" aria-hidden>🏆</span>} dark={darkMode} />
         <div className="flex gap-1 mb-5 bg-[#151d30] rounded-xl p-1">{['today', 'week'].map(tab => <button key={tab} onClick={() => setLeaderboardTab(tab)} className={'flex-1 py-2 text-xs font-bold rounded-lg transition-all tracking-wider uppercase ' + (leaderboardTab === tab ? (isSunset ? (darkMode ? 'bg-[#3d2640] text-white' : 'bg-orange-100 text-orange-900') : (darkMode ? 'bg-[#223858] text-white' : 'bg-gray-200 text-gray-900')) : (darkMode ? 'text-gray-600 hover:text-gray-400' : 'text-gray-400 hover:text-gray-600'))}>{tab === 'today' ? 'Today' : 'This Week'}</button>)}</div>
         <div className="space-y-2">{getLeaderboard().map((item, i) => {
           const pts = leaderboardTab === 'today' ? item.todayPts : item.weeklyPts, isMe = item.member.id === currentUser.id;
-          const medals = ['\u{1F947}', '\u{1F948}', '\u{1F949}'];
+          const medals = ['🥇', '🥈', '🥉'];
           const ms = !isMe ? (mutualStreaks[item.member.id] || 0) : 0;
           return (
             <div key={item.member.id} className={'rounded-xl p-4 border transition-all ' + (isMe ? 'bg-gradient-to-r from-blue-600/20 to-indigo-600/20 border-blue-500/30 shadow-lg shadow-[#5b7cf5]/10' : i === 0 ? 'bg-[#e8864a]/5 border-[#e8864a]/20' : (darkMode ? 'bg-[#182544] border-[#1e3050] hover:bg-[#1e2e50]' : 'bg-gray-50 border-gray-200 hover:bg-gray-100'))}>
-              <div className="flex items-center justify-between"><div className="flex items-center gap-3"><div className="text-lg w-8 text-center">{i < 3 ? medals[i] : <span className="text-sm text-gray-600">{i + 1}</span>}</div><Avatar user={item.member} size={28} className={isMe ? 'bg-blue-500/20 text-blue-400' : (darkMode ? 'bg-[#1e3050] text-gray-400' : 'bg-gray-100 text-gray-500')} /><div><div className={'text-sm font-semibold flex items-center gap-1.5 ' + (isMe ? 'text-blue-300' : (T.textMuted))}>{item.member.username}{isMe && <span className="text-[10px] text-gray-600">(you)</span>}{getRoomRole(item.member.id) && <span className={`text-[9px] font-bold ${getRoomRole(item.member.id).color}`}>{getRoomRole(item.member.id).icon}</span>}{ms > 0 && <span className={`text-[9px] font-bold ${ms >= 7 ? 'text-[#e8864a]' : 'text-[#e8864a]'}`}>🔗{ms}</span>}</div><div className="text-xs text-gray-600">{pts} pts{leaderboardTab === 'week' ? ' \u00b7 ' + item.weeklyCrystals + ' crystals' : ''}</div></div></div>
+              <div className="flex items-center justify-between"><div className="flex items-center gap-3"><div className="text-lg w-8 text-center">{i < 3 ? medals[i] : <span className="text-sm text-gray-600">{i + 1}</span>}</div><Avatar user={item.member} size={28} className={isMe ? 'bg-blue-500/20 text-blue-400' : (darkMode ? 'bg-[#1e3050] text-gray-400' : 'bg-gray-100 text-gray-500')} /><div><div className={'text-sm font-semibold flex items-center gap-1.5 ' + (isMe ? 'text-blue-300' : (T.textMuted))}>{item.member.username}{isMe && <span className="text-[10px] text-gray-600">(you)</span>}{getRoomRole(item.member.id) && <span className={`text-[9px] font-bold ${getRoomRole(item.member.id).color}`}>{getRoomRole(item.member.id).icon}</span>}{ms > 0 && <span className={`text-[9px] font-bold ${ms >= 7 ? 'text-[#e8864a]' : 'text-[#e8864a]'}`}>🔗{ms}</span>}</div><div className="text-xs text-gray-600">{pts} pts{leaderboardTab === 'week' ? ` · ${item.weeklyCrystals} crystals` : ''}</div></div></div>
                 <div className="flex items-center gap-3">{leaderboardTab === 'today' && <div className="flex items-center gap-1.5">{allCatNames.map(c => <div key={c} className={'w-2.5 h-2.5 rounded-full ' + (item.crystals[c] ? getCT(c).bg + ' shadow-sm' : (isMe ? 'bg-[#1e3050]' : (darkMode ? 'bg-[#1e3050]' : 'bg-gray-200')))} />)}</div>}{!isMe && <button onClick={() => { setShowLeaderboard(false); setShowCompetitor(item.member); }} className={`text-[10px] uppercase tracking-wider font-medium ${darkMode ? 'text-gray-600 hover:text-white' : 'text-gray-400 hover:text-gray-700'}`}>View</button>}</div>
               </div>
             </div>
@@ -3553,7 +3585,7 @@ function VersaAppMain() {
               <div className="text-center p-5 bg-gradient-to-r from-[#e8864a]/10 to-[#d4a04a]/10 border border-[#e8864a]/15 rounded-xl mb-4">
                 <span className="text-3xl anim-float">🏆</span>
                 <h3 className="text-xl font-black text-[#e8864a] mt-2">{lastWeekData.scores[0].member.username}</h3>
-                <p className={`text-sm ${T.textMuted} mt-1`}>{lastWeekData.scores[0].pts} points &middot; {lastWeekData.scores[0].activeDays} active days</p>
+                <p className={`text-sm ${T.textMuted} mt-1`}>{lastWeekData.scores[0].pts} points · {lastWeekData.scores[0].activeDays} active days</p>
               </div>
             )}
             <div className="space-y-2 mb-4">{lastWeekData.scores.map((s, i) => {
@@ -4121,7 +4153,7 @@ function VersaAppMain() {
         {roomStakes ? (
           <div>
             <div className={`p-4 rounded-xl border mb-6 text-center ${darkMode ? 'border-[#d4a04a]/30 bg-[#d4a04a]/10 text-white' : 'border-[#d4a04a]/30 bg-[#d4a04a]/5 text-gray-900'}`}>
-              <div className="text-[10px] uppercase tracking-wider text-[#d4a04a] mb-1 font-bold">{roomStakes.type} &middot; {roomStakes.duration}</div>
+              <div className="text-[10px] uppercase tracking-wider text-[#d4a04a] mb-1 font-bold">{roomStakes.type} · {roomStakes.duration}</div>
               <div className="text-sm font-medium">"{roomStakes.description}"</div>
             </div>
 
