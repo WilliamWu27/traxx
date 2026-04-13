@@ -518,8 +518,9 @@ function VersaAppMain() {
 
     // Fetch stakes
     const fetchStakes = async () => {
-      const { data } = await supabase.from('stakes').select('*').eq('room_id', currentRoom.id).eq('active', true).maybeSingle();
-      if (data) setRoomStakes({ ...data, id: data.id, roomId: data.room_id, createdBy: data.created_by });
+      const { data, error } = await supabase.from('stakes').select('*').eq('room_id', currentRoom.id).limit(1).maybeSingle();
+      if (error) console.error('fetchStakes', error);
+      if (data) setRoomStakes({ ...data, id: data.id, roomId: data.room_id, createdBy: data.created_by ?? data.createdBy });
       else setRoomStakes(null);
     };
     fetchStakes();
@@ -817,7 +818,7 @@ function VersaAppMain() {
   // ─── ROOM ROLES (computed from performance) ───
   const getRoomRole = (uid) => {
     if (!currentRoom) return null;
-    if ((roomCreatedBy || currentRoom.createdBy) === uid) {
+    if (String(roomCreatedBy || currentRoom.created_by || currentRoom.createdBy || '') === String(uid)) {
       if (weeklyWinner?.member?.id === uid) return { role: 'Champion', icon: '👑', color: 'text-[#e8864a]' };
       return { role: 'Creator', icon: '⚡', color: 'text-blue-400' };
     }
@@ -1057,8 +1058,9 @@ function VersaAppMain() {
   };
   const copyCode = () => { navigator.clipboard.writeText(currentRoom.code); setCopied(true); setTimeout(() => setCopied(false), 2000); };
 
-  // ─── ROOM CREATOR PERMISSIONS ───
-  const isRoomCreator = (roomCreatedBy || currentRoom?.createdBy) === currentUser?.id;
+  // ─── ROOM CREATOR PERMISSIONS (rooms table uses created_by from Supabase) ───
+  const effectiveRoomOwnerId = roomCreatedBy ?? currentRoom?.created_by ?? currentRoom?.createdBy ?? null;
+  const isRoomCreator = !!(currentUser?.id && effectiveRoomOwnerId && String(effectiveRoomOwnerId) === String(currentUser.id));
   const stakeBreakActive = stakeBreakEndMs != null && Date.now() < stakeBreakEndMs;
   const hasBlockingArchivedStake = archivedStakes.some(s => {
     if (isStakeExplicitlyVerified(s)) return false;
@@ -1177,7 +1179,12 @@ function VersaAppMain() {
     } catch (err) { console.error('Stakes error:', err); setError(err.message || 'Failed to save'); }
     finally { setLoading(false); }
   };
-  const clearStake = async () => { if (!isRoomCreator && roomStakes?.createdBy !== currentUser?.id) return; if (!confirm('Remove stake?')) return; try { await deleteStakeRowsForRoom(currentRoom.id); setRoomStakes(null); } catch { } };
+  const clearStake = async () => {
+    const setter = roomStakes?.createdBy ?? roomStakes?.created_by;
+    if (!isRoomCreator && String(setter || '') !== String(currentUser?.id)) return;
+    if (!confirm('Remove stake?')) return;
+    try { await deleteStakeRowsForRoom(currentRoom.id); setRoomStakes(null); } catch { }
+  };
 
   const archiveStake = async () => {
     if (!settleStakeData.winnerId || !settleStakeData.loserId) { setError('Select both a winner and a loser.'); return; }
@@ -1312,13 +1319,29 @@ function VersaAppMain() {
   };
 
   const endWeekEarly = async () => {
-    if (!currentUser || !currentRoom || !roomStakes || activeMembers.length < 2) return;
+    if (!currentUser || !currentRoom) {
+      setError('Sign in and open a room first.');
+      setTimeout(() => setError(''), 3500);
+      return;
+    }
+    if (!roomStakes) {
+      setError('No active stake — set one from the target icon first.');
+      setTimeout(() => setError(''), 3500);
+      return;
+    }
+    if (activeMembers.length < 2) {
+      setError('Need at least two people in the room to settle a stake.');
+      setTimeout(() => setError(''), 3500);
+      return;
+    }
     if (stakeBreakActive) {
       setError('Stake break is active — end the break first.');
       setTimeout(() => setError(''), 3200);
       return;
     }
-    if (!isRoomCreator && roomStakes.createdBy !== currentUser.id) {
+    const stakeSetterId = roomStakes.createdBy ?? roomStakes.created_by;
+    const canEndEarly = isRoomCreator || (stakeSetterId != null && String(stakeSetterId) === String(currentUser.id));
+    if (!canEndEarly) {
       setError('Only the room owner or person who set the stake can end the week early.');
       setTimeout(() => setError(''), 3200);
       return;
@@ -1338,12 +1361,11 @@ function VersaAppMain() {
     setError('');
     try {
       const st = roomStakes;
-      const { data: snapData } = await supabase.from('completions').select('*').eq('room_id', currentRoom.id).gte('date', ws).lte('date', today);
-      const comps = (snapData || []).map(d => ({ ...d, userId: d.user_id, habitId: d.habit_id, habitPoints: d.habit_points, bonusPoints: d.bonus_points, habitCategory: d.habit_category }));
+      let comps = (allCompletions || []).filter(c => c.date >= ws && c.date <= today);
       if (!comps.length) {
-        setError('No completions logged for this week yet — nothing to settle.');
-        setTimeout(() => setError(''), 3500);
-        return;
+        const { data: snapData, error: snapErr } = await supabase.from('completions').select('*').eq('room_id', currentRoom.id).gte('date', ws).lte('date', today);
+        if (snapErr) console.error('endWeekEarly completions', snapErr);
+        comps = (snapData || []).map(d => ({ ...d, userId: d.user_id, habitId: d.habit_id, habitPoints: d.habit_points, bonusPoints: d.bonus_points, habitCategory: d.habit_category }));
       }
       const scores = activeMembers.map(m => {
         const mc = comps.filter(c => c.userId === m.id);
@@ -1688,7 +1710,7 @@ function VersaAppMain() {
       setTimeout(() => setError(''), 3200);
       return;
     }
-    const ownerId = roomCreatedBy || currentRoom?.createdBy;
+    const ownerId = effectiveRoomOwnerId;
     const can = row.loser_id === currentUser.id || ownerId === currentUser.id;
     if (!can) { setError('Only the person who owes the stake or the room owner can mark it done.'); setTimeout(() => setError(''), 2800); return; }
     setMarkingArchivedStakeId(rid);
@@ -2962,7 +2984,7 @@ function VersaAppMain() {
                   {roomStakes.type === 'wheel' ? '🎰 Wheel' : '⚖️ Fixed'}: {(() => { try { return roomStakes.type === 'wheel' ? `${JSON.parse(roomStakes.description).length} options` : `"${roomStakes.description.substring(0, 30)}${roomStakes.description.length > 30 ? '...' : ''}"`; } catch { return roomStakes.description?.substring(0, 30) || 'Custom'; } })()}
                 </div>
               )}
-              {roomStakes && activeMembers.length >= 2 && (isRoomCreator || roomStakes.createdBy === currentUser.id) && (
+              {roomStakes && activeMembers.length >= 2 && (isRoomCreator || String((roomStakes.createdBy ?? roomStakes.created_by) || '') === String(currentUser.id)) && (
                 <button
                   type="button"
                   onClick={endWeekEarly}
@@ -3297,9 +3319,9 @@ function VersaAppMain() {
               ) : (
                 <p className="text-white font-medium">{roomStakes.description}</p>
               )}
-              <p className="text-[11px] text-gray-600 mt-2">Set by {activeMembers.find(m => m.id === roomStakes.createdBy)?.username || 'unknown'}</p>
+              <p className="text-[11px] text-gray-600 mt-2">Set by {activeMembers.find(m => String(m.id) === String(roomStakes.createdBy ?? roomStakes.created_by))?.username || 'unknown'}</p>
             </div>
-            {(isRoomCreator || roomStakes.createdBy === currentUser.id) && <button onClick={clearStake} className="w-full px-4 py-2.5 border border-red-500/20 text-red-400 rounded-xl hover:bg-red-500/10 text-sm transition-all">Remove Stake</button>}
+            {(isRoomCreator || String((roomStakes.createdBy ?? roomStakes.created_by) || '') === String(currentUser.id)) && <button onClick={clearStake} className="w-full px-4 py-2.5 border border-red-500/20 text-red-400 rounded-xl hover:bg-red-500/10 text-sm transition-all">Remove Stake</button>}
           </div>
         ) : (
           <div>
@@ -4091,7 +4113,7 @@ function VersaAppMain() {
           <div className="space-y-2">
             {activeMembers.map(m => {
               const isMe = m.id === currentUser.id;
-              const isCreator = m.id === (roomCreatedBy || currentRoom?.createdBy);
+              const isCreator = String(m.id) === String(effectiveRoomOwnerId);
               return (
                 <div key={m.id} className={`flex items-center justify-between p-3 rounded-xl border ${T.border} ${T.bgCard}`}>
                   <div className="flex items-center gap-3">
